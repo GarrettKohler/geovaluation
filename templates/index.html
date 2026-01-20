@@ -714,44 +714,6 @@
             line-height: 1.4;
         }
 
-        /* Highway toggle button */
-        .btn-toggle {
-            background: var(--gstv-gray);
-            color: var(--gstv-text);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-toggle.active {
-            background: var(--gstv-blue);
-            color: white;
-        }
-
-        .toggle-indicator {
-            width: 36px;
-            height: 20px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            position: relative;
-            transition: all 0.2s;
-        }
-
-        .toggle-indicator::after {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            background: #fff;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: all 0.2s;
-        }
-
-        .btn-toggle.active .toggle-indicator::after {
-            left: 18px;
-        }
 
         /* Side Panel */
         .side-panel {
@@ -2061,11 +2023,6 @@
                     <select id="site-select" multiple="multiple" style="width: 100%">
                     </select>
                 </div>
-                <button id="highway-toggle-btn" class="btn btn-toggle" title="Toggle highway connection lines">
-                    <span class="toggle-indicator"></span>
-                    <span>Highways</span>
-                </button>
-                <button id="draw-btn" class="btn" disabled>Show Selected</button>
                 <button id="clear-btn" class="btn btn-secondary">Clear</button>
             </div>
         </header>
@@ -2971,10 +2928,6 @@
                     <div class="legend-item"><div class="legend-marker" style="background: #4a4a4a; opacity: 0.3;"></div><span>Filtered out</span></div>
                     `;
                 }
-
-                html += `
-                    <div class="legend-item"><div class="legend-line" style="background: #ffd93d;"></div><span>Highway</span></div>
-                `;
             } else if (modelTrainingState.isModelTrained && modelTrainingState.taskType === 'regression') {
                 // Regression model legend - show training/testing/inactive
                 const trainCount = modelTrainingState.trainingSiteIds?.size || 0;
@@ -2993,10 +2946,6 @@
                     <div class="legend-item"><div class="legend-marker" style="background: #4a4a4a; opacity: 0.3;"></div><span>Filtered out</span></div>
                     `;
                 }
-
-                html += `
-                    <div class="legend-item"><div class="legend-line" style="background: #ffd93d;"></div><span>Highway</span></div>
-                `;
             } else if (filterModeActive) {
                 // Determine filter type for label
                 let filterLabel = 'Filtered';
@@ -3013,15 +2962,12 @@
                     <div class="legend-item"><div class="legend-marker" style="background: linear-gradient(90deg, #3ABFC2, #95C37A);"></div><span>${filterLabel} (${filteredSiteIds.size.toLocaleString()})</span></div>
                     <div class="legend-item"><div class="legend-marker" style="background: #4a4a4a; opacity: 0.4;"></div><span>Non-matching</span></div>
                     <div class="legend-item"><div class="legend-marker" style="background: linear-gradient(90deg, #fff, #0a0);"></div><span>Selected</span></div>
-                    <div class="legend-item"><div class="legend-line" style="background: #ffd93d;"></div><span>Highway</span></div>
                 `;
             } else {
                 // Default legend
                 html = `
                     <div class="legend-item"><div class="legend-marker" style="background: #888;"></div><span>All sites</span></div>
                     <div class="legend-item"><div class="legend-marker" style="background: linear-gradient(90deg, #fff, #0a0);"></div><span>Selected (by revenue)</span></div>
-                    <div class="legend-item"><div class="legend-line" style="background: #ffd93d;"></div><span>Highway</span></div>
-                    <div class="legend-item"><div class="legend-line" style="background: #888;"></div><span>Connection</span></div>
                 `;
             }
 
@@ -4381,7 +4327,6 @@
 
             // Reset highway toggle to off
             showHighwayConnections = false;
-            document.getElementById('highway-toggle-btn').classList.remove('active');
 
             // Also clear all filters (field filters + lasso filter)
             clearAllFilters();
@@ -4390,7 +4335,6 @@
         // Show/hide loading spinner
         function showLoading(show) {
             document.getElementById('loading').classList.toggle('show', show);
-            document.getElementById('draw-btn').disabled = show;
         }
 
         // Toggle select mode
@@ -4609,10 +4553,8 @@
             $('#site-select').on('change', updateSelectionDisplay);
 
             // Button handlers
-            document.getElementById('draw-btn').addEventListener('click', drawConnections);
             document.getElementById('clear-btn').addEventListener('click', clearMap);
             document.getElementById('select-mode-btn').addEventListener('click', toggleSelectMode);
-            document.getElementById('highway-toggle-btn').addEventListener('click', toggleHighwayConnections);
 
             // Side panel handlers
             document.getElementById('side-panel-close').addEventListener('click', closeSidePanel);
