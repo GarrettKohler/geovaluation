@@ -2193,16 +2193,24 @@
                 <div class="training-section-header">System Information</div>
                 <div class="system-info-card" id="system-info-card">
                     <div class="system-info-item">
-                        <span class="system-info-label">PyTorch</span>
-                        <span class="system-info-value" id="pytorch-version">Loading...</span>
+                        <span class="system-info-label">Chip</span>
+                        <span class="system-info-value" id="detected-chip">Detecting...</span>
                     </div>
                     <div class="system-info-item">
-                        <span class="system-info-label">GPU (MPS)</span>
+                        <span class="system-info-label">GPU Cores</span>
+                        <span class="system-info-value" id="gpu-cores">-</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Memory</span>
+                        <span class="system-info-value" id="unified-memory">-</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">MPS Status</span>
                         <span class="system-info-value" id="mps-status">Loading...</span>
                     </div>
                     <div class="system-info-item">
-                        <span class="system-info-label">Device</span>
-                        <span class="system-info-value" id="recommended-device">Loading...</span>
+                        <span class="system-info-label">PyTorch</span>
+                        <span class="system-info-value" id="pytorch-version">Loading...</span>
                     </div>
                 </div>
             </div>
@@ -2268,9 +2276,39 @@
                 </div>
 
                 <div class="training-form-group">
+                    <label class="training-form-label" data-tooltip="Select your Apple Silicon chip for optimized training. Higher-tier chips support larger batch sizes and faster training.">Apple Silicon</label>
+                    <select class="training-form-select" id="apple-chip">
+                        <option value="auto">Auto-Detect</option>
+                        <optgroup label="M1 Series">
+                            <option value="m1">M1</option>
+                            <option value="m1_pro">M1 Pro</option>
+                            <option value="m1_max">M1 Max</option>
+                            <option value="m1_ultra">M1 Ultra</option>
+                        </optgroup>
+                        <optgroup label="M2 Series">
+                            <option value="m2">M2</option>
+                            <option value="m2_pro">M2 Pro</option>
+                            <option value="m2_max">M2 Max</option>
+                            <option value="m2_ultra">M2 Ultra</option>
+                        </optgroup>
+                        <optgroup label="M3 Series">
+                            <option value="m3">M3</option>
+                            <option value="m3_pro">M3 Pro</option>
+                            <option value="m3_max">M3 Max</option>
+                        </optgroup>
+                        <optgroup label="M4 Series">
+                            <option value="m4">M4</option>
+                            <option value="m4_pro">M4 Pro</option>
+                            <option value="m4_max">M4 Max</option>
+                        </optgroup>
+                    </select>
+                    <div class="training-form-hint" id="chip-hint">Auto-detect will identify your chip</div>
+                </div>
+
+                <div class="training-form-group">
                     <label class="training-form-label" data-tooltip="Hardware for training: MPS uses Apple Silicon GPU for 2-5x speedup. CPU is slower but always available.">Device</label>
                     <select class="training-form-select" id="training-device">
-                        <option value="mps">Apple M4 GPU (MPS)</option>
+                        <option value="mps">Apple GPU (MPS)</option>
                         <option value="cpu">CPU</option>
                     </select>
                 </div>
@@ -4765,6 +4803,24 @@
             }
         }
 
+        // Apple Silicon chip specifications
+        const APPLE_CHIP_SPECS = {
+            'm1':       { name: 'Apple M1', gpuCores: 8, memory: '8-16 GB', maxBatch: 4096, tier: 1 },
+            'm1_pro':   { name: 'Apple M1 Pro', gpuCores: 16, memory: '16-32 GB', maxBatch: 8192, tier: 2 },
+            'm1_max':   { name: 'Apple M1 Max', gpuCores: 32, memory: '32-64 GB', maxBatch: 16384, tier: 3 },
+            'm1_ultra': { name: 'Apple M1 Ultra', gpuCores: 64, memory: '64-128 GB', maxBatch: 32768, tier: 4 },
+            'm2':       { name: 'Apple M2', gpuCores: 10, memory: '8-24 GB', maxBatch: 4096, tier: 1 },
+            'm2_pro':   { name: 'Apple M2 Pro', gpuCores: 19, memory: '16-32 GB', maxBatch: 8192, tier: 2 },
+            'm2_max':   { name: 'Apple M2 Max', gpuCores: 38, memory: '32-96 GB', maxBatch: 16384, tier: 3 },
+            'm2_ultra': { name: 'Apple M2 Ultra', gpuCores: 76, memory: '64-192 GB', maxBatch: 32768, tier: 4 },
+            'm3':       { name: 'Apple M3', gpuCores: 10, memory: '8-24 GB', maxBatch: 4096, tier: 1 },
+            'm3_pro':   { name: 'Apple M3 Pro', gpuCores: 18, memory: '18-36 GB', maxBatch: 8192, tier: 2 },
+            'm3_max':   { name: 'Apple M3 Max', gpuCores: 40, memory: '36-128 GB', maxBatch: 16384, tier: 3 },
+            'm4':       { name: 'Apple M4', gpuCores: 10, memory: '16-32 GB', maxBatch: 8192, tier: 2 },
+            'm4_pro':   { name: 'Apple M4 Pro', gpuCores: 20, memory: '24-64 GB', maxBatch: 16384, tier: 3 },
+            'm4_max':   { name: 'Apple M4 Max', gpuCores: 40, memory: '36-128 GB', maxBatch: 32768, tier: 4 },
+        };
+
         async function loadSystemInfo() {
             try {
                 const response = await fetch('/api/training/system-info');
@@ -4781,9 +4837,29 @@
                     mpsStatus.classList.add('unavailable');
                 }
 
-                const deviceEl = document.getElementById('recommended-device');
-                deviceEl.textContent = info.recommended_device === 'mps' ? 'Apple M4 GPU' :
-                                       info.recommended_device === 'cuda' ? 'NVIDIA GPU' : 'CPU';
+                // Display detected chip information
+                const detectedChip = info.detected_chip || 'auto';
+                const chipSelect = document.getElementById('apple-chip');
+                const chipHint = document.getElementById('chip-hint');
+
+                if (info.detected_chip && info.detected_chip !== 'unknown') {
+                    const specs = APPLE_CHIP_SPECS[info.detected_chip];
+                    document.getElementById('detected-chip').textContent = specs?.name || info.chip_name || 'Apple Silicon';
+                    document.getElementById('gpu-cores').textContent = specs?.gpuCores || info.gpu_cores || '-';
+                    document.getElementById('unified-memory').textContent = info.total_memory || specs?.memory || '-';
+
+                    // Auto-select the detected chip
+                    chipSelect.value = info.detected_chip;
+                    chipHint.textContent = `Detected: ${specs?.name || info.chip_name}`;
+
+                    // Update batch size recommendation based on chip
+                    updateBatchSizeForChip(info.detected_chip);
+                } else {
+                    document.getElementById('detected-chip').textContent = info.chip_name || 'Apple Silicon';
+                    document.getElementById('gpu-cores').textContent = info.gpu_cores || '-';
+                    document.getElementById('unified-memory').textContent = info.total_memory || '-';
+                    chipHint.textContent = 'Select your chip for optimized settings';
+                }
 
                 // Update device selector
                 const deviceSelect = document.getElementById('training-device');
@@ -4791,11 +4867,57 @@
                     deviceSelect.value = 'cpu';
                     deviceSelect.querySelector('option[value="mps"]').disabled = true;
                 }
+
+                // Add chip selection change handler
+                chipSelect.addEventListener('change', handleChipSelectionChange);
+
             } catch (error) {
                 console.error('Failed to load system info:', error);
                 document.getElementById('pytorch-version').textContent = 'Error loading';
                 document.getElementById('mps-status').textContent = 'Error';
-                document.getElementById('recommended-device').textContent = 'Unknown';
+                document.getElementById('detected-chip').textContent = 'Unknown';
+            }
+        }
+
+        function handleChipSelectionChange() {
+            const chipSelect = document.getElementById('apple-chip');
+            const chipValue = chipSelect.value;
+            const chipHint = document.getElementById('chip-hint');
+
+            if (chipValue === 'auto') {
+                chipHint.textContent = 'Auto-detect will identify your chip';
+            } else {
+                const specs = APPLE_CHIP_SPECS[chipValue];
+                if (specs) {
+                    chipHint.textContent = `${specs.gpuCores} GPU cores, ${specs.memory} unified memory`;
+                    updateBatchSizeForChip(chipValue);
+                }
+            }
+        }
+
+        function updateBatchSizeForChip(chipId) {
+            const specs = APPLE_CHIP_SPECS[chipId];
+            if (!specs) return;
+
+            const batchSelect = document.getElementById('batch-size');
+
+            // Add higher batch size options for more powerful chips
+            const currentOptions = Array.from(batchSelect.options).map(o => parseInt(o.value));
+
+            if (specs.maxBatch >= 16384 && !currentOptions.includes(16384)) {
+                batchSelect.add(new Option('16384 (High Memory)', '16384'));
+            }
+            if (specs.maxBatch >= 32768 && !currentOptions.includes(32768)) {
+                batchSelect.add(new Option('32768 (Ultra)', '32768'));
+            }
+
+            // Select optimal batch size for the chip
+            if (specs.tier >= 3 && specs.maxBatch >= 8192) {
+                batchSelect.value = '8192';
+            } else if (specs.tier >= 2) {
+                batchSelect.value = '4096';
+            } else {
+                batchSelect.value = '2048';
             }
         }
 
@@ -4803,12 +4925,14 @@
             const hiddenLayersStr = document.getElementById('hidden-layers').value;
             const hiddenLayers = hiddenLayersStr.split(',').map(x => parseInt(x.trim()));
             const taskType = document.getElementById('task-type').value;
+            const chipSelection = document.getElementById('apple-chip').value;
 
             return {
                 task_type: taskType,
                 model_type: document.getElementById('model-type').value,
                 target: taskType === 'lookalike' ? 'revenue' : document.getElementById('target-variable').value,
                 device: document.getElementById('training-device').value,
+                apple_chip: chipSelection,
                 epochs: parseInt(document.getElementById('epochs').value),
                 batch_size: parseInt(document.getElementById('batch-size').value),
                 learning_rate: parseFloat(document.getElementById('learning-rate').value),

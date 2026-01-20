@@ -50,8 +50,14 @@ class TrainingConfig:
     early_stopping_patience: int = 10
     scheduler_patience: int = 5
 
-    # Device
+    # Device and hardware
     device: str = field(default_factory=lambda: "mps" if torch.backends.mps.is_available() else "cpu")
+    apple_chip: str = "auto"  # auto, m1, m1_pro, m1_max, m1_ultra, m2, m2_pro, etc.
+
+    # Data loader optimizations (set based on chip)
+    num_workers: int = 4
+    pin_memory: bool = True
+    prefetch_factor: int = 2
 
 
 @dataclass
@@ -130,7 +136,7 @@ class TrainingJob:
                 message="Loading and processing data..."
             ))
 
-            # Create PyTorch config from user config
+            # Create PyTorch config from user config with Apple Silicon optimizations
             pytorch_config = Config()
             pytorch_config.target = self.config.target
             pytorch_config.epochs = self.config.epochs
@@ -144,7 +150,29 @@ class TrainingJob:
             pytorch_config.scheduler_patience = self.config.scheduler_patience
             pytorch_config.device = self.config.device
 
-            # Load data
+            # Apply Apple Silicon optimizations to data loader config
+            pytorch_config.num_workers = self.config.num_workers
+            pytorch_config.pin_memory = self.config.pin_memory
+            pytorch_config.prefetch_factor = self.config.prefetch_factor
+
+            # Get chip name for display
+            chip_name = APPLE_CHIP_SPECS.get(self.config.apple_chip, {})
+            chip_display = f"Apple {self.config.apple_chip.upper().replace('_', ' ')}" if self.config.apple_chip != "auto" else "Apple Silicon"
+
+            self._report_progress(TrainingProgress(
+                epoch=0,
+                total_epochs=self.config.epochs,
+                train_loss=0,
+                val_loss=0,
+                val_mae=0,
+                val_r2=0,
+                learning_rate=self.config.learning_rate,
+                elapsed_time=time.time() - start_time,
+                status="running",
+                message=f"Optimizing for {chip_display} ({self.config.num_workers} workers, batch={self.config.batch_size})..."
+            ))
+
+            # Load data with optimized settings
             train_loader, val_loader, test_loader, processor = create_data_loaders(pytorch_config)
 
             self._report_progress(TrainingProgress(
@@ -391,8 +419,126 @@ class TrainingJob:
 _current_job: Optional[TrainingJob] = None
 
 
+def detect_apple_chip() -> Dict:
+    """
+    Detect the Apple Silicon chip model using system commands.
+    Returns chip info including model, GPU cores, and memory.
+    """
+    import subprocess
+    import re
+
+    chip_info = {
+        "detected_chip": "unknown",
+        "chip_name": "Unknown",
+        "gpu_cores": None,
+        "total_memory": None,
+    }
+
+    try:
+        # Get chip info from sysctl on macOS
+        result = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True, text=True, timeout=5
+        )
+        cpu_brand = result.stdout.strip()
+
+        # Get total memory
+        mem_result = subprocess.run(
+            ["sysctl", "-n", "hw.memsize"],
+            capture_output=True, text=True, timeout=5
+        )
+        if mem_result.stdout.strip():
+            mem_bytes = int(mem_result.stdout.strip())
+            mem_gb = mem_bytes / (1024 ** 3)
+            chip_info["total_memory"] = f"{int(mem_gb)} GB"
+
+        # Parse Apple Silicon chip model
+        if "Apple" in cpu_brand:
+            chip_info["chip_name"] = cpu_brand
+
+            # Match patterns like M1, M1 Pro, M1 Max, M1 Ultra, M2, M3, M4, etc.
+            match = re.search(r'M(\d+)(?:\s+(Pro|Max|Ultra))?', cpu_brand, re.IGNORECASE)
+            if match:
+                generation = match.group(1)
+                variant = match.group(2)
+
+                if variant:
+                    chip_id = f"m{generation}_{variant.lower()}"
+                else:
+                    chip_id = f"m{generation}"
+
+                chip_info["detected_chip"] = chip_id
+
+        # Try to get GPU core count from system_profiler
+        gpu_result = subprocess.run(
+            ["system_profiler", "SPDisplaysDataType", "-json"],
+            capture_output=True, text=True, timeout=10
+        )
+        if gpu_result.stdout:
+            import json
+            gpu_data = json.loads(gpu_result.stdout)
+            displays = gpu_data.get("SPDisplaysDataType", [])
+            for display in displays:
+                if "sppci_cores" in display:
+                    chip_info["gpu_cores"] = display["sppci_cores"]
+                    break
+
+    except Exception as e:
+        print(f"Warning: Could not detect Apple chip: {e}")
+
+    return chip_info
+
+
+# Apple Silicon chip specifications for optimization
+APPLE_CHIP_SPECS = {
+    "m1":       {"gpu_cores": 8, "max_batch": 4096, "tier": 1, "memory_bandwidth": 68.25},
+    "m1_pro":   {"gpu_cores": 16, "max_batch": 8192, "tier": 2, "memory_bandwidth": 200},
+    "m1_max":   {"gpu_cores": 32, "max_batch": 16384, "tier": 3, "memory_bandwidth": 400},
+    "m1_ultra": {"gpu_cores": 64, "max_batch": 32768, "tier": 4, "memory_bandwidth": 800},
+    "m2":       {"gpu_cores": 10, "max_batch": 4096, "tier": 1, "memory_bandwidth": 100},
+    "m2_pro":   {"gpu_cores": 19, "max_batch": 8192, "tier": 2, "memory_bandwidth": 200},
+    "m2_max":   {"gpu_cores": 38, "max_batch": 16384, "tier": 3, "memory_bandwidth": 400},
+    "m2_ultra": {"gpu_cores": 76, "max_batch": 32768, "tier": 4, "memory_bandwidth": 800},
+    "m3":       {"gpu_cores": 10, "max_batch": 4096, "tier": 1, "memory_bandwidth": 100},
+    "m3_pro":   {"gpu_cores": 18, "max_batch": 8192, "tier": 2, "memory_bandwidth": 150},
+    "m3_max":   {"gpu_cores": 40, "max_batch": 16384, "tier": 3, "memory_bandwidth": 400},
+    "m4":       {"gpu_cores": 10, "max_batch": 8192, "tier": 2, "memory_bandwidth": 120},
+    "m4_pro":   {"gpu_cores": 20, "max_batch": 16384, "tier": 3, "memory_bandwidth": 273},
+    "m4_max":   {"gpu_cores": 40, "max_batch": 32768, "tier": 4, "memory_bandwidth": 546},
+}
+
+
+def get_optimized_training_params(chip_id: str, user_batch_size: int) -> Dict:
+    """
+    Get optimized training parameters based on the Apple Silicon chip.
+    Returns adjusted batch size, number of workers, and other optimizations.
+    """
+    specs = APPLE_CHIP_SPECS.get(chip_id, {"gpu_cores": 8, "max_batch": 4096, "tier": 1})
+
+    # Ensure batch size doesn't exceed chip's capability
+    optimized_batch = min(user_batch_size, specs["max_batch"])
+
+    # Number of data loader workers based on chip tier
+    num_workers = min(specs["tier"] * 2, 8)
+
+    # Pin memory for faster data transfer (beneficial for all Apple Silicon)
+    pin_memory = True
+
+    # Prefetch factor based on tier
+    prefetch_factor = specs["tier"] + 1
+
+    return {
+        "batch_size": optimized_batch,
+        "num_workers": num_workers,
+        "pin_memory": pin_memory,
+        "prefetch_factor": prefetch_factor,
+        "chip_tier": specs["tier"],
+        "gpu_cores": specs["gpu_cores"],
+    }
+
+
 def get_system_info() -> Dict:
-    """Get system information for training."""
+    """Get system information for training, including Apple Silicon detection."""
     info = {
         "pytorch_version": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
@@ -406,22 +552,48 @@ def get_system_info() -> Dict:
     if torch.backends.mps.is_available():
         info["mps_device"] = "Apple Silicon GPU (MPS)"
 
+        # Detect specific Apple Silicon chip
+        chip_info = detect_apple_chip()
+        info.update(chip_info)
+
     return info
 
 
 def start_training(config_dict: Dict) -> Tuple[bool, str]:
-    """Start a new training job."""
+    """Start a new training job with Apple Silicon optimizations."""
     global _current_job
 
     if _current_job is not None and _current_job.is_running:
         return False, "A training job is already running"
 
     try:
+        # Determine the Apple Silicon chip to use
+        apple_chip = config_dict.get("apple_chip", "auto")
+        if apple_chip == "auto":
+            # Auto-detect the chip
+            chip_info = detect_apple_chip()
+            apple_chip = chip_info.get("detected_chip", "m1")
+            if apple_chip == "unknown":
+                apple_chip = "m1"  # Default fallback
+
+        # Get chip-optimized parameters
+        user_batch_size = int(config_dict.get("batch_size", 4096))
+        optimized_params = get_optimized_training_params(apple_chip, user_batch_size)
+
+        print(f"=== Apple Silicon Optimization ===")
+        print(f"Selected Chip: {apple_chip}")
+        print(f"GPU Cores: {optimized_params['gpu_cores']}")
+        print(f"Chip Tier: {optimized_params['chip_tier']}")
+        print(f"Optimized Batch Size: {optimized_params['batch_size']} (requested: {user_batch_size})")
+        print(f"Data Loader Workers: {optimized_params['num_workers']}")
+        print(f"Pin Memory: {optimized_params['pin_memory']}")
+        print(f"Prefetch Factor: {optimized_params['prefetch_factor']}")
+
         config = TrainingConfig(
             model_type=config_dict.get("model_type", "neural_network"),
             target=config_dict.get("target", "revenue"),
             epochs=int(config_dict.get("epochs", 50)),
-            batch_size=int(config_dict.get("batch_size", 4096)),
+            batch_size=optimized_params["batch_size"],
             learning_rate=float(config_dict.get("learning_rate", 1e-4)),
             weight_decay=float(config_dict.get("weight_decay", 1e-5)),
             dropout=float(config_dict.get("dropout", 0.2)),
@@ -430,6 +602,10 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
             early_stopping_patience=int(config_dict.get("early_stopping_patience", 10)),
             scheduler_patience=int(config_dict.get("scheduler_patience", 5)),
             device=config_dict.get("device", "mps" if torch.backends.mps.is_available() else "cpu"),
+            apple_chip=apple_chip,
+            num_workers=optimized_params["num_workers"],
+            pin_memory=optimized_params["pin_memory"],
+            prefetch_factor=optimized_params["prefetch_factor"],
         )
 
         _current_job = TrainingJob(config)
@@ -438,6 +614,7 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
         return True, _current_job.job_id
 
     except Exception as e:
+        traceback.print_exc()
         return False, f"Failed to start training: {str(e)}"
 
 
