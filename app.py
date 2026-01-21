@@ -367,20 +367,29 @@ def api_stream_training():
 # =============================================================================
 
 if __name__ == '__main__':
-    print("=" * 60)
-    print("Site Visualization Server")
-    print("=" * 60)
+    import os
 
-    # Pre-load all data
-    print("\nLoading data...")
+    # Only print startup banner once (not in reloader child process)
+    is_reloader = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+    if not is_reloader:
+        print("=" * 60)
+        print("Site Visualization Server")
+        print("=" * 60)
+
+    # Pre-load all data (in both processes for data availability)
+    if not is_reloader:
+        print("\nLoading data...")
     preload_all_data()
 
-    print("\nPre-loading highway data (this may take a moment on first run)...")
+    if not is_reloader:
+        print("\nPre-loading highway data (this may take a moment on first run)...")
     preload_highway_data()
 
-    print("\n" + "=" * 60)
-    print("Starting Flask server...")
-    print("Open http://localhost:8080 in your browser")
-    print("=" * 60)
+    if not is_reloader:
+        print("\n" + "=" * 60)
+        print("Starting Flask server...")
+        print("Open http://localhost:8080 in your browser")
+        print("=" * 60)
 
     app.run(debug=True, port=8080)
