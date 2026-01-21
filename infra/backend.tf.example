@@ -1,0 +1,16 @@
+# Remote State Backend Configuration
+#
+# To use remote state storage:
+# 1. First, create the storage account for state (run setup-backend.sh or manually create)
+# 2. Copy this file to backend.tf
+# 3. Update the values below
+# 4. Run: terraform init -migrate-state
+#
+# terraform {
+#   backend "azurerm" {
+#     resource_group_name  = "rg-terraform-state"
+#     storage_account_name = "stterraformstate"  # Must be globally unique
+#     container_name       = "tfstate"
+#     key                  = "dooh-ml-dev.tfstate"
+#   }
+# }

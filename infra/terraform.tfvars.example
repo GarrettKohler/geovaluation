@@ -1,0 +1,22 @@
+# Example Terraform variables
+# Copy this file to terraform.tfvars and customize values
+
+project_name = "dooh-ml"
+environment  = "dev"
+location     = "eastus"
+
+tags = {
+  Owner   = "your-name"
+  Purpose = "DOOH Site Optimization ML Platform"
+}
+
+# Database configuration
+database_sku            = "B_Standard_B1ms"  # Burstable for dev
+database_storage_mb     = 32768              # 32 GB
+database_admin_username = "pgadmin"
+
+# ML Workspace
+ml_workspace_sku = "Basic"
+
+# Container Apps
+container_apps_environment_sku = "Consumption"

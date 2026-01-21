@@ -13,8 +13,8 @@ Then open http://localhost:5000 in your browser.
 """
 
 from flask import Flask, render_template, jsonify, request, Response
-from src.interstate_distance import distance_to_nearest_interstate, preload_highway_data
-from src.data_service import (
+from src.services.interstate_distance import distance_to_nearest_interstate, preload_highway_data
+from src.services.data_service import (
     load_sites,
     load_revenue_metrics,
     load_site_details,
@@ -23,8 +23,9 @@ from src.data_service import (
     get_site_details_for_display,
     CATEGORICAL_FIELDS,
     preload_all_data,
+    _clean_nan_values,
 )
-from src.training_service import (
+from src.services.training_service import (
     get_system_info,
     start_training,
     stop_training,
@@ -167,16 +168,9 @@ def get_bulk_site_details():
     for site_id in site_ids:
         site_row = details_df[details_df['gtvid'] == site_id]
         if not site_row.empty:
-            # Convert row to dict, replacing NaN with None
+            # Convert row to dict and clean NaN/Inf values for JSON
             site_data = site_row.iloc[0].to_dict()
-            # Clean up None values for JSON
-            cleaned_data = {}
-            for k, v in site_data.items():
-                if v is None or (isinstance(v, float) and str(v) == 'nan'):
-                    cleaned_data[k] = None
-                else:
-                    cleaned_data[k] = v
-            result[site_id] = cleaned_data
+            result[site_id] = _clean_nan_values(site_data)
 
     return jsonify(result)
 

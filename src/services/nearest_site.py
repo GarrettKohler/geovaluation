@@ -10,7 +10,7 @@ import geopandas as gpd
 from scipy.spatial import cKDTree
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 INPUT_FILE = PROJECT_ROOT / "data" / "input" / "Sites - Base Data Set.csv"
 OUTPUT_DIR = PROJECT_ROOT / "distance_results"
 

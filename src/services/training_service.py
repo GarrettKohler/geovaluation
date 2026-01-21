@@ -18,9 +18,7 @@ import threading
 from queue import Queue
 import traceback
 
-# Import from site_scoring module
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Import from site_scoring module (at project root)
 from site_scoring.config import Config
 from site_scoring.model import SiteScoringModel
 from site_scoring.data_loader import DataProcessor, create_data_loaders

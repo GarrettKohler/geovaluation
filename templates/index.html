@@ -2376,7 +2376,7 @@
                     </div>
                     <div class="progress-metric">
                         <div class="progress-metric-value" id="metric-r2">-</div>
-                        <div class="progress-metric-label">R² Score</div>
+                        <div class="progress-metric-label" id="metric-r2-label">R² Score</div>
                     </div>
                 </div>
 
@@ -2409,7 +2409,7 @@
                         </div>
                         <div class="result-item">
                             <div class="result-value" id="result-r2">-</div>
-                            <div class="result-label">Test R²</div>
+                            <div class="result-label" id="result-r2-label">Test R²</div>
                         </div>
                         <div class="result-item">
                             <div class="result-value" id="result-loss">-</div>
@@ -4708,14 +4708,22 @@
             const taskType = document.getElementById('task-type').value;
             const hintEl = document.getElementById('task-type-hint');
             const targetGroup = document.getElementById('target-variable-group');
+            const metricR2Label = document.getElementById('metric-r2-label');
+            const resultR2Label = document.getElementById('result-r2-label');
 
             if (taskType === 'lookalike') {
                 hintEl.textContent = 'Train on top 10% ACTIVE sites, find INACTIVE lookalikes to reactivate';
                 // Hide target variable for lookalike (always uses revenue)
                 if (targetGroup) targetGroup.style.display = 'none';
+                // Update metric labels for classification
+                if (metricR2Label) metricR2Label.textContent = 'AUC';
+                if (resultR2Label) resultR2Label.textContent = 'Test AUC';
             } else {
                 hintEl.textContent = 'Predict actual revenue values for all sites';
                 if (targetGroup) targetGroup.style.display = 'block';
+                // Update metric labels for regression
+                if (metricR2Label) metricR2Label.textContent = 'R² Score';
+                if (resultR2Label) resultR2Label.textContent = 'Test R²';
             }
         }
 
@@ -5126,8 +5134,8 @@
 
             // Sort ACTIVE sites by revenue to find top 10% performers
             const sortedActiveByRevenue = [...activeSitesWithRevenue].sort((a, b) => {
-                const revA = revenueDataMap[a.GTVID]?.avg_monthly || 0;
-                const revB = revenueDataMap[b.GTVID]?.avg_monthly || 0;
+                const revA = revenueDataMap[a.GTVID]?.avgMonthly || 0;
+                const revB = revenueDataMap[b.GTVID]?.avgMonthly || 0;
                 return revB - revA; // Descending
             });
 
@@ -5184,7 +5192,7 @@
             modelTrainingState.lookalikeSiteIds = new Set(); // Not used for regression
 
             // Calculate revenue statistics for the training set
-            const trainingRevenues = trainingSites.map(s => revenueDataMap[s.GTVID]?.avg_monthly || 0);
+            const trainingRevenues = trainingSites.map(s => revenueDataMap[s.GTVID]?.avgMonthly || 0);
             const sortedRevenues = [...trainingRevenues].sort((a, b) => a - b);
             const p10 = sortedRevenues[Math.floor(sortedRevenues.length * 0.1)] || 0;
             const p50 = sortedRevenues[Math.floor(sortedRevenues.length * 0.5)] || 0;
@@ -5197,7 +5205,7 @@
 
             // For training sites: prediction = actual (they were used to train)
             trainingSites.forEach(s => {
-                const actual = revenueDataMap[s.GTVID]?.avg_monthly || 0;
+                const actual = revenueDataMap[s.GTVID]?.avgMonthly || 0;
                 // Add slight noise to simulate prediction vs actual
                 const noise = (Math.random() - 0.5) * 0.1 * actual;
                 modelTrainingState.predictedRevenues[s.GTVID] = Math.max(0, actual + noise);
@@ -5205,7 +5213,7 @@
 
             // For testing sites: prediction based on learned patterns
             testingSites.forEach(s => {
-                const actual = revenueDataMap[s.GTVID]?.avg_monthly || 0;
+                const actual = revenueDataMap[s.GTVID]?.avgMonthly || 0;
                 // Simulate model prediction (with more variance for testing)
                 const noise = (Math.random() - 0.5) * 0.3 * actual;
                 modelTrainingState.predictedRevenues[s.GTVID] = Math.max(0, actual + noise);
@@ -5243,13 +5251,13 @@
 
             // Store training examples for export (sorted by revenue descending)
             modelTrainingState.trainingExamples = [...trainingSites].sort((a, b) => {
-                const revA = revenueDataMap[a.GTVID]?.avg_monthly || 0;
-                const revB = revenueDataMap[b.GTVID]?.avg_monthly || 0;
+                const revA = revenueDataMap[a.GTVID]?.avgMonthly || 0;
+                const revB = revenueDataMap[b.GTVID]?.avgMonthly || 0;
                 return revB - revA;
             });
             modelTrainingState.testingExamples = [...testingSites].sort((a, b) => {
-                const revA = revenueDataMap[a.GTVID]?.avg_monthly || 0;
-                const revB = revenueDataMap[b.GTVID]?.avg_monthly || 0;
+                const revA = revenueDataMap[a.GTVID]?.avgMonthly || 0;
+                const revB = revenueDataMap[b.GTVID]?.avgMonthly || 0;
                 return revB - revA;
             });
             modelTrainingState.predictedLookalikes = []; // Not applicable for regression
@@ -5344,7 +5352,7 @@
 
             // Calculate revenue statistics for training sites
             const trainingRevenues = modelTrainingState.trainingExamples?.map(s =>
-                revenueDataMap[s.GTVID]?.avg_monthly || revenueDataMap[s.GTVID]?.avgMonthly || 0
+                revenueDataMap[s.GTVID]?.avgMonthly || 0
             ) || [];
 
             const avgTrainingRevenue = trainingRevenues.length > 0
@@ -5388,7 +5396,7 @@ Hyperparameters:
 TRAINING METRICS
 ================================================================================
 Final Test MAE:     $${metrics?.test_mae !== undefined && metrics.test_mae !== null ? metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
-Final Test R²:      ${metrics?.test_r2 !== undefined && metrics.test_r2 !== null ? metrics.test_r2.toFixed(4) : 'N/A'}
+${taskType === 'lookalike' ? 'Final Test AUC' : 'Final Test R²'}:      ${metrics?.test_r2 !== undefined && metrics.test_r2 !== null ? metrics.test_r2.toFixed(4) : 'N/A'}
 Final Test Loss:    ${metrics?.test_loss !== undefined && metrics.test_loss !== null ? metrics.test_loss.toFixed(4) : 'N/A'}
 Training Time:      ${metrics?.elapsed_time !== undefined && metrics.elapsed_time !== null ? Math.floor(metrics.elapsed_time / 60) + 'm ' + Math.floor(metrics.elapsed_time % 60) + 's' : 'N/A'}
 
@@ -5403,7 +5411,7 @@ Inactive Sites:         ${totalInactive.toLocaleString()} (${(totalInactive / al
             if (taskType === 'lookalike') {
                 // Lookalike-specific statistics
                 const lookalikeRevenues = modelTrainingState.predictedLookalikes?.map(s =>
-                    revenueDataMap[s.GTVID]?.avg_monthly || revenueDataMap[s.GTVID]?.avgMonthly || 0
+                    revenueDataMap[s.GTVID]?.avgMonthly || 0
                 ) || [];
                 const avgLookalikeRevenue = lookalikeRevenues.length > 0
                     ? lookalikeRevenues.reduce((a, b) => a + b, 0) / lookalikeRevenues.length
@@ -5436,6 +5444,16 @@ REACTIVATION OPPORTUNITY
 Recommended Sites:      ${lookalikeCount.toLocaleString()} inactive sites identified as high-potential
 Potential Revenue:      $${(lookalikeCount * avgTrainingRevenue * 0.7).toLocaleString(undefined, {maximumFractionDigits: 0})} estimated monthly
                         (assuming 70% of top performer average)
+
+================================================================================
+MODEL INTERPRETATION
+================================================================================
+AUC Score:              ${metrics?.test_r2 ? (metrics.test_r2 * 100).toFixed(1) + '% classification accuracy' : 'N/A'}
+
+${metrics?.test_r2 >= 0.9 ? 'EXCELLENT: AUC >90% indicates highly accurate lookalike identification.' :
+  metrics?.test_r2 >= 0.8 ? 'GOOD: AUC >80% shows reliable classification of potential high performers.' :
+  metrics?.test_r2 >= 0.7 ? 'MODERATE: AUC >70% provides useful lookalike predictions with some noise.' :
+  'LIMITED: Low AUC suggests model needs more features or training data.'}
 `;
             } else {
                 // Regression-specific statistics

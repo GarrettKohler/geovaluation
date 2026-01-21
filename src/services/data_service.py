@@ -7,11 +7,38 @@ All data is cached in memory after first load for fast subsequent access.
 
 import pandas as pd
 import numpy as np
+import math
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-# Data file paths
-DATA_DIR = Path(__file__).parent.parent / "data" / "input"
+
+def _clean_nan_values(obj: Any) -> Any:
+    """
+    Recursively convert NaN/Inf values to None for JSON serialization.
+
+    JSON doesn't support NaN or Inf, so we convert them to null.
+    """
+    if isinstance(obj, dict):
+        return {k: _clean_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_clean_nan_values(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, np.floating):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.ndarray):
+        return _clean_nan_values(obj.tolist())
+    return obj
+
+
+# Data file paths (go up: services -> src -> project root)
+DATA_DIR = Path(__file__).parent.parent.parent / "data" / "input"
 REVENUE_CSV = DATA_DIR / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv"
 
 # Cached data (module-level singletons)
@@ -393,7 +420,8 @@ def get_site_details_for_display(site_id: str) -> Optional[Dict[str, Any]]:
         if has_revenue:
             result['available_data'].append('revenue')
 
-    return result
+    # Clean NaN/Inf values for JSON serialization
+    return _clean_nan_values(result)
 
 
 def preload_all_data() -> None:
