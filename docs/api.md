@@ -1,16 +1,449 @@
 # API Reference
 
-Complete API documentation for the Geospatial Distance Calculator library.
+Complete API documentation for the GSTV Geospatial Site Visualization application.
 
 ## Table of Contents
 
-- [interstate_distance Module](#interstate_distance-module)
-  - [distance_to_nearest_interstate](#distance_to_nearest_interstate)
-  - [batch_distance_to_interstate](#batch_distance_to_interstate)
-  - [preload_highway_data](#preload_highway_data)
-- [nearest_site Module](#nearest_site-module)
-  - [calculate_nearest_site_distances](#calculate_nearest_site_distances)
+- [Flask Web API](#flask-web-api)
+  - [Page Routes](#page-routes)
+  - [Sites Data Endpoints](#sites-data-endpoints)
+  - [Highway Connection Endpoints](#highway-connection-endpoints)
+  - [Filtering Endpoints](#filtering-endpoints)
+  - [Model Training Endpoints](#model-training-endpoints)
+  - [SHAP Feature Importance Endpoints](#shap-feature-importance-endpoints)
+- [Python Library Modules](#python-library-modules)
+  - [interstate_distance Module](#interstate_distance-module)
+  - [nearest_site Module](#nearest_site-module)
+  - [Feature Selection Module](#feature-selection-module)
 - [Constants](#constants)
+
+---
+
+## Flask Web API
+
+The application runs a Flask server (default port 8080) providing REST API endpoints and Server-Sent Events for real-time updates.
+
+### Page Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/` | GET | Main map visualization page |
+| `/training-details` | GET | Training details page with site records |
+| `/glossary` | GET | ML/statistics glossary page |
+| `/shap-values` | GET | SHAP feature importance visualization page |
+
+---
+
+### Sites Data Endpoints
+
+#### GET /api/sites
+
+Get all sites with coordinates, revenue metrics, and status.
+
+**Response:**
+```json
+[
+  {
+    "GTVID": "SFR001",
+    "Latitude": 37.7749,
+    "Longitude": -122.4194,
+    "revenueScore": 0.85,
+    "avgMonthlyRevenue": 2500.00,
+    "totalRevenue": 75000.00,
+    "activeMonths": 30,
+    "status": "Active"
+  }
+]
+```
+
+---
+
+#### GET /api/site/{site_id}
+
+Get basic site information including highway distance.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `site_id` | string | The site GTVID |
+
+**Response:**
+```json
+{
+  "site_id": "SFR001",
+  "latitude": 37.7749,
+  "longitude": -122.4194,
+  "nearest_highway": "I- 80",
+  "distance_miles": 2.45,
+  "highway_point": {
+    "lat": 37.8012,
+    "lon": -122.4089
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{"error": "Site not found"}
+```
+
+---
+
+#### GET /api/site-details/{site_id}
+
+Get comprehensive site details for side panel display.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `site_id` | string | The site GTVID |
+
+**Response:**
+```json
+{
+  "site_id": "SFR001",
+  "categories": {
+    "Location": {"state": "CA", "county": "San Francisco", ...},
+    "Site Info": {"network": "Gilbarco", "hardware_type": "DCR", ...},
+    "Brands": {"brand_fuel": "Shell", "brand_c_store": "7-Eleven", ...},
+    "Revenue": {"avg_monthly_revenue": 2500.00, "total_revenue": 75000.00, ...}
+  }
+}
+```
+
+---
+
+#### POST /api/bulk-site-details
+
+Get detailed information for multiple sites at once.
+
+**Request Body:**
+```json
+{
+  "site_ids": ["SFR001", "GHR001", "SFR002"]
+}
+```
+
+**Response:**
+```json
+{
+  "SFR001": {"gtvid": "SFR001", "state": "CA", ...},
+  "GHR001": {"gtvid": "GHR001", "state": "TX", ...},
+  "SFR002": {"gtvid": "SFR002", "state": "CA", ...}
+}
+```
+
+---
+
+### Highway Connection Endpoints
+
+#### POST /api/highway-connections
+
+Calculate highway connections for selected sites.
+
+**Request Body:**
+```json
+{
+  "site_ids": ["SFR001", "GHR001"]
+}
+```
+
+**Response:**
+```json
+{
+  "connections": [
+    {
+      "site_id": "SFR001",
+      "site_lat": 37.7749,
+      "site_lon": -122.4194,
+      "highway_lat": 37.8012,
+      "highway_lon": -122.4089,
+      "highway_name": "I- 80",
+      "highway_segment": [[37.79, -122.41], [37.80, -122.40], ...],
+      "distance_miles": 2.45
+    }
+  ]
+}
+```
+
+---
+
+### Filtering Endpoints
+
+#### GET /api/filter-options
+
+Get unique values for all categorical fields that can be used as filters.
+
+**Response:**
+```json
+{
+  "State": ["CA", "TX", "FL", "NY", ...],
+  "Network": ["Gilbarco", "Verifone", "Wayne", ...],
+  "Retailer": ["Shell", "Chevron", "ExxonMobil", ...],
+  "DMA": ["Houston", "Los Angeles", "New York", ...],
+  ...
+}
+```
+
+---
+
+#### POST /api/filtered-sites
+
+Get sites matching the specified filters.
+
+**Request Body:**
+```json
+{
+  "filters": {
+    "State": "TX",
+    "Network": "Gilbarco",
+    "Retailer": "Shell"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "site_ids": ["GHR001", "GHR002", "GHR003"],
+  "count": 3
+}
+```
+
+---
+
+### Model Training Endpoints
+
+#### GET /api/training/system-info
+
+Get system information for training (GPU availability, Apple Silicon detection).
+
+**Response:**
+```json
+{
+  "pytorch_version": "2.1.0",
+  "cuda_available": false,
+  "mps_available": true,
+  "recommended_device": "mps",
+  "mps_device": "Apple Silicon GPU (MPS)",
+  "detected_chip": "m4_pro",
+  "chip_name": "Apple M4 Pro",
+  "gpu_cores": 20,
+  "total_memory": "48 GB"
+}
+```
+
+---
+
+#### POST /api/training/start
+
+Start a new model training job.
+
+**Request Body:**
+```json
+{
+  "model_type": "neural_network",
+  "task_type": "regression",
+  "target": "avg_monthly_revenue",
+  "epochs": 50,
+  "batch_size": 4096,
+  "learning_rate": 0.0001,
+  "dropout": 0.2,
+  "hidden_layers": [512, 256, 128, 64],
+  "device": "mps",
+  "apple_chip": "auto",
+  "feature_selection_method": "stg_light",
+  "stg_lambda": 0.1,
+  "stg_sigma": 0.5,
+  "run_shap_validation": false,
+  "track_gradients": false
+}
+```
+
+**Feature Selection Methods:**
+| Method | Description |
+|--------|-------------|
+| `none` | No feature selection |
+| `stg_light` | Light Stochastic Gates regularization |
+| `stg_aggressive` | Aggressive STG with SHAP validation |
+| `lassonet_standard` | Standard LassoNet configuration |
+| `lassonet_path` | LassoNet with full lambda path |
+| `shap_only` | Post-training SHAP-Select only |
+| `tabnet` | TabNet with sparsemax attention |
+| `hybrid_stg_shap` | STG during training + SHAP post-training |
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "job_id": "job_1705849200"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "success": false,
+  "error": "A training job is already running"
+}
+```
+
+---
+
+#### POST /api/training/stop
+
+Stop the current training job.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Training stop requested"
+}
+```
+
+---
+
+#### GET /api/training/status
+
+Get current training job status.
+
+**Response (Running):**
+```json
+{
+  "job_id": "job_1705849200",
+  "is_running": true,
+  "epoch": 25,
+  "total_epochs": 50,
+  "train_loss": 0.0234,
+  "val_loss": 0.0256,
+  "val_mae": 1234.56,
+  "val_smape": 15.2,
+  "val_rmse": 1567.89,
+  "val_r2": 0.8523,
+  "learning_rate": 0.0001,
+  "elapsed_time": 45.2,
+  "status": "running",
+  "message": "Epoch 25/50 | 180 features active",
+  "best_val_loss": 0.0245
+}
+```
+
+**Response (No Job):**
+```json
+{
+  "status": "no_job",
+  "message": "No training job exists"
+}
+```
+
+---
+
+#### GET /api/training/stream
+
+Server-Sent Events stream for real-time training progress.
+
+**Response (SSE Stream):**
+```
+data: {"epoch": 25, "total_epochs": 50, "train_loss": 0.0234, "val_loss": 0.0256, "val_mae": 1234.56, "val_smape": 15.2, "val_rmse": 1567.89, "val_r2": 0.8523, "learning_rate": 0.0001, "elapsed_time": 45.2, "status": "running", "message": "Epoch 25/50", "best_val_loss": 0.0245, "n_active_features": 180, "fs_reg_loss": 0.0012}
+
+data: {"epoch": 26, "total_epochs": 50, ...}
+
+data: {"status": "completed", "final_metrics": {...}}
+
+data: {"status": "stream_end"}
+```
+
+---
+
+### SHAP Feature Importance Endpoints
+
+#### GET /api/shap/available
+
+Check if SHAP data is available from the last training run.
+
+**Response (Available):**
+```json
+{
+  "available": true,
+  "n_samples": 200,
+  "n_features": 84
+}
+```
+
+**Response (Not Available):**
+```json
+{
+  "available": false
+}
+```
+
+---
+
+#### GET /api/shap/summary
+
+Get SHAP feature importance summary data.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_n` | int | 30 | Number of top features to return |
+
+**Response:**
+```json
+{
+  "features": [
+    {
+      "feature": "avg_monthly_revenue",
+      "importance": 0.456,
+      "mean_shap": 0.234,
+      "std_shap": 0.089
+    },
+    {
+      "feature": "screen_count",
+      "importance": 0.234,
+      "mean_shap": 0.123,
+      "std_shap": 0.045
+    }
+  ],
+  "base_value": 2345.67,
+  "n_samples": 200,
+  "n_features": 84,
+  "total_features_available": 84
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "error": "No SHAP data available. Train a model first."
+}
+```
+
+---
+
+#### GET /api/shap/plots
+
+Get SHAP visualization plots as base64-encoded PNG images.
+
+**Response:**
+```json
+{
+  "bar_plot": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "summary_plot": "iVBORw0KGgoAAAANSUhEUgAA..."
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "error": "No SHAP plots available. Train a model first."
+}
+```
+
+---
+
+## Python Library Modules
 
 ---
 
@@ -203,7 +636,7 @@ This module processes a CSV file of site locations and calculates the distance t
 ```python
 PROJECT_DIR = Path(__file__).parent
 INPUT_FILE = PROJECT_DIR / "Sites - Base Data Set.csv"
-OUTPUT_DIR = PROJECT_DIR / "distance_results"
+OUTPUT_DIR = PROJECT_DIR / "data" / "output"
 METERS_PER_MILE = 1609.344
 ```
 
@@ -387,3 +820,299 @@ except KeyError as e:
 1. Call `preload_highway_data()` at application startup
 2. Use `batch_distance_to_interstate()` for multiple points
 3. For very large datasets, consider chunking into batches of 50,000-100,000 points
+
+---
+
+## Feature Selection Module
+
+Dynamic feature selection techniques for neural network training. Located in `site_scoring/feature_selection/`.
+
+### Available Methods
+
+The module implements 5 techniques for feature selection during or after training:
+
+| Method | Type | Description |
+|--------|------|-------------|
+| **Stochastic Gates (STG)** | During training | Learnable Bernoulli gates with L0 regularization |
+| **LassoNet** | During training | Hierarchical L1 constraints with skip connections |
+| **SHAP-Select** | Post-training | Iterative elimination using statistical significance |
+| **TabNet** | During training | Instance-wise sparsemax attention (replaces MLP) |
+| **Gradient Analysis** | During training | Weight/gradient profile tracking |
+
+### Quick Start
+
+```python
+from site_scoring.feature_selection import (
+    FeatureSelectionConfig,
+    FeatureSelectionMethod,
+    FeatureSelectionTrainer,
+    create_feature_selection_model,
+    get_preset,
+)
+
+# Quick start with preset
+config = get_preset('stg_light')
+model, fs_trainer = create_feature_selection_model(
+    config=config,
+    base_model=base_model,
+    n_numeric=24,
+    n_boolean=48,
+    categorical_vocab_sizes={'state': 50, 'network': 10},
+    feature_names=feature_names,
+    device='mps'
+)
+
+# Training loop
+for epoch in range(epochs):
+    for batch in train_loader:
+        loss, fs_loss = model(batch)
+        total_loss = loss + fs_loss
+        total_loss.backward()
+        optimizer.step()
+
+    # End of epoch - record feature selection stats
+    stats = fs_trainer.on_epoch_end(epoch)
+    print(f"Active features: {stats.get('n_active_features')}")
+
+# Get final selection summary
+summary = fs_trainer.get_selection_summary()
+print(f"Selected {summary['n_selected']}/{summary['n_total_features']} features")
+```
+
+---
+
+### Configuration
+
+```python
+@dataclass
+class FeatureSelectionConfig:
+    # Primary method to use during training
+    method: FeatureSelectionMethod = FeatureSelectionMethod.NONE
+
+    # Post-training SHAP validation (can combine with any method)
+    run_shap_validation: bool = False
+
+    # Track gradient/weight profiles (can combine with any method)
+    track_gradients: bool = False
+
+    # Stochastic Gates (STG) Parameters
+    stg_sigma: float = 0.5          # Gate distribution spread
+    stg_lambda: float = 0.1         # L0 regularization weight
+    stg_init_mean: float = 0.5      # Initial gate activation
+    stg_threshold: float = 0.5      # Selection threshold
+
+    # LassoNet Parameters
+    lassonet_M: float = 10.0        # Hierarchy coefficient
+    lassonet_lambda: float = 0.01   # L1 regularization strength
+    lassonet_lambda_path: bool = False
+
+    # SHAP-Select Parameters
+    shap_significance_level: float = 0.05
+    shap_n_background: int = 100
+    shap_n_samples: int = 100
+
+    # TabNet Parameters
+    tabnet_n_d: int = 64
+    tabnet_n_a: int = 64
+    tabnet_n_steps: int = 5
+    tabnet_gamma: float = 1.5
+
+    # Gradient Analysis Parameters
+    gradient_analysis_interval: int = 5
+    gradient_elimination_interval: int = 10
+    gradient_elimination_percentile: float = 5
+    gradient_min_features: int = 5
+```
+
+---
+
+### Presets
+
+```python
+from site_scoring.feature_selection import get_preset
+
+# Available presets
+config = get_preset('none')              # No feature selection
+config = get_preset('stg_light')         # Light STG (keeps most features)
+config = get_preset('stg_aggressive')    # Aggressive STG + SHAP validation
+config = get_preset('lassonet_standard') # Standard LassoNet
+config = get_preset('lassonet_path')     # LassoNet with full lambda path
+config = get_preset('shap_only')         # Post-training SHAP-Select only
+config = get_preset('tabnet')            # TabNet with sparsemax
+config = get_preset('hybrid_stg_shap')   # STG + SHAP post-training
+```
+
+---
+
+### Stochastic Gates (STG)
+
+Implements the method from "Feature Selection using Stochastic Gates" (ICML 2020).
+
+**Key idea:** Attach a learnable gate z_d to each input feature. The gate is drawn from a continuous relaxation of the Bernoulli distribution, enabling gradient-based optimization of L0 regularization.
+
+**Mathematical formulation:**
+```
+z_d = clamp(0.5 + mu_d + epsilon_d, 0, 1)   where epsilon_d ~ N(0, sigma^2)
+Loss = L(f(z * x), y) + lambda * sum_d P(z_d > 0)
+```
+
+```python
+from site_scoring.feature_selection import StochasticGates
+
+stg = StochasticGates(
+    n_features=200,
+    sigma=0.5,
+    reg_weight=0.1,
+    init_mean=0.5
+)
+
+# Forward pass
+gated_x, reg_loss = stg(x)  # gated_x has features weighted by gates
+
+# Get feature importance
+importance = stg.get_feature_importance()  # tensor of gate probabilities
+mask = stg.get_feature_mask(threshold=0.5)  # boolean mask
+n_active = stg.get_n_active_features()  # count of active features
+```
+
+---
+
+### LassoNet
+
+Implements the method from "LassoNet: A Neural Network with Feature Sparsity" (JMLR 2021).
+
+**Key idea:** Enforce a hierarchy constraint where a feature can only participate in hidden layers if its linear (skip connection) representative is active.
+
+**Mathematical formulation:**
+```
+minimize  L(theta, W) + lambda * ||theta||_1
+s.t.      ||W_j^(1)||_inf <= M * |theta_j|,  j=1,...,d
+```
+
+When theta_j = 0, the constraint forces W_j = 0, completely removing feature j.
+
+```python
+from site_scoring.feature_selection import LassoNetModel, HierProx
+
+# Create LassoNet model
+model = LassoNetModel(
+    n_numeric=24,
+    n_boolean=48,
+    categorical_vocab_sizes={'state': 50},
+    hidden_dims=[512, 256, 128],
+    M=10.0  # hierarchy coefficient
+)
+
+# Apply hierarchical proximal operator after optimizer step
+theta_new, W_new = HierProx.apply(
+    theta=model.lassonet_layer.theta,
+    W=model.lassonet_layer.linear.weight,
+    lam=0.01,
+    M=10.0
+)
+```
+
+---
+
+### SHAP-Select
+
+Post-training feature elimination using SHAP values and statistical significance testing.
+
+```python
+from site_scoring.feature_selection import apply_shap_select
+
+results = apply_shap_select(
+    model_predict_fn=model.predict,
+    X_val=X_val,
+    y_val=y_val,
+    feature_names=feature_names,
+    n_background=100,
+    n_shap_samples=100,
+    significance_level=0.05,
+    verbose=True
+)
+
+# Results include:
+# - significant_features: list of statistically significant features
+# - eliminated_features: list of features to eliminate
+# - p_values: dict of feature -> p-value
+# - shap_values: raw SHAP values matrix
+```
+
+---
+
+### FeatureSelectionTrainer
+
+Unified trainer that integrates feature selection with model training.
+
+```python
+from site_scoring.feature_selection import FeatureSelectionTrainer
+
+fs_trainer = FeatureSelectionTrainer(
+    config=config,
+    model=model,
+    feature_names=feature_names,
+    input_dim=200,
+    device='mps'
+)
+
+# During training
+for epoch in range(epochs):
+    # Training step
+    gated_x, reg_loss = fs_trainer.apply_feature_gating(x)
+    predictions = model.mlp(gated_x)
+    total_loss = criterion(predictions, targets) + reg_loss
+
+    # End of epoch
+    stats = fs_trainer.on_epoch_end(epoch)
+
+# After training
+summary = fs_trainer.get_selection_summary()
+# {
+#     'method': 'Stochastic Gates (STG)',
+#     'n_total_features': 200,
+#     'n_selected': 150,
+#     'n_eliminated': 50,
+#     'selection_rate': 0.75,
+#     'selected_features': [...],
+#     'eliminated_features': [...],
+#     'importance_scores': {...},
+#     'top_10_features': [...],
+#     'bottom_10_features': [...]
+# }
+
+# Save results
+fs_trainer.save_results(output_dir)
+```
+
+---
+
+### Integration with Training Service
+
+The training service automatically integrates feature selection when configured:
+
+```python
+# Via API
+POST /api/training/start
+{
+    "feature_selection_method": "stg_light",
+    "stg_lambda": 0.1,
+    "stg_sigma": 0.5
+}
+
+# Progress updates include feature selection stats
+{
+    "n_active_features": 150,
+    "fs_reg_loss": 0.0012
+}
+
+# Final metrics include feature selection summary
+{
+    "feature_selection": {
+        "n_selected": 150,
+        "n_eliminated": 50,
+        "selected_features": [...],
+        "top_10_features": [...]
+    }
+}
+```

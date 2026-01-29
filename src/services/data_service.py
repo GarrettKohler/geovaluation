@@ -66,24 +66,82 @@ DETAIL_COLUMNS = [
     'c_emv_enabled', 'c_nfc_enabled', 'c_open_24_hours',
     'c_sells_beer', 'c_sells_wine', 'c_sells_diesel_fuel', 'c_sells_lottery',
     'c_vistar_programmatic_enabled', 'c_walk_up_enabled',
+    # Restrictions
+    'r_lottery', 'r_government', 'r_travel_and_tourism', 'r_retail_car_wash',
+    'r_cpg_beverage_beer_oof', 'r_cpg_beverage_beer_video', 'r_cpg_beverage_wine_oof',
+    'r_cpg_beverage_wine_video', 'r_finance_credit_cards', 'r_cpg_cbd_hemp_ingestibles_non_thc',
+    'r_cpg_non_food_beverage_cannabis_medical', 'r_cpg_non_food_beverage_cannabis_recreational',
+    'r_cpg_non_food_beverage_cbd_hemp_non_thc', 'r_alcohol_drink_responsibly_message',
+    'r_alternative_transportation', 'r_associations_and_npo_anti_smoking',
+    'r_automotive_after_market_oil', 'r_cpg_beverage_spirits_ooh', 'r_cpg_beverage_spirits_video',
+    'r_cpg_non_food_beverage_e_cigarette', 'r_entertainment_casinos_and_gambling',
+    'r_government_political', 'r_automotive_electric', 'r_recruitment',
+    'r_restaurants_cdr', 'r_restaurants_qsr', 'r_retail_automotive_service',
+    'r_retail_grocery', 'r_retail_grocery_with_fuel',
     # Sales info
     'sellable_site', 'schedule_site'
 ]
 
 # Categorical fields that can be used as filters (display_name -> column_name)
 CATEGORICAL_FIELDS = {
+    # Location
     'State': 'state',
     'County': 'county',
     'DMA': 'dma',
+    # Site info
     'Retailer': 'retailer',
     'Network': 'network',
     'Hardware': 'hardware_type',
     'Experience': 'experience_type',
     'Program': 'program',
     'Status': 'statuis',
+    # Brands
     'Fuel Brand': 'brand_fuel',
     'Restaurant': 'brand_restaurant',
     'C-Store': 'brand_c_store',
+    # Capabilities
+    'EMV Enabled': 'c_emv_enabled',
+    'NFC Enabled': 'c_nfc_enabled',
+    'Open 24 Hours': 'c_open_24_hours',
+    'Sells Beer': 'c_sells_beer',
+    'Sells Wine': 'c_sells_wine',
+    'Sells Diesel': 'c_sells_diesel_fuel',
+    'Sells Lottery': 'c_sells_lottery',
+    'Programmatic Enabled': 'c_vistar_programmatic_enabled',
+    'Walk-up Enabled': 'c_walk_up_enabled',
+    # Restrictions
+    'R: Lottery': 'r_lottery',
+    'R: Government': 'r_government',
+    'R: Travel & Tourism': 'r_travel_and_tourism',
+    'R: Car Wash': 'r_retail_car_wash',
+    'R: Beer (OOF)': 'r_cpg_beverage_beer_oof',
+    'R: Beer (Video)': 'r_cpg_beverage_beer_video',
+    'R: Wine (OOF)': 'r_cpg_beverage_wine_oof',
+    'R: Wine (Video)': 'r_cpg_beverage_wine_video',
+    'R: Spirits (OOH)': 'r_cpg_beverage_spirits_ooh',
+    'R: Spirits (Video)': 'r_cpg_beverage_spirits_video',
+    'R: Credit Cards': 'r_finance_credit_cards',
+    'R: CBD/Hemp': 'r_cpg_cbd_hemp_ingestibles_non_thc',
+    'R: Cannabis Medical': 'r_cpg_non_food_beverage_cannabis_medical',
+    'R: Cannabis Recreational': 'r_cpg_non_food_beverage_cannabis_recreational',
+    'R: CBD Non-THC': 'r_cpg_non_food_beverage_cbd_hemp_non_thc',
+    'R: Drink Responsibly': 'r_alcohol_drink_responsibly_message',
+    'R: Alt Transportation': 'r_alternative_transportation',
+    'R: Anti-Smoking': 'r_associations_and_npo_anti_smoking',
+    'R: Oil/Aftermarket': 'r_automotive_after_market_oil',
+    'R: E-Cigarette': 'r_cpg_non_food_beverage_e_cigarette',
+    'R: Casinos/Gambling': 'r_entertainment_casinos_and_gambling',
+    'R: Political': 'r_government_political',
+    'R: Electric Vehicles': 'r_automotive_electric',
+    'R: Recruitment': 'r_recruitment',
+    'R: Restaurants CDR': 'r_restaurants_cdr',
+    'R: Restaurants QSR': 'r_restaurants_qsr',
+    'R: Auto Service': 'r_retail_automotive_service',
+    'R: Grocery': 'r_retail_grocery',
+    'R: Grocery w/ Fuel': 'r_retail_grocery_with_fuel',
+    # Sales
+    'Sellable Site': 'sellable_site',
+    'Schedule Site': 'schedule_site',
 }
 
 # Category organization for site details display
@@ -292,12 +350,16 @@ def get_filter_options(force_reload: bool = False) -> Dict[str, List[str]]:
     return options
 
 
-def get_filtered_site_ids(filters: Dict[str, str]) -> List[str]:
+def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
     """
     Get site IDs matching the specified filters.
 
+    Supports both single values and multi-select (arrays of values).
+    When multiple values are provided for a field, sites matching ANY value are included (OR logic).
+    When multiple fields have filters, ALL must match (AND logic between fields).
+
     Args:
-        filters: Dict mapping field display name to filter value.
+        filters: Dict mapping field display name to filter value (string) or values (list).
 
     Returns:
         List of matching site IDs.
@@ -315,7 +377,13 @@ def get_filtered_site_ids(filters: Dict[str, str]) -> List[str]:
         if display_name in CATEGORICAL_FIELDS and value:
             col_name = CATEGORICAL_FIELDS[display_name]
             if col_name in details_df.columns:
-                mask = mask & (details_df[col_name] == value)
+                # Handle multi-select (list of values) with OR logic
+                if isinstance(value, list):
+                    if len(value) > 0:
+                        mask = mask & (details_df[col_name].isin(value))
+                else:
+                    # Single value
+                    mask = mask & (details_df[col_name] == value)
 
     return details_df.loc[mask, 'gtvid'].tolist()
 

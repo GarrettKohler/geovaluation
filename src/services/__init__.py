@@ -4,7 +4,6 @@ Service modules for the geospatial application.
 Contains:
 - data_service: Data loading and caching
 - training_service: ML model training with GPU acceleration
-- interstate_distance: Highway distance calculations
 - nearest_site: Spatial indexing and nearest neighbor queries
 - epa_walkability: EPA walkability score lookups
 """

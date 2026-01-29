@@ -2,13 +2,13 @@
 TRAINING DATASET SUMMARY REPORT
 ================================================================================
 
-Generated: 2026-01-18 12:29:31
+Generated: 2026-01-26 12:26:48
 
 ----------------------------------------
 DATASET OVERVIEW
 ----------------------------------------
 Total sites (Active only): 26,099
-Total columns: 90
+Total columns: 94
 
 ----------------------------------------
 COLUMN BREAKDOWN

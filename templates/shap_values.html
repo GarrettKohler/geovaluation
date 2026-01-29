@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHAP Feature Importance - GSTV Site Visualization</title>
+    <!-- Google Fonts - Inter for Kepler.gl style -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           Kepler.gl Dark Theme - SHAP Values
+           Based on https://kepler.gl/ design system
+           ============================================ */
+        :root {
+            /* Kepler.gl Core Colors */
+            --kepler-active: #1FBAD6;
+            --kepler-active-hover: #108188;
+            --kepler-primary-btn: #0F9668;
+            --kepler-primary-btn-hover: #13B17B;
+            --kepler-error: #F9042C;
+            --kepler-warning: #FFC043;
+            --kepler-success: #47B275;
+            --kepler-info: #276EF1;
+
+            /* Kepler.gl Background Colors */
+            --kepler-bg-base: #242730;
+            --kepler-bg-panel: #29323C;
+            --kepler-bg-content: #292E36;
+            --kepler-bg-hover: #3A4552;
+            --kepler-bg-input: #29323C;
+
+            /* Kepler.gl Text Colors */
+            --kepler-text: #A0A7B4;
+            --kepler-text-highlight: #F0F0F0;
+            --kepler-text-title: #FFFFFF;
+            --kepler-text-label: #6A7485;
+
+            /* Kepler.gl Border Colors */
+            --kepler-border: #3A414C;
+
+            /* Shadows */
+            --kepler-shadow-dropdown: 0 8px 16px rgba(0,0,0,0.5);
+
+            /* Motion */
+            --kepler-transition: 200ms ease;
+
+            /* Shape */
+            --kepler-radius-sm: 2px;
+            --kepler-radius-md: 4px;
+            --kepler-radius-lg: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--kepler-bg-base);
+            color: var(--kepler-text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ============ Header ============ */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: var(--kepler-bg-panel);
+            padding: 16px 20px;
+            border-radius: var(--kepler-radius-md);
+            border: 1px solid var(--kepler-border);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--kepler-text);
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: var(--kepler-radius-md);
+            transition: all var(--kepler-transition);
+            border: 1px solid transparent;
+        }
+
+        .back-link:hover {
+            color: var(--kepler-active);
+            background: var(--kepler-bg-hover);
+            border-color: var(--kepler-border);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--kepler-text-title);
+            letter-spacing: -0.01em;
+        }
+
+        .header-subtitle {
+            font-size: 0.8125rem;
+            color: var(--kepler-text-label);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        /* ============ Summary Cards - Kepler.gl Style ============ */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: var(--kepler-bg-panel);
+            border-radius: var(--kepler-radius-md);
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--kepler-border);
+            transition: all var(--kepler-transition);
+        }
+
+        .summary-card:hover {
+            border-color: var(--kepler-active);
+        }
+
+        .summary-card-value {
+            font-size: 1.375rem;
+            font-weight: 600;
+            color: var(--kepler-active);
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .summary-card-label {
+            font-size: 0.625rem;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        /* ============ Tab Navigation - Kepler.gl Style ============ */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            background: var(--kepler-bg-panel);
+            padding: 4px;
+            border-radius: var(--kepler-radius-md);
+            margin-bottom: 0;
+            border: 1px solid var(--kepler-border);
+            border-bottom: none;
+            border-radius: var(--kepler-radius-md) var(--kepler-radius-md) 0 0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--kepler-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: var(--kepler-text-label);
+            transition: all var(--kepler-transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tab-btn:hover {
+            background: var(--kepler-bg-hover);
+            color: var(--kepler-text);
+        }
+
+        .tab-btn.active {
+            background: var(--kepler-active);
+            color: #FFFFFF;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ============ Plot Container - Kepler.gl Style ============ */
+        .plot-card {
+            background: var(--kepler-bg-panel);
+            border-radius: 0 0 var(--kepler-radius-md) var(--kepler-radius-md);
+            padding: 20px;
+            border: 1px solid var(--kepler-border);
+            border-top: none;
+            margin-bottom: 20px;
+        }
+
+        .plot-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .plot-card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--kepler-text-title);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .plot-card-subtitle {
+            font-size: 0.8125rem;
+            color: var(--kepler-text-label);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .plot-img {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            display: block;
+            border-radius: var(--kepler-radius-sm);
+            border: 1px solid var(--kepler-border);
+        }
+
+        /* ============ Feature Table - Kepler.gl Style ============ */
+        .feature-table-container {
+            overflow-x: auto;
+            border-radius: var(--kepler-radius-md);
+            border: 1px solid var(--kepler-border);
+        }
+
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+        }
+
+        .feature-table thead {
+            background: var(--kepler-bg-content);
+        }
+
+        .feature-table th {
+            padding: 12px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--kepler-text-label);
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--kepler-border);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            transition: color var(--kepler-transition);
+        }
+
+        .feature-table th:hover {
+            color: var(--kepler-active);
+        }
+
+        .feature-table th .sort-indicator {
+            display: inline-block;
+            margin-left: 4px;
+            opacity: 0.4;
+            transition: opacity var(--kepler-transition);
+        }
+
+        .feature-table th.sorted .sort-indicator {
+            opacity: 1;
+            color: var(--kepler-active);
+        }
+
+        .feature-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--kepler-border);
+            color: var(--kepler-text);
+        }
+
+        .feature-table tr {
+            transition: background var(--kepler-transition);
+        }
+
+        .feature-table tr:hover td {
+            background: var(--kepler-bg-hover);
+        }
+
+        .feature-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .feature-table .rank-cell {
+            font-weight: 500;
+            color: var(--kepler-text-label);
+            width: 50px;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .feature-table .feature-name {
+            font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8125rem;
+            color: var(--kepler-text-highlight);
+        }
+
+        .importance-bar-cell {
+            width: 180px;
+        }
+
+        .importance-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: var(--kepler-border);
+            border-radius: var(--kepler-radius-sm);
+            overflow: hidden;
+        }
+
+        .importance-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--kepler-active), var(--kepler-primary-btn));
+            border-radius: var(--kepler-radius-sm);
+            transition: width 300ms ease;
+        }
+
+        .importance-value {
+            font-weight: 500;
+            color: var(--kepler-active);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8125rem;
+        }
+
+        .mean-shap-positive {
+            color: var(--kepler-error);
+        }
+
+        .mean-shap-negative {
+            color: var(--kepler-info);
+        }
+
+        /* ============ Loading State ============ */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--kepler-text-label);
+        }
+
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--kepler-border);
+            border-top-color: var(--kepler-active);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============ Error State ============ */
+        .error-container {
+            text-align: center;
+            padding: 60px;
+            color: var(--kepler-text-label);
+        }
+
+        .error-container svg {
+            width: 56px;
+            height: 56px;
+            stroke: var(--kepler-error);
+            margin-bottom: 16px;
+            opacity: 0.8;
+        }
+
+        .error-container h3 {
+            color: var(--kepler-text-highlight);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        /* ============ Info Box - Kepler.gl Style ============ */
+        .info-box {
+            background: linear-gradient(135deg, rgba(31, 186, 214, 0.1), rgba(15, 150, 104, 0.1));
+            border: 1px solid rgba(31, 186, 214, 0.3);
+            border-radius: var(--kepler-radius-md);
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            font-size: 0.8125rem;
+            color: var(--kepler-text);
+            line-height: 1.5;
+        }
+
+        .info-box strong {
+            font-weight: 600;
+            color: var(--kepler-active);
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .tab-nav { flex-wrap: wrap; }
+            .importance-bar-cell { width: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                    Back to Map
+                </a>
+                <div>
+                    <h1>SHAP Feature Importance</h1>
+                    <div class="header-subtitle">Model interpretability via Shapley additive explanations</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid" id="summary-grid">
+            <div class="summary-card">
+                <div class="summary-card-value" id="summary-samples">-</div>
+                <div class="summary-card-label">Samples Explained</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-value" id="summary-features">-</div>
+                <div class="summary-card-label">Total Features</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-value" id="summary-base">-</div>
+                <div class="summary-card-label">Base Prediction</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-value" id="summary-top-feature">-</div>
+                <div class="summary-card-label">Most Important</div>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <strong>What are SHAP values?</strong> SHAP (SHapley Additive exPlanations) measures how each feature
+            contributes to the model's prediction. A higher |SHAP value| means the feature has more impact on predictions.
+            Positive mean SHAP values push predictions higher; negative values push them lower.
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="importance">Feature Importance</button>
+            <button class="tab-btn" data-tab="summary">Summary Plot</button>
+            <button class="tab-btn" data-tab="table">Data Table</button>
+        </div>
+
+        <!-- Tab: Feature Importance Bar Plot -->
+        <div class="tab-content active" id="tab-importance">
+            <div class="plot-card">
+                <div class="plot-card-header">
+                    <div>
+                        <div class="plot-card-title">Global Feature Importance</div>
+                        <div class="plot-card-subtitle">Features ranked by mean |SHAP value| across all explained samples</div>
+                    </div>
+                </div>
+                <div id="bar-plot-container">
+                    <div class="loading-container" id="bar-plot-loading">
+                        <div class="loading-spinner"></div>
+                        <div>Generating importance plot...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Summary/Beeswarm Plot -->
+        <div class="tab-content" id="tab-summary">
+            <div class="plot-card">
+                <div class="plot-card-header">
+                    <div>
+                        <div class="plot-card-title">SHAP Summary (Beeswarm)</div>
+                        <div class="plot-card-subtitle">Each dot represents one sample. Color shows feature value (red=high, blue=low). Position shows SHAP impact.</div>
+                    </div>
+                </div>
+                <div id="summary-plot-container">
+                    <div class="loading-container" id="summary-plot-loading">
+                        <div class="loading-spinner"></div>
+                        <div>Generating summary plot...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Data Table -->
+        <div class="tab-content" id="tab-table">
+            <div class="plot-card">
+                <div class="plot-card-header">
+                    <div>
+                        <div class="plot-card-title">Feature Importance Table</div>
+                        <div class="plot-card-subtitle">Click column headers to sort</div>
+                    </div>
+                </div>
+                <div class="feature-table-container" id="table-container">
+                    <div class="loading-container" id="table-loading">
+                        <div class="loading-spinner"></div>
+                        <div>Loading feature data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error state (hidden by default) -->
+        <div class="error-container" id="error-container" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h3>No SHAP Data Available</h3>
+            <p id="error-message">Train a model first to generate feature importance data.</p>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let shapData = null;
+        let sortColumn = 'importance';
+        let sortDirection = 'desc';
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Load data on page load
+        async function init() {
+            try {
+                // Fetch summary data and plots in parallel
+                const [summaryRes, plotsRes] = await Promise.all([
+                    fetch('/api/shap/summary?top_n=50'),
+                    fetch('/api/shap/plots')
+                ]);
+
+                if (!summaryRes.ok) {
+                    showError('No SHAP data available. Train a model to generate feature importance.');
+                    return;
+                }
+
+                shapData = await summaryRes.json();
+
+                // Update summary cards
+                document.getElementById('summary-samples').textContent = shapData.n_samples.toLocaleString();
+                document.getElementById('summary-features').textContent = shapData.total_features_available;
+                document.getElementById('summary-base').textContent = shapData.base_value.toFixed(4);
+                if (shapData.features.length > 0) {
+                    // Show a shortened version of the feature name
+                    const topName = shapData.features[0].feature;
+                    document.getElementById('summary-top-feature').textContent =
+                        topName.length > 16 ? topName.substring(0, 14) + '...' : topName;
+                    document.getElementById('summary-top-feature').title = topName;
+                }
+
+                // Render feature table (replaces loading spinner automatically)
+                renderTable(shapData.features);
+
+                // Render plots
+                if (plotsRes.ok) {
+                    const plots = await plotsRes.json();
+
+                    if (plots.bar_plot) {
+                        document.getElementById('bar-plot-container').innerHTML =
+                            `<img class="plot-img" src="data:image/png;base64,${plots.bar_plot}" alt="SHAP Feature Importance Bar Plot">`;
+                    } else {
+                        document.getElementById('bar-plot-loading').innerHTML = '<div>Plot generation not available</div>';
+                    }
+
+                    if (plots.summary_plot) {
+                        document.getElementById('summary-plot-container').innerHTML =
+                            `<img class="plot-img" src="data:image/png;base64,${plots.summary_plot}" alt="SHAP Beeswarm Summary Plot">`;
+                    } else {
+                        document.getElementById('summary-plot-loading').innerHTML = '<div>Plot generation not available</div>';
+                    }
+                } else {
+                    document.getElementById('bar-plot-loading').innerHTML = '<div>Could not generate plots</div>';
+                    document.getElementById('summary-plot-loading').innerHTML = '<div>Could not generate plots</div>';
+                }
+
+            } catch (err) {
+                console.error('Failed to load SHAP data:', err);
+                showError('Failed to load SHAP data: ' + err.message);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('summary-grid').style.display = 'none';
+            document.querySelector('.info-box').style.display = 'none';
+            document.querySelector('.tab-nav').style.display = 'none';
+            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById('error-container').style.display = 'block';
+            document.getElementById('error-message').textContent = message;
+        }
+
+        function renderTable(features) {
+            const maxImportance = features.length > 0 ? features[0].importance : 1;
+
+            let html = `
+                <table class="feature-table">
+                    <thead>
+                        <tr>
+                            <th class="rank-cell">#</th>
+                            <th data-sort="feature">Feature <span class="sort-indicator">&#9650;</span></th>
+                            <th data-sort="importance" class="sorted">Importance <span class="sort-indicator">&#9660;</span></th>
+                            <th>Visual</th>
+                            <th data-sort="mean_shap">Mean SHAP <span class="sort-indicator">&#9650;</span></th>
+                            <th data-sort="std_shap">Std Dev <span class="sort-indicator">&#9650;</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            features.forEach((f, idx) => {
+                const barWidth = (f.importance / maxImportance * 100).toFixed(1);
+                const meanClass = f.mean_shap >= 0 ? 'mean-shap-positive' : 'mean-shap-negative';
+                const meanSign = f.mean_shap >= 0 ? '+' : '';
+
+                html += `
+                    <tr>
+                        <td class="rank-cell">${idx + 1}</td>
+                        <td class="feature-name" title="${f.feature}">${f.feature}</td>
+                        <td class="importance-value">${f.importance.toFixed(6)}</td>
+                        <td class="importance-bar-cell">
+                            <div class="importance-bar-bg">
+                                <div class="importance-bar-fill" style="width: ${barWidth}%"></div>
+                            </div>
+                        </td>
+                        <td class="${meanClass}">${meanSign}${f.mean_shap.toFixed(6)}</td>
+                        <td>${f.std_shap.toFixed(6)}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+
+            document.getElementById('table-container').innerHTML = html;
+
+            // Add sort handlers
+            document.querySelectorAll('.feature-table th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const col = th.dataset.sort;
+                    if (sortColumn === col) {
+                        sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+                    } else {
+                        sortColumn = col;
+                        sortDirection = 'desc';
+                    }
+
+                    const sorted = [...shapData.features].sort((a, b) => {
+                        let va = a[col], vb = b[col];
+                        if (col === 'feature') {
+                            return sortDirection === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                        }
+                        return sortDirection === 'asc' ? va - vb : vb - va;
+                    });
+
+                    renderTable(sorted);
+                });
+            });
+        }
+
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>

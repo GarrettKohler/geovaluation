@@ -1,19 +1,20 @@
 """
-Flask application for visualizing site-to-highway connections.
+Flask application for visualizing geospatial site data with ML scoring.
 
 Features:
 - Interactive map with all sites displayed
 - Lasso selection and click-to-select sites
-- Highway connection visualization with distance calculations
 - Side panel with comprehensive site details
 - Filtering by categorical fields (State, Network, Retailer, etc.)
+- ML model training (regression and lookalike)
+- Explainability features (tier classification, counterfactuals)
 
 Run with: python app.py
-Then open http://localhost:5000 in your browser.
+Then open http://localhost:8080 in your browser.
 """
 
+from pathlib import Path
 from flask import Flask, render_template, jsonify, request, Response
-from src.services.interstate_distance import distance_to_nearest_interstate, preload_highway_data
 from src.services.data_service import (
     load_sites,
     load_revenue_metrics,
@@ -31,7 +32,16 @@ from src.services.training_service import (
     stop_training,
     get_training_status,
     stream_training_progress,
+    load_explainability_components,
+    explain_prediction,
 )
+from site_scoring.config import get_all_model_presets, get_model_preset, get_all_available_features, DEFAULT_OUTPUT_DIR
+from src.services.fleet_analysis_service import (
+    start_fleet_analysis,
+    get_fleet_analysis_status,
+    export_fleet_analysis_to_excel,
+)
+from src.services.shap_service import ShapCache, generate_shap_plots
 
 app = Flask(__name__)
 
@@ -44,6 +54,24 @@ app = Flask(__name__)
 def index():
     """Render the main map visualization page."""
     return render_template('index.html')
+
+
+@app.route('/training-details')
+def training_details():
+    """Render the training details page with site records."""
+    return render_template('training_details.html')
+
+
+@app.route('/glossary')
+def glossary():
+    """Render the ML/statistics glossary page."""
+    return render_template('glossary.html')
+
+
+@app.route('/shap-values')
+def shap_values():
+    """Render the SHAP feature importance visualization page."""
+    return render_template('shap_values.html')
 
 
 # =============================================================================
@@ -92,41 +120,6 @@ def get_sites():
     return jsonify(sites)
 
 
-@app.route('/api/site/<site_id>')
-def get_site_detail(site_id):
-    """
-    Get basic site information including highway distance.
-
-    Args:
-        site_id: The site GTVID.
-
-    Returns:
-        JSON with site coordinates, nearest highway, and distance.
-    """
-    df = load_sites()
-    site_row = df[df['GTVID'] == site_id]
-
-    if site_row.empty:
-        return jsonify({'error': 'Site not found'}), 404
-
-    site = site_row.iloc[0]
-    lat, lon = site['Latitude'], site['Longitude']
-
-    result = distance_to_nearest_interstate(lat, lon, include_nearest_point=True)
-
-    return jsonify({
-        'site_id': site_id,
-        'latitude': lat,
-        'longitude': lon,
-        'nearest_highway': result['nearest_highway'],
-        'distance_miles': round(result['distance_miles'], 2),
-        'highway_point': {
-            'lat': result['nearest_point_lat'],
-            'lon': result['nearest_point_lon']
-        }
-    })
-
-
 @app.route('/api/site-details/<site_id>')
 def get_full_site_details(site_id):
     """
@@ -173,64 +166,6 @@ def get_bulk_site_details():
             result[site_id] = _clean_nan_values(site_data)
 
     return jsonify(result)
-
-
-# =============================================================================
-# API Routes - Highway Connections
-# =============================================================================
-
-@app.route('/api/highway-connections', methods=['POST'])
-def get_highway_connections():
-    """
-    Calculate highway connections for selected sites.
-
-    Request Body:
-        {"site_ids": ["SFR001", "GHR001", ...]}
-
-    Returns:
-        JSON with connections array, each containing:
-        - site_id, site_lat, site_lon: Site information
-        - highway_lat, highway_lon, highway_name: Nearest highway point
-        - highway_segment: Coordinates for highlighting the highway section
-        - distance_miles: Distance from site to highway
-    """
-    data = request.get_json()
-    site_ids = data.get('site_ids', [])
-
-    if not site_ids:
-        return jsonify({'connections': []})
-
-    df = load_sites()
-    connections = []
-
-    for site_id in site_ids:
-        site_row = df[df['GTVID'] == site_id]
-        if site_row.empty:
-            continue
-
-        site = site_row.iloc[0]
-        lat, lon = site['Latitude'], site['Longitude']
-
-        # Get nearest interstate with highway segment
-        result = distance_to_nearest_interstate(
-            lat, lon,
-            include_nearest_point=True,
-            include_highway_segment=True,
-            segment_length_meters=800
-        )
-
-        connections.append({
-            'site_id': site_id,
-            'site_lat': lat,
-            'site_lon': lon,
-            'highway_lat': result['nearest_point_lat'],
-            'highway_lon': result['nearest_point_lon'],
-            'highway_name': result['nearest_highway'],
-            'highway_segment': result.get('highway_segment', []),
-            'distance_miles': round(result['distance_miles'], 2)
-        })
-
-    return jsonify({'connections': connections})
 
 
 # =============================================================================
@@ -286,6 +221,79 @@ def api_get_system_info():
         JSON with PyTorch version, CUDA/MPS availability, recommended device.
     """
     return jsonify(get_system_info())
+
+
+@app.route('/api/training/presets')
+def api_get_training_presets():
+    """
+    Get available model presets with feature counts.
+
+    Returns:
+        JSON dict mapping preset key to {name, description, counts}.
+    """
+    return jsonify(get_all_model_presets())
+
+
+@app.route('/api/training/features')
+def api_get_training_features():
+    """
+    Get the feature lists for a model preset (or the default config).
+
+    Query Params:
+        preset: Optional model preset name (model_a, model_b)
+
+    Returns:
+        JSON with numeric, categorical, and boolean feature lists plus counts.
+    """
+    from site_scoring.config import Config
+    cfg = Config()
+
+    preset_name = request.args.get('preset')
+    if preset_name:
+        try:
+            cfg.apply_model_preset(preset_name)
+        except ValueError:
+            pass  # Fall back to default if invalid preset
+
+    return jsonify({
+        'target': cfg.target,
+        'task_type': cfg.task_type,
+        'numeric': cfg.numeric_features,
+        'categorical': cfg.categorical_features,
+        'boolean': cfg.boolean_features,
+        'preset': preset_name or 'default',
+        'counts': {
+            'numeric': len(cfg.numeric_features),
+            'categorical': len(cfg.categorical_features),
+            'boolean': len(cfg.boolean_features),
+            'total': len(cfg.numeric_features) + len(cfg.categorical_features) + len(cfg.boolean_features),
+        },
+    })
+
+
+@app.route('/api/training/all-features')
+def api_get_all_features():
+    """
+    Get all available features across all presets.
+    Used by the feature selection UI to show what can be selected.
+
+    Returns:
+        JSON with numeric, categorical, and boolean feature lists (union of all presets).
+    """
+    all_features = get_all_available_features()
+    return jsonify({
+        'numeric': all_features['numeric'],
+        'categorical': all_features['categorical'],
+        'boolean': all_features['boolean'],
+        'counts': {
+            'numeric': len(all_features['numeric']),
+            'categorical': len(all_features['categorical']),
+            'boolean': len(all_features['boolean']),
+            'total': (len(all_features['numeric']) +
+                      len(all_features['categorical']) +
+                      len(all_features['boolean'])),
+        },
+    })
 
 
 @app.route('/api/training/start', methods=['POST'])
@@ -363,6 +371,480 @@ def api_stream_training():
 
 
 # =============================================================================
+# API Routes - SHAP Feature Importance
+# =============================================================================
+
+SHAP_OUTPUT_DIR = DEFAULT_OUTPUT_DIR
+
+
+@app.route('/api/shap/available')
+def api_shap_available():
+    """
+    Check if SHAP data is available from the last training run.
+
+    Returns:
+        JSON with available flag and basic info.
+    """
+    cache = ShapCache(SHAP_OUTPUT_DIR)
+    if cache.exists():
+        info = cache.get_feature_importance(top_n=1)
+        return jsonify({
+            'available': True,
+            'n_samples': info['n_samples'] if info else 0,
+            'n_features': info['n_features'] if info else 0,
+        })
+    return jsonify({'available': False})
+
+
+@app.route('/api/shap/summary')
+def api_shap_summary():
+    """
+    Get SHAP feature importance summary data.
+
+    Query Params:
+        top_n: Number of top features to return (default: 30)
+
+    Returns:
+        JSON with ranked feature importance list, base value, and sample counts.
+    """
+    top_n = request.args.get('top_n', 30, type=int)
+    cache = ShapCache(SHAP_OUTPUT_DIR)
+    result = cache.get_feature_importance(top_n=top_n)
+
+    if result is None:
+        return jsonify({'error': 'No SHAP data available. Train a model first.'}), 404
+
+    return jsonify(result)
+
+
+@app.route('/api/shap/plots')
+def api_shap_plots():
+    """
+    Get SHAP visualization plots as base64-encoded PNG images.
+
+    Returns:
+        JSON with bar_plot and summary_plot as base64 strings,
+        or error if SHAP data/matplotlib unavailable.
+    """
+    plots = generate_shap_plots(SHAP_OUTPUT_DIR)
+    if plots is None:
+        return jsonify({'error': 'No SHAP plots available. Train a model first.'}), 404
+    return jsonify(plots)
+
+
+# =============================================================================
+# API Routes - Explainability (Conformal Prediction & Tier Classification)
+# =============================================================================
+
+@app.route('/api/explainability/available')
+def api_explainability_available():
+    """
+    Check if the explainability pipeline is available.
+
+    The pipeline is fitted automatically after training lookalike models
+    and provides:
+    - Probability calibration (isotonic regression)
+    - Conformal prediction (prediction sets with coverage guarantees)
+    - Tier classification (executive-friendly labels)
+
+    Returns:
+        JSON with:
+        - available: bool
+        - calibration_method: str (if available)
+        - conformal_alpha: float (if available)
+    """
+    components = load_explainability_components(SHAP_OUTPUT_DIR)
+
+    if components is None:
+        return jsonify({
+            'available': False,
+            'message': 'No explainability pipeline found. Train a lookalike model first.'
+        })
+
+    metadata = components.get('metadata', {})
+    return jsonify({
+        'available': True,
+        'calibration_method': 'isotonic',
+        'conformal_alpha': metadata.get('conformal_alpha', 0.10),
+        'n_features': metadata.get('n_numeric', 0) + metadata.get('n_categorical', 0) + metadata.get('n_boolean', 0),
+        'n_calibration_samples': metadata.get('n_calibration_samples', 0),
+    })
+
+
+@app.route('/api/explainability/explain', methods=['POST'])
+def api_explain_prediction():
+    """
+    Explain a prediction with calibration and tier classification.
+
+    This lightweight endpoint takes a raw model probability and returns:
+    - Calibrated probability
+    - Tier classification with confidence statement
+    - Historical accuracy for the tier
+
+    Request Body:
+        {"probability": 0.75}  # Raw sigmoid output from model
+
+    Returns:
+        JSON with:
+        - raw_probability: float
+        - calibrated_probability: float
+        - tier: int (1-4)
+        - tier_label: str (Recommended, Promising, Review Required, Not Recommended)
+        - tier_action: str (recommended action)
+        - confidence_statement: str (e.g., "8 out of 10 similar sites succeeded")
+        - historical_accuracy: float or null
+        - color: str (hex color for UI)
+    """
+    data = request.get_json() or {}
+    probability = data.get('probability')
+
+    if probability is None:
+        return jsonify({'error': 'Missing probability parameter'}), 400
+
+    try:
+        probability = float(probability)
+        if not 0 <= probability <= 1:
+            return jsonify({'error': 'Probability must be between 0 and 1'}), 400
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid probability value'}), 400
+
+    result = explain_prediction(probability, SHAP_OUTPUT_DIR)
+
+    if 'error' in result:
+        return jsonify(result), 404
+
+    return jsonify(result)
+
+
+@app.route('/api/explainability/explain-batch', methods=['POST'])
+def api_explain_batch():
+    """
+    Explain multiple predictions at once.
+
+    Request Body:
+        {"probabilities": {"site1": 0.75, "site2": 0.42, ...}}
+
+    Returns:
+        JSON dict mapping site_id to explanation result.
+    """
+    data = request.get_json() or {}
+    probabilities = data.get('probabilities', {})
+
+    if not probabilities:
+        return jsonify({})
+
+    components = load_explainability_components(SHAP_OUTPUT_DIR)
+    if components is None:
+        return jsonify({'error': 'Explainability pipeline not available'}), 404
+
+    calibrator = components.get('calibrator')
+    tier_classifier = components.get('tier_classifier')
+
+    if calibrator is None or tier_classifier is None:
+        return jsonify({'error': 'Missing calibrator or tier classifier'}), 404
+
+    import numpy as np
+    results = {}
+
+    for site_id, raw_prob in probabilities.items():
+        try:
+            raw_prob = float(raw_prob)
+            calibrated_prob = calibrator.calibrate(np.array([raw_prob]))[0]
+            tier_result = tier_classifier.classify(calibrated_prob)
+
+            results[site_id] = {
+                'raw_probability': raw_prob,
+                'calibrated_probability': float(calibrated_prob),
+                'tier': tier_result.tier,
+                'tier_label': tier_result.label,
+                'tier_action': tier_result.action,
+                'confidence_statement': tier_result.confidence_statement,
+                'historical_accuracy': tier_result.historical_accuracy,
+                'color': tier_result.color,
+            }
+        except (TypeError, ValueError) as e:
+            results[site_id] = {'error': str(e)}
+
+    return jsonify(results)
+
+
+@app.route('/api/explainability/tier-summary', methods=['POST'])
+def api_tier_summary():
+    """
+    Get tier distribution summary for a set of predictions.
+
+    Useful for fleet-wide analysis to understand how sites are distributed
+    across tiers.
+
+    Request Body:
+        {"probabilities": [0.85, 0.72, 0.45, ...]}
+
+    Returns:
+        JSON with:
+        - tier_distribution: dict mapping tier to {count, percentage, label, color}
+        - total_sites: int
+        - calibration_applied: bool
+    """
+    data = request.get_json() or {}
+    probabilities = data.get('probabilities', [])
+
+    if not probabilities:
+        return jsonify({
+            'tier_distribution': {},
+            'total_sites': 0,
+            'calibration_applied': False,
+        })
+
+    components = load_explainability_components(SHAP_OUTPUT_DIR)
+    if components is None:
+        return jsonify({'error': 'Explainability pipeline not available'}), 404
+
+    calibrator = components.get('calibrator')
+    tier_classifier = components.get('tier_classifier')
+
+    if calibrator is None or tier_classifier is None:
+        return jsonify({'error': 'Missing calibrator or tier classifier'}), 404
+
+    import numpy as np
+
+    # Calibrate all probabilities
+    raw_probs = np.array([float(p) for p in probabilities])
+    calibrated_probs = calibrator.calibrate(raw_probs)
+
+    # Get tier distribution
+    from site_scoring.explainability.tiers import TIER_LABELS, TIER_COLORS
+    tier_counts = {1: 0, 2: 0, 3: 0, 4: 0}
+
+    for prob in calibrated_probs:
+        tier_result = tier_classifier.classify(prob)
+        tier_counts[tier_result.tier] += 1
+
+    total = len(probabilities)
+    tier_distribution = {}
+    for tier, count in tier_counts.items():
+        tier_distribution[tier] = {
+            'count': count,
+            'percentage': count / total if total > 0 else 0,
+            'label': TIER_LABELS[tier],
+            'color': TIER_COLORS[tier],
+        }
+
+    return jsonify({
+        'tier_distribution': tier_distribution,
+        'total_sites': total,
+        'calibration_applied': True,
+    })
+
+
+# =============================================================================
+# API Routes - Fleet-Wide Intervention Analysis (Phase 5)
+# =============================================================================
+
+@app.route('/api/explainability/fleet-analysis', methods=['POST'])
+def api_start_fleet_analysis():
+    """
+    Start fleet-wide intervention analysis.
+
+    This endpoint analyzes all low-performing sites (Tier 3-4) to identify
+    strategic interventions that could upgrade the entire portfolio.
+
+    Request Body:
+        {
+            "site_ids": ["SFR001", "GHR001", ...],
+            "probabilities": [0.35, 0.42, ...],
+            "n_counterfactuals": 3,  # optional, default 3
+            "n_clusters": 5          # optional, default 5
+        }
+
+    Returns:
+        JSON with:
+        - success: bool
+        - job_id: str (for tracking progress)
+        - message: str
+    """
+    data = request.get_json() or {}
+    site_ids = data.get('site_ids', [])
+    probabilities = data.get('probabilities', [])
+    n_counterfactuals = data.get('n_counterfactuals', 3)
+    n_clusters = data.get('n_clusters', 5)
+
+    if not site_ids or not probabilities:
+        return jsonify({
+            'success': False,
+            'error': 'Missing site_ids or probabilities'
+        }), 400
+
+    if len(site_ids) != len(probabilities):
+        return jsonify({
+            'success': False,
+            'error': f'Length mismatch: {len(site_ids)} site_ids vs {len(probabilities)} probabilities'
+        }), 400
+
+    # Load explainability components
+    components = load_explainability_components(SHAP_OUTPUT_DIR)
+    if components is None:
+        return jsonify({
+            'success': False,
+            'error': 'Explainability pipeline not available. Train a lookalike model first.'
+        }), 404
+
+    calibrator = components.get('calibrator')
+    tier_classifier = components.get('tier_classifier')
+    metadata = components.get('metadata', {})
+
+    if calibrator is None or tier_classifier is None:
+        return jsonify({
+            'success': False,
+            'error': 'Missing calibrator or tier classifier'
+        }), 404
+
+    # Load site feature data
+    try:
+        import pandas as pd
+        details_df = load_site_details()
+
+        # Filter to requested sites
+        site_data = details_df[details_df['gtvid'].isin(site_ids)].copy()
+
+        if site_data.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No matching sites found in site details'
+            }), 404
+
+        # Get feature names from metadata
+        feature_names = metadata.get('feature_names', [])
+        continuous_features = metadata.get('continuous_features', [])
+
+        if not feature_names:
+            return jsonify({
+                'success': False,
+                'error': 'Feature names not found in metadata'
+            }), 500
+
+        # Load the trained model for counterfactual generation
+        model_path = SHAP_OUTPUT_DIR / 'best_model.pt'
+        if not model_path.exists():
+            return jsonify({
+                'success': False,
+                'error': 'Trained model not found. Train a model first.'
+            }), 404
+
+        # Load sklearn wrapper for counterfactuals
+        from site_scoring.explainability.conformal import SklearnModelWrapper
+        import torch
+
+        # Load model architecture info from metadata
+        n_numeric = metadata.get('n_numeric', 0)
+        n_categorical = metadata.get('n_categorical', 0)
+        n_boolean = metadata.get('n_boolean', 0)
+        device = 'cpu'
+
+        # Load the actual PyTorch model
+        from site_scoring.model import DOOHScoringModel
+        model = DOOHScoringModel(
+            n_numeric=n_numeric,
+            n_categorical=n_categorical,
+            n_boolean=n_boolean,
+            hidden_layers=[512, 256, 128, 64],
+            dropout=0.2,
+        )
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+        model.eval()
+
+        # Create sklearn wrapper
+        sklearn_model = SklearnModelWrapper(
+            model=model,
+            n_numeric=n_numeric,
+            n_categorical=n_categorical,
+            n_boolean=n_boolean,
+            device=device,
+        )
+
+        # Prepare training data for counterfactual generator
+        # (Uses feature ranges from training data)
+        train_data = site_data[feature_names].copy() if all(f in site_data.columns for f in feature_names) else site_data.copy()
+
+        # Start fleet analysis job
+        job_id = start_fleet_analysis(
+            model=sklearn_model,
+            train_data=train_data,
+            feature_names=feature_names,
+            continuous_features=continuous_features,
+            calibrator=calibrator,
+            tier_classifier=tier_classifier,
+            site_data=site_data,
+            site_ids=site_ids,
+            raw_probabilities=probabilities,
+            n_counterfactuals=n_counterfactuals,
+            n_clusters=n_clusters,
+            output_dir=SHAP_OUTPUT_DIR / 'fleet_analysis',
+        )
+
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'message': f'Fleet analysis started. Analyzing {len(site_ids)} sites.',
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to start fleet analysis: {str(e)}'
+        }), 500
+
+
+@app.route('/api/explainability/fleet-analysis/status/<job_id>')
+def api_fleet_analysis_status(job_id: str):
+    """
+    Get status of a fleet analysis job.
+
+    Returns:
+        JSON with:
+        - job_id: str
+        - status: 'pending' | 'running' | 'completed' | 'failed'
+        - progress_pct: float
+        - progress_message: str
+        - results: dict (when completed)
+    """
+    status = get_fleet_analysis_status(job_id)
+
+    if status is None:
+        return jsonify({
+            'error': f'Job {job_id} not found'
+        }), 404
+
+    return jsonify(status)
+
+
+@app.route('/api/explainability/export-report/<job_id>')
+def api_export_fleet_report(job_id: str):
+    """
+    Export fleet analysis results to Excel.
+
+    Returns:
+        Excel file download, or JSON error
+    """
+    from flask import send_file
+
+    excel_path = export_fleet_analysis_to_excel(job_id)
+
+    if excel_path is None:
+        return jsonify({
+            'error': 'Export failed. Job may not be complete or openpyxl not installed.'
+        }), 400
+
+    return send_file(
+        excel_path,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'fleet_intervention_analysis_{job_id}.xlsx',
+    )
+
+
+# =============================================================================
 # Application Entry Point
 # =============================================================================
 
@@ -381,10 +863,6 @@ if __name__ == '__main__':
     if not is_reloader:
         print("\nLoading data...")
     preload_all_data()
-
-    if not is_reloader:
-        print("\nPre-loading highway data (this may take a moment on first run)...")
-    preload_highway_data()
 
     if not is_reloader:
         print("\n" + "=" * 60)

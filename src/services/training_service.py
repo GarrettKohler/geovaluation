@@ -1,4 +1,5 @@
 """
+TRAINING FOR BINARY CLASSIFICATION FOR LOOKALIKE CALCULATION
 Training service for model training with GPU acceleration.
 Provides async training with progress tracking via Server-Sent Events.
 """
@@ -19,9 +20,28 @@ from queue import Queue
 import traceback
 
 # Import from site_scoring module (at project root)
-from site_scoring.config import Config
+from site_scoring.config import Config, DEFAULT_OUTPUT_DIR
 from site_scoring.model import SiteScoringModel
 from site_scoring.data_loader import DataProcessor, create_data_loaders
+from src.services.shap_service import compute_shap_values, ShapCache
+
+# Feature selection imports
+from site_scoring.feature_selection import (
+    FeatureSelectionConfig,
+    FeatureSelectionMethod,
+    FeatureSelectionTrainer,
+    create_feature_selection_model,
+    STGAugmentedModel,
+    get_preset,
+)
+
+# Explainability imports (Phase 3 integration)
+from site_scoring.explainability import (
+    ExplainabilityPipeline,
+    ProbabilityCalibrator,
+    ConformalClassifier,
+    TierClassifier,
+)
 
 
 @dataclass
@@ -30,8 +50,11 @@ class TrainingConfig:
     # Model type
     model_type: str = "neural_network"  # neural_network, gradient_boosting, random_forest
 
+    # Task type: "regression" (predict revenue) or "lookalike" (classify top performers)
+    task_type: str = "regression"
+
     # Target variable
-    target: str = "revenue"  # revenue, monthly_impressions, monthly_revenue_per_screen
+    target: str = "avg_monthly_revenue"  # avg_monthly_revenue (recommended), total_revenue
 
     # Training hyperparameters
     epochs: int = 50
@@ -57,6 +80,25 @@ class TrainingConfig:
     pin_memory: bool = True
     prefetch_factor: int = 2
 
+    # Feature Selection Configuration
+    feature_selection_method: str = "none"  # none, stg_light, stg_aggressive, lassonet_standard, etc.
+    stg_lambda: float = 0.1        # STG L0 regularization weight
+    stg_sigma: float = 0.5         # STG gate distribution spread
+    run_shap_validation: bool = False  # Run SHAP-Select post-training
+    track_gradients: bool = False  # Track gradient/weight profiles
+
+    # Model Preset (controls which features are included)
+    model_preset: str = "model_b"  # model_a (all features) or model_b (curated)
+
+    # User-selected features (subset of preset features)
+    # If None or empty, all preset features are used
+    selected_features: Optional[list] = None
+
+    # Explainability Configuration (for lookalike/classification tasks)
+    fit_explainability: bool = True  # Fit calibration + conformal prediction after training
+    calibration_split: float = 0.5   # Fraction of validation data reserved for calibration
+    conformal_alpha: float = 0.10    # Significance level (0.10 = 90% coverage)
+
 
 @dataclass
 class TrainingProgress:
@@ -66,12 +108,17 @@ class TrainingProgress:
     train_loss: float
     val_loss: float
     val_mae: float
+    val_smape: float
+    val_rmse: float
     val_r2: float
     learning_rate: float
     elapsed_time: float
     status: str  # running, completed, error
     message: str = ""
     best_val_loss: float = float('inf')
+    # Feature selection stats
+    n_active_features: Optional[int] = None
+    fs_reg_loss: float = 0.0
 
 
 class TrainingJob:
@@ -115,6 +162,158 @@ class TrainingJob:
         """Add progress update to queue."""
         self.progress_queue.put(progress)
 
+    def _fit_explainability_pipeline(
+        self,
+        model: nn.Module,
+        val_loader: DataLoader,
+        processor,
+        pytorch_config,
+        all_feature_names: list,
+        output_dir: Path,
+        device: torch.device,
+    ) -> Dict:
+        """
+        Fit the explainability pipeline after training completes.
+
+        This includes:
+        1. Probability calibration (isotonic regression)
+        2. Conformal prediction (MAPIE with APS method)
+        3. Tier classifier initialization
+
+        Args:
+            model: Trained PyTorch model
+            val_loader: Validation data loader
+            processor: Data processor with encoders
+            pytorch_config: Training configuration
+            all_feature_names: List of feature names
+            output_dir: Directory to save pipeline
+            device: Device for inference
+
+        Returns:
+            Dict with calibration and conformal prediction statistics
+        """
+        import pandas as pd
+
+        # Collect validation data for calibration
+        model.eval()
+        all_numeric = []
+        all_categorical = []
+        all_boolean = []
+        all_targets = []
+        all_predictions = []
+
+        with torch.no_grad():
+            for numeric, categorical, boolean, target in val_loader:
+                numeric = numeric.to(device, non_blocking=True)
+                categorical = categorical.to(device, non_blocking=True)
+                boolean = boolean.to(device, non_blocking=True)
+
+                predictions = model(numeric, categorical, boolean)
+                proba = torch.sigmoid(predictions).cpu().numpy().ravel()
+
+                all_numeric.append(numeric.cpu().numpy())
+                all_categorical.append(categorical.cpu().numpy())
+                all_boolean.append(boolean.cpu().numpy())
+                all_targets.append(target.numpy().ravel())
+                all_predictions.append(proba)
+
+        # Concatenate all batches
+        X_numeric = np.vstack(all_numeric)
+        X_categorical = np.vstack(all_categorical)
+        X_boolean = np.vstack(all_boolean)
+        y_val = np.concatenate(all_targets)
+        y_proba_val = np.concatenate(all_predictions)
+
+        # Concatenate features for sklearn-style input
+        X_val = np.hstack([X_numeric, X_categorical, X_boolean])
+
+        # Split validation into calibration and holdout
+        n_cal = int(len(X_val) * self.config.calibration_split)
+        indices = np.random.permutation(len(X_val))
+        cal_indices = indices[:n_cal]
+        holdout_indices = indices[n_cal:]
+
+        X_cal = X_val[cal_indices]
+        y_cal = y_val[cal_indices]
+        y_proba_cal = y_proba_val[cal_indices]
+
+        X_holdout = X_val[holdout_indices]
+        y_holdout = y_val[holdout_indices]
+
+        # 1. Fit probability calibrator
+        calibrator = ProbabilityCalibrator(method='isotonic')
+        calibrator.fit(y_proba_cal, y_cal)
+
+        # Evaluate calibration on holdout
+        y_proba_holdout = y_proba_val[holdout_indices]
+        y_calibrated_holdout = calibrator.calibrate(y_proba_holdout)
+        calibration_ece = calibrator.get_expected_calibration_error(
+            y_calibrated_holdout, y_holdout
+        )
+
+        # 2. Fit conformal predictor
+        n_numeric = X_numeric.shape[1]
+        n_categorical = X_categorical.shape[1]
+        n_boolean = X_boolean.shape[1]
+
+        conformal = ConformalClassifier(
+            model=model,
+            n_numeric=n_numeric,
+            n_categorical=n_categorical,
+            n_boolean=n_boolean,
+            alpha=self.config.conformal_alpha,
+            method='aps',
+            device=str(device),
+        )
+        conformal.fit(X_cal, y_cal)
+
+        # Evaluate coverage on holdout
+        coverage_stats = conformal.evaluate_coverage(X_holdout, y_holdout)
+
+        # 3. Initialize tier classifier
+        tier_classifier = TierClassifier()
+
+        # Save components
+        explainability_dir = output_dir / "explainability"
+        explainability_dir.mkdir(parents=True, exist_ok=True)
+
+        calibrator.save(explainability_dir / "calibrator.pkl")
+        conformal.save(explainability_dir / "conformal.pkl")
+
+        # Save tier classifier config
+        import pickle
+        with open(explainability_dir / "tier_classifier.pkl", 'wb') as f:
+            pickle.dump(tier_classifier.to_dict(), f)
+
+        # Save metadata
+        metadata = {
+            'feature_names': all_feature_names,
+            'n_numeric': n_numeric,
+            'n_categorical': n_categorical,
+            'n_boolean': n_boolean,
+            'conformal_alpha': self.config.conformal_alpha,
+            'calibration_split': self.config.calibration_split,
+            'n_calibration_samples': n_cal,
+        }
+        with open(explainability_dir / "metadata.pkl", 'wb') as f:
+            pickle.dump(metadata, f)
+
+        # Return statistics
+        return {
+            'calibration_method': 'isotonic',
+            'calibration_ece': float(calibration_ece) if not np.isnan(calibration_ece) else None,
+            'calibration_brier_before': calibrator.brier_score_before,
+            'calibration_brier_after': calibrator.brier_score_after,
+            'conformal_method': 'aps',
+            'conformal_alpha': self.config.conformal_alpha,
+            'conformal_coverage': coverage_stats['coverage'],
+            'conformal_target_coverage': coverage_stats['target_coverage'],
+            'conformal_avg_set_size': coverage_stats['avg_set_size'],
+            'conformal_pct_uncertain': coverage_stats['pct_uncertain'],
+            'n_calibration_samples': n_cal,
+            'pipeline_path': str(explainability_dir),
+        }
+
     def _run_training(self):
         """Main training loop - runs in background thread."""
         start_time = time.time()
@@ -127,6 +326,8 @@ class TrainingJob:
                 train_loss=0,
                 val_loss=0,
                 val_mae=0,
+                val_smape=0,
+                val_rmse=0,
                 val_r2=0,
                 learning_rate=self.config.learning_rate,
                 elapsed_time=0,
@@ -152,6 +353,29 @@ class TrainingJob:
             pytorch_config.num_workers = self.config.num_workers
             pytorch_config.pin_memory = self.config.pin_memory
             pytorch_config.prefetch_factor = self.config.prefetch_factor
+            pytorch_config.task_type = self.config.task_type
+
+            # Apply model preset (controls which features are included)
+            if self.config.model_preset:
+                pytorch_config.apply_model_preset(self.config.model_preset)
+
+                # Apply user feature selection (filter to selected subset)
+                if self.config.selected_features:
+                    from site_scoring.config import filter_features_by_selection
+                    filtered = filter_features_by_selection(
+                        self.config.model_preset,
+                        self.config.selected_features
+                    )
+                    pytorch_config.numeric_features = filtered["numeric"]
+                    pytorch_config.categorical_features = filtered["categorical"]
+                    pytorch_config.boolean_features = filtered["boolean"]
+                    print(f"[Training] User feature selection applied: "
+                          f"{len(self.config.selected_features)} features selected")
+
+                print(f"[Training] Model preset: {self.config.model_preset} "
+                      f"({len(pytorch_config.numeric_features)} numeric, "
+                      f"{len(pytorch_config.categorical_features)} categorical, "
+                      f"{len(pytorch_config.boolean_features)} boolean)")
 
             # Get chip name for display
             chip_name = APPLE_CHIP_SPECS.get(self.config.apple_chip, {})
@@ -163,6 +387,8 @@ class TrainingJob:
                 train_loss=0,
                 val_loss=0,
                 val_mae=0,
+                val_smape=0,
+                val_rmse=0,
                 val_r2=0,
                 learning_rate=self.config.learning_rate,
                 elapsed_time=time.time() - start_time,
@@ -179,6 +405,8 @@ class TrainingJob:
                 train_loss=0,
                 val_loss=0,
                 val_mae=0,
+                val_smape=0,
+                val_rmse=0,
                 val_r2=0,
                 learning_rate=self.config.learning_rate,
                 elapsed_time=time.time() - start_time,
@@ -200,8 +428,87 @@ class TrainingJob:
             device = torch.device(self.config.device)
             model = model.to(device)
 
-            # Training setup
-            criterion = nn.HuberLoss(delta=1.0)
+            # Initialize feature selection
+            fs_trainer = None
+            fs_config = None
+            use_stg = False
+
+            if self.config.feature_selection_method != "none":
+                self._report_progress(TrainingProgress(
+                    epoch=0,
+                    total_epochs=self.config.epochs,
+                    train_loss=0,
+                    val_loss=0,
+                    val_mae=0,
+                    val_smape=0,
+                    val_rmse=0,
+                    val_r2=0,
+                    learning_rate=self.config.learning_rate,
+                    elapsed_time=time.time() - start_time,
+                    status="running",
+                    message=f"Initializing feature selection: {self.config.feature_selection_method}..."
+                ))
+
+                # Get preset or create custom config
+                try:
+                    fs_config = get_preset(self.config.feature_selection_method)
+                except ValueError:
+                    # Custom config with user parameters
+                    fs_config = FeatureSelectionConfig(
+                        method=FeatureSelectionMethod.STOCHASTIC_GATES,
+                        stg_lambda=self.config.stg_lambda,
+                        stg_sigma=self.config.stg_sigma,
+                        run_shap_validation=self.config.run_shap_validation,
+                        track_gradients=self.config.track_gradients,
+                    )
+
+                # Build feature names list
+                all_feature_names = (
+                    list(pytorch_config.numeric_features) +
+                    list(pytorch_config.categorical_features) +
+                    list(pytorch_config.boolean_features)
+                )
+
+                # Calculate total input dimension
+                # Must match CategoricalEmbedding formula: max(min(embedding_dim, (vocab+1)//2), 4)
+                cat_dim = sum(
+                    max(min(pytorch_config.embedding_dim, (vocab + 1) // 2), 4)
+                    for vocab in processor.categorical_vocab_sizes.values()
+                )
+                total_input_dim = cat_dim + processor.n_numeric_features + processor.n_boolean_features
+
+                # Create feature selection model/trainer
+                model, fs_trainer = create_feature_selection_model(
+                    config=fs_config,
+                    base_model=model,
+                    n_numeric=processor.n_numeric_features,
+                    n_boolean=processor.n_boolean_features,
+                    categorical_vocab_sizes=processor.categorical_vocab_sizes,
+                    embedding_dim=pytorch_config.embedding_dim,
+                    hidden_dims=pytorch_config.hidden_dims,
+                    dropout=pytorch_config.dropout,
+                    feature_names=all_feature_names,
+                    device=self.config.device,
+                )
+
+                # Check if using STG (requires modified forward pass)
+                use_stg = (fs_config.method == FeatureSelectionMethod.STOCHASTIC_GATES and
+                          fs_trainer is not None and fs_trainer.stg_gates is not None)
+
+                if use_stg:
+                    # Wrap model with STG
+                    model = STGAugmentedModel(model, fs_trainer.stg_gates).to(device)
+
+                print(f"[Training] Feature selection initialized: {fs_config.get_method_display_name()}")
+
+            # Training setup - branch loss function by task type
+            if self.config.task_type == "lookalike":
+                # Classification: BCEWithLogitsLoss with class weighting for 90/10 imbalance
+                pos_weight = torch.tensor([9.0], device=device)
+                criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+            else:
+                # Regression: Huber loss (robust to revenue outliers)
+                criterion = nn.HuberLoss(delta=1.0)
             optimizer = AdamW(
                 model.parameters(),
                 lr=pytorch_config.learning_rate,
@@ -227,7 +534,9 @@ class TrainingJob:
                         train_loss=0,
                         val_loss=0,
                         val_mae=0,
-                        val_r2=0,
+                        val_smape=0,
+                        val_rmse=0,
+                                val_r2=0,
                         learning_rate=optimizer.param_groups[0]["lr"],
                         elapsed_time=time.time() - start_time,
                         status="stopped",
@@ -240,6 +549,8 @@ class TrainingJob:
                 total_train_loss = 0.0
                 n_batches = 0
 
+                total_fs_reg_loss = 0.0  # Feature selection regularization loss
+
                 for numeric, categorical, boolean, target in train_loader:
                     numeric = numeric.to(device, non_blocking=True)
                     categorical = categorical.to(device, non_blocking=True)
@@ -248,15 +559,30 @@ class TrainingJob:
 
                     optimizer.zero_grad(set_to_none=True)
                     predictions = model(numeric, categorical, boolean)
-                    loss = criterion(predictions, target)
+                    task_loss = criterion(predictions, target)
+
+                    # Add feature selection regularization loss if using STG
+                    if use_stg and hasattr(model, 'get_regularization_loss'):
+                        fs_reg_loss = model.get_regularization_loss()
+                        loss = task_loss + fs_reg_loss
+                        total_fs_reg_loss += fs_reg_loss.item()
+                    else:
+                        loss = task_loss
+
                     loss.backward()
+
+                    # Record gradients for gradient analyzer if enabled
+                    if fs_trainer is not None and fs_trainer.gradient_analyzer is not None:
+                        fs_trainer.gradient_analyzer.record_gradients()
+
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                     optimizer.step()
 
-                    total_train_loss += loss.item()
+                    total_train_loss += task_loss.item()
                     n_batches += 1
 
                 train_loss = total_train_loss / n_batches
+                fs_reg_loss_avg = total_fs_reg_loss / n_batches if n_batches > 0 else 0.0
 
                 # Validate
                 model.eval()
@@ -283,13 +609,35 @@ class TrainingJob:
                 # Calculate metrics
                 predictions_np = torch.cat(all_predictions).numpy()
                 targets_np = torch.cat(all_targets).numpy()
-                predictions_orig = processor.target_scaler.inverse_transform(predictions_np)
-                targets_orig = processor.target_scaler.inverse_transform(targets_np)
 
-                mae = np.mean(np.abs(predictions_orig - targets_orig))
-                ss_res = np.sum((targets_orig - predictions_orig) ** 2)
-                ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
-                r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+                if self.config.task_type == "lookalike":
+                    # Classification metrics
+                    from sklearn.metrics import roc_auc_score
+                    predictions_prob = 1 / (1 + np.exp(-predictions_np.flatten()))  # sigmoid
+                    targets_binary = targets_np.flatten()
+                    try:
+                        auc = float(roc_auc_score(targets_binary, predictions_prob))
+                    except ValueError:
+                        auc = 0.0  # Edge case: only one class in batch
+                    accuracy = float(np.mean((predictions_prob >= 0.5) == targets_binary))
+                    # Map to progress fields: val_r2 → AUC (frontend uses this for display)
+                    mae, smape, rmse, r2 = 0.0, 0.0, 0.0, auc
+                else:
+                    # Regression metrics
+                    predictions_orig = processor.target_scaler.inverse_transform(predictions_np)
+                    targets_orig = processor.target_scaler.inverse_transform(targets_np)
+                    errors = predictions_orig - targets_orig
+                    mae = float(np.mean(np.abs(errors)))
+                    rmse = float(np.sqrt(np.mean(errors ** 2)))
+                    denominator = (np.abs(targets_orig) + np.abs(predictions_orig)) / 2
+                    nonzero_mask = denominator > 0
+                    if nonzero_mask.any():
+                        smape = float(np.mean(np.abs(errors[nonzero_mask]) / denominator[nonzero_mask]) * 100)
+                    else:
+                        smape = 0.0
+                    ss_res = np.sum(errors ** 2)
+                    ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
+                    r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
 
                 # Update scheduler
                 scheduler.step(val_loss)
@@ -303,19 +651,36 @@ class TrainingJob:
                 else:
                     patience_counter += 1
 
+                # Feature selection: call on_epoch_end
+                n_active_features = None
+                if fs_trainer is not None:
+                    fs_stats = fs_trainer.on_epoch_end(epoch)
+                    n_active_features = fs_stats.get('n_active_features')
+
+                # Build progress message
+                progress_msg = f"Epoch {epoch}/{self.config.epochs}"
+                if n_active_features is not None:
+                    progress_msg += f" | {n_active_features} features active"
+                if fs_reg_loss_avg > 0:
+                    progress_msg += f" | FS reg: {fs_reg_loss_avg:.4f}"
+
                 # Report progress
                 self._report_progress(TrainingProgress(
                     epoch=epoch,
                     total_epochs=self.config.epochs,
                     train_loss=train_loss,
                     val_loss=val_loss,
-                    val_mae=float(mae),
+                    val_mae=mae,
+                    val_smape=smape,
+                    val_rmse=rmse,
                     val_r2=float(r2),
                     learning_rate=current_lr,
                     elapsed_time=time.time() - start_time,
                     status="running",
-                    message=f"Epoch {epoch}/{self.config.epochs}",
-                    best_val_loss=best_val_loss
+                    message=progress_msg,
+                    best_val_loss=best_val_loss,
+                    n_active_features=n_active_features,
+                    fs_reg_loss=fs_reg_loss_avg,
                 ))
 
                 # Early stopping
@@ -349,50 +714,191 @@ class TrainingJob:
             test_loss = total_test_loss / len(test_loader)
             predictions_np = torch.cat(all_predictions).numpy()
             targets_np = torch.cat(all_targets).numpy()
-            predictions_orig = processor.target_scaler.inverse_transform(predictions_np)
-            targets_orig = processor.target_scaler.inverse_transform(targets_np)
 
-            test_mae = np.mean(np.abs(predictions_orig - targets_orig))
-            ss_res = np.sum((targets_orig - predictions_orig) ** 2)
-            ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
-            test_r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            if self.config.task_type == "lookalike":
+                # Classification test metrics
+                from sklearn.metrics import roc_auc_score
+                predictions_prob = 1 / (1 + np.exp(-predictions_np.flatten()))  # sigmoid
+                targets_binary = targets_np.flatten()
+                try:
+                    test_auc = float(roc_auc_score(targets_binary, predictions_prob))
+                except ValueError:
+                    test_auc = 0.0
+                test_accuracy = float(np.mean((predictions_prob >= 0.5) == targets_binary))
+                test_mae, test_smape, test_rmse, test_r2 = 0.0, 0.0, 0.0, test_auc
+            else:
+                # Regression test metrics
+                predictions_orig = processor.target_scaler.inverse_transform(predictions_np)
+                targets_orig = processor.target_scaler.inverse_transform(targets_np)
+                test_errors = predictions_orig - targets_orig
+                test_mae = float(np.mean(np.abs(test_errors)))
+                test_rmse = float(np.sqrt(np.mean(test_errors ** 2)))
+                denominator = (np.abs(targets_orig) + np.abs(predictions_orig)) / 2
+                nonzero_mask = denominator > 0
+                if nonzero_mask.any():
+                    test_smape = float(np.mean(np.abs(test_errors[nonzero_mask]) / denominator[nonzero_mask]) * 100)
+                else:
+                    test_smape = 0.0
+                ss_res = np.sum(test_errors ** 2)
+                ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
+                test_r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
 
             # Save model
             output_dir = pytorch_config.output_dir
             output_dir.mkdir(parents=True, exist_ok=True)
 
             checkpoint_path = output_dir / "best_model.pt"
+            if self.config.task_type == "lookalike":
+                test_metrics_dict = {
+                    "test_loss": test_loss,
+                    "test_auc": test_auc,
+                    "test_accuracy": test_accuracy,
+                    "test_r2": test_auc,  # Frontend reads this field
+                }
+            else:
+                test_metrics_dict = {
+                    "test_loss": test_loss,
+                    "test_mae": test_mae,
+                    "test_smape": test_smape,
+                    "test_rmse": test_rmse,
+                    "test_r2": float(test_r2),
+                }
+
+            # Include feature selection summary if available
+            fs_summary = None
+            if fs_trainer is not None:
+                fs_summary = fs_trainer.get_selection_summary()
+                fs_trainer.save_results(output_dir)
+                print(f"[Training] Feature selection: {fs_summary['n_selected']}/{fs_summary['n_total_features']} features selected")
+
+            # Build feature info for export
+            features_used = {
+                "numeric": list(pytorch_config.numeric_features),
+                "categorical": list(pytorch_config.categorical_features),
+                "boolean": list(pytorch_config.boolean_features),
+                "total": (len(pytorch_config.numeric_features) +
+                          len(pytorch_config.categorical_features) +
+                          len(pytorch_config.boolean_features)),
+            }
+
             torch.save({
                 "model_state_dict": model.state_dict(),
                 "config": pytorch_config,
-                "test_metrics": {
-                    "test_loss": test_loss,
-                    "test_mae": float(test_mae),
-                    "test_r2": float(test_r2),
-                }
+                "test_metrics": test_metrics_dict,
+                "feature_selection": fs_summary,
+                "model_preset": self.config.model_preset,
+                "selected_features": self.config.selected_features,
+                "features_used": features_used,
             }, checkpoint_path)
             processor.save(output_dir / "preprocessor.pkl")
 
+            # Compute SHAP values for model interpretability
+            shap_available = False
+            if not self.should_stop:
+                # Build combined feature names list matching the order used in data loading
+                all_feature_names = (
+                    list(pytorch_config.numeric_features) +
+                    list(pytorch_config.categorical_features) +
+                    list(pytorch_config.boolean_features)
+                )
+
+                def shap_progress(msg):
+                    self._report_progress(TrainingProgress(
+                        epoch=self.config.epochs,
+                        total_epochs=self.config.epochs,
+                        train_loss=train_loss,
+                        val_loss=val_loss,
+                        val_mae=test_mae if self.config.task_type != "lookalike" else 0.0,
+                        val_smape=test_smape if self.config.task_type != "lookalike" else 0.0,
+                        val_rmse=test_rmse if self.config.task_type != "lookalike" else 0.0,
+                        val_r2=float(test_r2) if self.config.task_type != "lookalike" else float(test_auc),
+                        learning_rate=current_lr,
+                        elapsed_time=time.time() - start_time,
+                        status="running",
+                        message=msg,
+                        best_val_loss=best_val_loss
+                    ))
+
+                shap_available = compute_shap_values(
+                    model=model,
+                    processor=processor,
+                    test_loader=test_loader,
+                    feature_names=all_feature_names,
+                    output_dir=output_dir,
+                    device=self.config.device,
+                    task_type=self.config.task_type,
+                    progress_callback=shap_progress,
+                )
+
+            # Fit explainability pipeline for lookalike (classification) tasks
+            explainability_stats = None
+            if (self.config.task_type == "lookalike" and
+                self.config.fit_explainability and
+                not self.should_stop):
+
+                self._report_progress(TrainingProgress(
+                    epoch=self.config.epochs,
+                    total_epochs=self.config.epochs,
+                    train_loss=train_loss,
+                    val_loss=val_loss,
+                    val_mae=0.0,
+                    val_smape=0.0,
+                    val_rmse=0.0,
+                    val_r2=float(test_auc),
+                    learning_rate=current_lr,
+                    elapsed_time=time.time() - start_time,
+                    status="running",
+                    message="Fitting calibration & conformal prediction...",
+                    best_val_loss=best_val_loss
+                ))
+
+                try:
+                    explainability_stats = self._fit_explainability_pipeline(
+                        model=model,
+                        val_loader=val_loader,
+                        processor=processor,
+                        pytorch_config=pytorch_config,
+                        all_feature_names=all_feature_names,
+                        output_dir=output_dir,
+                        device=device,
+                    )
+                    print(f"[Training] Explainability: calibration ECE={explainability_stats.get('calibration_ece', 'N/A'):.4f}, "
+                          f"coverage={explainability_stats.get('conformal_coverage', 'N/A'):.2%}")
+                except Exception as e:
+                    print(f"[Training] Warning: Explainability fitting failed: {e}")
+                    traceback.print_exc()
+
             self.final_metrics = {
-                "test_loss": float(test_loss),
-                "test_mae": float(test_mae),
-                "test_r2": float(test_r2),
+                **test_metrics_dict,
                 "best_val_loss": float(best_val_loss),
                 "model_path": str(checkpoint_path),
+                "shap_available": shap_available,
+                "feature_selection": fs_summary,
+                "explainability": explainability_stats,
+                "model_preset": self.config.model_preset,
+                "selected_features": self.config.selected_features,
+                "features_used": features_used,
             }
 
             # Report completion
+            if self.config.task_type == "lookalike":
+                completion_msg = f"Training complete! AUC: {test_auc:.4f}, Accuracy: {test_accuracy:.2%}"
+            else:
+                completion_msg = f"Training complete! MAE: ${test_mae:,.0f}, SMAPE: {test_smape:.2f}%, RMSE: ${test_rmse:,.0f}, R²: {test_r2:.4f}"
+
             self._report_progress(TrainingProgress(
                 epoch=self.config.epochs,
                 total_epochs=self.config.epochs,
                 train_loss=train_loss,
                 val_loss=val_loss,
-                val_mae=float(test_mae),
+                val_mae=test_mae,
+                val_smape=test_smape,
+                val_rmse=test_rmse,
                 val_r2=float(test_r2),
                 learning_rate=current_lr,
                 elapsed_time=time.time() - start_time,
                 status="completed",
-                message=f"Training complete! Test MAE: ${test_mae:,.2f}, R²: {test_r2:.4f}",
+                message=completion_msg,
                 best_val_loss=best_val_loss
             ))
 
@@ -403,6 +909,8 @@ class TrainingJob:
                 train_loss=0,
                 val_loss=0,
                 val_mae=0,
+                val_smape=0,
+                val_rmse=0,
                 val_r2=0,
                 learning_rate=self.config.learning_rate,
                 elapsed_time=time.time() - start_time,
@@ -589,7 +1097,8 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
 
         config = TrainingConfig(
             model_type=config_dict.get("model_type", "neural_network"),
-            target=config_dict.get("target", "revenue"),
+            task_type=config_dict.get("task_type", "regression"),
+            target=config_dict.get("target", "avg_monthly_revenue"),
             epochs=int(config_dict.get("epochs", 50)),
             batch_size=optimized_params["batch_size"],
             learning_rate=float(config_dict.get("learning_rate", 1e-4)),
@@ -604,7 +1113,43 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
             num_workers=optimized_params["num_workers"],
             pin_memory=optimized_params["pin_memory"],
             prefetch_factor=optimized_params["prefetch_factor"],
+            # Model preset
+            model_preset=config_dict.get("model_preset", "model_b"),
+            # User-selected features (subset of preset)
+            selected_features=config_dict.get("selected_features"),
+            # Feature selection parameters
+            feature_selection_method=config_dict.get("feature_selection_method", "none"),
+            stg_lambda=float(config_dict.get("stg_lambda", 0.1)),
+            stg_sigma=float(config_dict.get("stg_sigma", 0.5)),
+            run_shap_validation=config_dict.get("run_shap_validation", False),
+            track_gradients=config_dict.get("track_gradients", False),
+            # Explainability parameters
+            fit_explainability=config_dict.get("fit_explainability", True),
+            calibration_split=float(config_dict.get("calibration_split", 0.5)),
+            conformal_alpha=float(config_dict.get("conformal_alpha", 0.10)),
         )
+
+        # Log model preset
+        print(f"=== Model Preset ===")
+        print(f"Preset: {config.model_preset}")
+
+        # Log explainability settings for lookalike tasks
+        if config.task_type == "lookalike" and config.fit_explainability:
+            print(f"=== Explainability Pipeline ===")
+            print(f"Calibration: isotonic (split={config.calibration_split:.0%})")
+            print(f"Conformal: APS (alpha={config.conformal_alpha}, coverage={1-config.conformal_alpha:.0%})")
+
+        # Log feature selection settings if enabled
+        if config.feature_selection_method != "none":
+            print(f"=== Feature Selection ===")
+            print(f"Method: {config.feature_selection_method}")
+            if "stg" in config.feature_selection_method:
+                print(f"STG Lambda: {config.stg_lambda}")
+                print(f"STG Sigma: {config.stg_sigma}")
+            if config.run_shap_validation:
+                print(f"SHAP Validation: Enabled")
+            if config.track_gradients:
+                print(f"Gradient Tracking: Enabled")
 
         _current_job = TrainingJob(config)
         _current_job.start()
@@ -652,6 +1197,8 @@ def get_training_status() -> Optional[Dict]:
         "train_loss": progress.train_loss,
         "val_loss": progress.val_loss,
         "val_mae": progress.val_mae,
+        "val_smape": progress.val_smape,
+        "val_rmse": progress.val_rmse,
         "val_r2": progress.val_r2,
         "learning_rate": progress.learning_rate,
         "elapsed_time": progress.elapsed_time,
@@ -660,6 +1207,20 @@ def get_training_status() -> Optional[Dict]:
         "best_val_loss": progress.best_val_loss,
         "final_metrics": _current_job.final_metrics,
     }
+
+
+def _sanitize_for_json(obj):
+    """Convert Infinity/NaN values to None for JSON serialization."""
+    import math
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    return obj
 
 
 def stream_training_progress() -> Generator[str, None, None]:
@@ -679,23 +1240,129 @@ def stream_training_progress() -> Generator[str, None, None]:
                 "train_loss": progress.train_loss,
                 "val_loss": progress.val_loss,
                 "val_mae": progress.val_mae,
+                "val_smape": progress.val_smape,
+                "val_rmse": progress.val_rmse,
                 "val_r2": progress.val_r2,
                 "learning_rate": progress.learning_rate,
                 "elapsed_time": progress.elapsed_time,
                 "status": progress.status,
                 "message": progress.message,
                 "best_val_loss": progress.best_val_loss,
+                # Feature selection stats
+                "n_active_features": progress.n_active_features,
+                "fs_reg_loss": progress.fs_reg_loss,
             }
 
             # Include final_metrics in the completion message so frontend gets it immediately
             if progress.status in ("completed", "error", "stopped"):
                 if _current_job.final_metrics:
                     data["final_metrics"] = _current_job.final_metrics
-                yield f"data: {json.dumps(data)}\n\n"
+                # Sanitize Infinity/NaN values before JSON serialization
+                yield f"data: {json.dumps(_sanitize_for_json(data))}\n\n"
                 break
             else:
-                yield f"data: {json.dumps(data)}\n\n"
+                # Sanitize Infinity/NaN values before JSON serialization
+                yield f"data: {json.dumps(_sanitize_for_json(data))}\n\n"
         else:
             time.sleep(0.5)
 
     yield f"data: {json.dumps({'status': 'stream_end'})}\n\n"
+
+
+def load_explainability_components(output_dir: Path = None) -> Dict:
+    """
+    Load the explainability pipeline components from saved files.
+
+    Returns a dict with:
+    - calibrator: ProbabilityCalibrator for calibrating raw predictions
+    - conformal: ConformalClassifier for prediction sets (requires model)
+    - tier_classifier: TierClassifier for executive-friendly labels
+    - metadata: Feature names, dimensions, etc.
+
+    Note: To use conformal prediction, you need to also load the model
+    and call conformal.sklearn_wrapper with the model.
+    """
+    import pickle
+
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
+
+    explainability_dir = output_dir / "explainability"
+
+    if not explainability_dir.exists():
+        return None
+
+    components = {}
+
+    # Load calibrator
+    cal_path = explainability_dir / "calibrator.pkl"
+    if cal_path.exists():
+        components['calibrator'] = ProbabilityCalibrator.load(cal_path)
+
+    # Load tier classifier
+    tier_path = explainability_dir / "tier_classifier.pkl"
+    if tier_path.exists():
+        with open(tier_path, 'rb') as f:
+            tier_data = pickle.load(f)
+            components['tier_classifier'] = TierClassifier.from_dict(tier_data)
+
+    # Load metadata
+    meta_path = explainability_dir / "metadata.pkl"
+    if meta_path.exists():
+        with open(meta_path, 'rb') as f:
+            components['metadata'] = pickle.load(f)
+
+    # Conformal state (for loading with model)
+    conf_path = explainability_dir / "conformal.pkl"
+    if conf_path.exists():
+        components['conformal_path'] = conf_path
+
+    return components
+
+
+def explain_prediction(
+    raw_probability: float,
+    output_dir: Path = None,
+) -> Dict:
+    """
+    Explain a single prediction using the saved explainability pipeline.
+
+    This is a lightweight function that doesn't require loading the full model.
+    It takes a raw model probability and returns:
+    - Calibrated probability
+    - Tier classification with confidence statement
+    - Historical accuracy for the tier
+
+    Args:
+        raw_probability: Raw sigmoid output from model (0-1)
+        output_dir: Directory containing saved pipeline
+
+    Returns:
+        Dict with explanation data
+    """
+    components = load_explainability_components(output_dir)
+    if components is None:
+        return {"error": "Explainability pipeline not found"}
+
+    calibrator = components.get('calibrator')
+    tier_classifier = components.get('tier_classifier')
+
+    if calibrator is None or tier_classifier is None:
+        return {"error": "Missing calibrator or tier classifier"}
+
+    # Calibrate the probability
+    calibrated_prob = calibrator.calibrate(np.array([raw_probability]))[0]
+
+    # Classify into tier
+    tier_result = tier_classifier.classify(calibrated_prob)
+
+    return {
+        "raw_probability": raw_probability,
+        "calibrated_probability": float(calibrated_prob),
+        "tier": tier_result.tier,
+        "tier_label": tier_result.label,
+        "tier_action": tier_result.action,
+        "confidence_statement": tier_result.confidence_statement,
+        "historical_accuracy": tier_result.historical_accuracy,
+        "color": tier_result.color,
+    }

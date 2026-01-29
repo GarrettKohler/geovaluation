@@ -76,6 +76,7 @@ geospatial/
 │
 ├── data/                       # Data files
 │   ├── input/                  # Input CSV files
+│   ├── output/                 # Generated results (distances, etc.)
 │   └── shapefiles/             # Geographic data
 │
 ├── scripts/                    # Utility scripts
@@ -83,7 +84,14 @@ geospatial/
 │   └── site_walkability.py     # Walkability calculations
 │
 └── docs/                       # Documentation
-    └── api.md                  # API reference
+    ├── api.md                  # API reference
+    ├── ARCHITECTURE.md         # System architecture & diagrams
+    ├── src_and_site_scoring.md # How src/ and site_scoring/ work together
+    ├── scripts_pipeline.md    # How scripts/ generates ML features
+    ├── test_coverage.md       # Test coverage analysis and edge cases
+    ├── highway_geospatial_research.md  # Highway geospatial research guide
+    └── platinum_ml_web_app/    # App demo videos
+        └── Train Lookalike Group.mov
 ```
 
 ## Web Application Features
@@ -147,6 +155,13 @@ Contains:
 Place these files in `data/input/`:
 - `Sites - Base Data Set.csv` - Site locations (GTVID, Latitude, Longitude)
 - `Site Scores - Site Revenue, Impressions, and Diagnostics.csv` - Site details and metrics
+- `nearest_distances.csv` - each sites distance the closest GSTV site
+- `interstate_distances.csv` - each sites distance to the nearest interstate
+- `distance_to_mcdonalds_mi.csv` - each sites distance to the nearest mcdonalds
+- `distance_to_walmart_mi.csv` - each sites distance to the nearest walmart
+- `distance_to_kroger_mi.csv` - each sites distance to the nearest kroger
+- `distance_to_------_mi.csv` - each sites distance to the nearest 
+
 
 ## Installation
 
@@ -181,7 +196,6 @@ pip install -r requirements.txt
 
 - **Startup**: ~5-10 seconds to load all data
 - **Site Rendering**: WebGL handles 57K+ points smoothly
-- **Highway Queries**: <100ms per site using spatial indexing
 - **Filtering**: Near-instant with pre-cached unique values
 
 ## License

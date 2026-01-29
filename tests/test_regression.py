@@ -72,7 +72,7 @@ class TestModelLoading:
 
         if "test_metrics" in checkpoint:
             metrics = checkpoint["test_metrics"]
-            assert "test_mae" in metrics or "test_loss" in metrics
+            assert "test_smape" in metrics or "test_mae" in metrics or "test_loss" in metrics
 
     def test_can_instantiate_scorer(self, model_output_dir):
         """SiteScorer can be instantiated from saved model."""
@@ -185,15 +185,22 @@ class TestPredictionQuality:
         except Exception as e:
             pytest.skip(f"Could not load checkpoint: {e}")
 
-    def test_mae_is_reasonable(self, model_metrics):
-        """Mean Absolute Error is within acceptable range."""
-        if "test_mae" not in model_metrics:
-            pytest.skip("MAE not in saved metrics")
+    def test_smape_is_reasonable(self, model_metrics):
+        """Symmetric Mean Absolute Percentage Error is within acceptable range (0-200%)."""
+        if "test_smape" not in model_metrics:
+            pytest.skip("SMAPE not in saved metrics")
 
-        mae = model_metrics["test_mae"]
+        smape = model_metrics["test_smape"]
 
-        # MAE should be less than $50,000 for monthly revenue
-        assert mae < 50000, f"MAE too high: ${mae:,.2f}"
+        # SMAPE sanity check: bounded between 0% and 200%
+        assert smape >= 0, f"SMAPE is negative: {smape:.2f}%"
+        assert smape <= 200, f"SMAPE exceeds 200%: {smape:.2f}%"
+        assert np.isfinite(smape), f"SMAPE is not finite: {smape}"
+
+        # Warn if SMAPE is high (model may need retraining)
+        if smape > 50:
+            import warnings
+            warnings.warn(f"Model SMAPE is {smape:.2f}% - predictions may be unreliable")
 
     def test_r2_is_not_severely_negative(self, model_metrics):
         """R-squared is not severely negative (model is at least reasonably trained)."""

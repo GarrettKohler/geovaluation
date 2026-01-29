@@ -36,6 +36,7 @@ graph TB
             DS[data_service.py<br/>Data Loading & Caching]
             TS[training_service.py<br/>ML Training Manager]
             IS[interstate_distance.py<br/>Highway Calculations]
+            SS[shap_service.py<br/>Feature Importance]
         end
     end
 
@@ -43,27 +44,30 @@ graph TB
         CONFIG[config.py<br/>Training Config]
         MODEL[model.py<br/>Neural Network]
         LOADER[data_loader.py<br/>Data Processing]
-        TRAIN[train.py<br/>Training Loop]
+        FS[feature_selection/<br/>STG, LassoNet, SHAP-Select]
     end
 
     subgraph "Data Storage"
         CSV[(CSV Files<br/>Site Data)]
         TIGER[(Census TIGER<br/>Highway Data)]
-        OUTPUTS[(outputs/<br/>Trained Models)]
+        OUTPUTS[(outputs/<br/>Models + SHAP Cache)]
     end
 
     UI --> |HTTP/REST| APP
     APP --> DS
     APP --> TS
     APP --> IS
+    APP --> SS
 
     TS --> CONFIG
     TS --> MODEL
     TS --> LOADER
+    TS --> FS
 
     DS --> CSV
     IS --> TIGER
     TS --> OUTPUTS
+    SS --> OUTPUTS
 
     LEAFLET --> UI
     SELECT2 --> UI
@@ -88,13 +92,18 @@ graph TB
             v
 +------------------------------------------------------------------+
 |                      BACKEND (Flask - app.py)                     |
-|  +------------------+  +------------------+  +------------------+ |
-|  |  data_service    |  | training_service |  |interstate_distance| |
-|  | - load_sites()   |  | - start_training |  | - distance calc  | |
-|  | - filter_sites() |  | - stop_training  |  | - spatial index  | |
-|  | - revenue_metrics|  | - SSE streaming  |  | - TIGER data     | |
-|  +--------+---------+  +--------+---------+  +--------+---------+ |
-+-----------|----------------------|-----------------------|--------+
+|  +---------------+  +----------------+  +------------------+      |
+|  | data_service  |  |training_service|  |interstate_distance|     |
+|  | - load_sites  |  | - start/stop   |  | - distance calc  |      |
+|  | - filters     |  | - SSE stream   |  | - spatial index  |      |
+|  +---------------+  +----------------+  +------------------+      |
+|                            |                                      |
+|  +---------------+         |         +------------------+         |
+|  | shap_service  |<--------+-------->| feature_selection|         |
+|  | - importance  |                   | - STG, LassoNet  |         |
+|  | - plots       |                   | - SHAP-Select    |         |
+|  +---------------+                   +------------------+         |
++------------------------------------------------------------------+
             |                      |                       |
             v                      v                       v
 +------------------------------------------------------------------+
@@ -102,7 +111,7 @@ graph TB
 |  +------------------+  +------------------+  +------------------+ |
 |  |   CSV Files      |  |   ML Pipeline    |  |   TIGER Roads    | |
 |  | Site Scores.csv  |  | PyTorch Models   |  |  Census Bureau   | |
-|  |                  |  | Polars + NumPy   |  |                  | |
+|  |                  |  | SHAP Cache       |  |                  | |
 |  +------------------+  +------------------+  +------------------+ |
 +------------------------------------------------------------------+
 ```
@@ -683,6 +692,18 @@ SSE Handler:
 +---------------------------+--------+-------------------------------------------+
 ```
 
+### SHAP Feature Importance Endpoints
+
+```
++---------------------------+--------+-------------------------------------------+
+| Endpoint                  | Method | Description                               |
++---------------------------+--------+-------------------------------------------+
+| /api/shap/available       | GET    | Check if SHAP data exists from last run   |
+| /api/shap/summary         | GET    | Get feature importance summary (top_n)    |
+| /api/shap/plots           | GET    | Get SHAP plots as base64 PNG images       |
++---------------------------+--------+-------------------------------------------+
+```
+
 ### Detailed API Specifications
 
 #### GET /api/sites
@@ -736,16 +757,31 @@ Start a model training job.
 ```json
 {
   "model_type": "neural_network",
-  "target": "revenue",
+  "task_type": "regression",
+  "target": "avg_monthly_revenue",
   "epochs": 50,
   "batch_size": 4096,
   "learning_rate": 0.0001,
   "dropout": 0.2,
   "hidden_layers": [512, 256, 128, 64],
   "device": "mps",
-  "apple_chip": "auto"
+  "apple_chip": "auto",
+  "feature_selection_method": "stg_light",
+  "stg_lambda": 0.1,
+  "stg_sigma": 0.5,
+  "run_shap_validation": false,
+  "track_gradients": false
 }
 ```
+
+**Feature Selection Methods:**
+- `none` - No feature selection
+- `stg_light` - Light Stochastic Gates
+- `stg_aggressive` - Aggressive STG + SHAP
+- `lassonet_standard` - LassoNet
+- `shap_only` - Post-training SHAP-Select
+- `tabnet` - TabNet with sparsemax
+- `hybrid_stg_shap` - STG + SHAP validation
 
 **Response:**
 ```json
@@ -767,11 +803,33 @@ data: {
   "train_loss": 0.0234,
   "val_loss": 0.0256,
   "val_mae": 1234.56,
+  "val_smape": 15.2,
+  "val_rmse": 1567.89,
   "val_r2": 0.8523,
   "learning_rate": 0.0001,
   "elapsed_time": 45.2,
   "status": "running",
-  "message": "Epoch 25/50"
+  "message": "Epoch 25/50 | 180 features active",
+  "best_val_loss": 0.0245,
+  "n_active_features": 180,
+  "fs_reg_loss": 0.0012
+}
+```
+
+**Completion Event (includes final_metrics and feature_selection):**
+```
+data: {
+  "status": "completed",
+  "final_metrics": {
+    "test_mae": 1200.0,
+    "test_r2": 0.86,
+    "shap_available": true,
+    "feature_selection": {
+      "n_selected": 150,
+      "n_eliminated": 50,
+      "selected_features": [...]
+    }
+  }
 }
 ```
 
@@ -802,8 +860,18 @@ graph TD
         CONCAT[Concatenate]
     end
 
+    subgraph "Feature Selection (Optional)"
+        CONCAT --> FS{Feature Selection<br/>Method?}
+        FS -->|STG| STG[Stochastic Gates<br/>L0 Regularization]
+        FS -->|LassoNet| LASSO[Skip Connection<br/>Hierarchy Constraint]
+        FS -->|None| DIRECT[Direct Pass]
+        STG --> GATED
+        LASSO --> GATED
+        DIRECT --> GATED[Gated Features]
+    end
+
     subgraph "Residual MLP"
-        CONCAT --> RB1[ResidualBlock<br/>512 neurons]
+        GATED --> RB1[ResidualBlock<br/>512 neurons]
         RB1 --> RB2[ResidualBlock<br/>256 neurons]
         RB2 --> RB3[ResidualBlock<br/>128 neurons]
         RB3 --> RB4[ResidualBlock<br/>64 neurons]
@@ -813,6 +881,53 @@ graph TD
         RB4 --> OUT[Linear<br/>1 neuron]
         OUT --> PRED[Revenue Prediction]
     end
+```
+
+### Feature Selection Module
+
+The feature selection module (`site_scoring/feature_selection/`) provides 5 techniques:
+
+```
++------------------------+------------------+------------------------------------------+
+| Technique              | When Applied     | Description                              |
++------------------------+------------------+------------------------------------------+
+| Stochastic Gates (STG) | During training  | Learnable Bernoulli gates, L0 reg        |
+| LassoNet               | During training  | Hierarchical L1 with skip connections    |
+| SHAP-Select            | Post-training    | Statistical significance testing         |
+| TabNet                  | During training  | Sparsemax attention (replaces MLP)       |
+| Gradient Analysis      | During training  | Weight/gradient profile tracking         |
++------------------------+------------------+------------------------------------------+
+```
+
+**Stochastic Gates (STG) Flow:**
+```
+Input Features --> [Learnable Gates z_d] --> Gated Features --> MLP
+                        |
+                   L0 Regularization (lambda * sum P(z_d > 0))
+```
+
+**LassoNet Hierarchy Constraint:**
+```
+Feature j can use hidden layers ONLY IF its skip connection theta_j is active:
+||W_j^(1)||_inf <= M * |theta_j|
+
+When theta_j = 0, all connections from feature j are forced to zero.
+```
+
+**Available Presets:**
+```
++-------------------+-------------------------------------------+
+| Preset            | Description                               |
++-------------------+-------------------------------------------+
+| none              | No feature selection                      |
+| stg_light         | Light STG (keeps most features)           |
+| stg_aggressive    | Aggressive STG + SHAP validation          |
+| lassonet_standard | Standard LassoNet                         |
+| lassonet_path     | LassoNet with lambda path                 |
+| shap_only         | Post-training SHAP-Select only            |
+| tabnet            | TabNet with sparsemax attention           |
+| hybrid_stg_shap   | STG + SHAP post-training                  |
++-------------------+-------------------------------------------+
 ```
 
 ### ASCII Fallback
@@ -917,7 +1032,11 @@ flowchart LR
 
     subgraph "Training Loop"
         LOADER --> FORWARD[Forward Pass]
-        FORWARD --> LOSS[Huber Loss]
+        FORWARD --> FS{Feature Selection?}
+        FS -->|STG| GATE[Apply STG Gates]
+        FS -->|None| DIRECT[Direct]
+        GATE --> LOSS[Huber Loss + FS Reg]
+        DIRECT --> LOSS
         LOSS --> BACKWARD[Backward Pass]
         BACKWARD --> OPTIM[AdamW Optimizer]
         OPTIM --> SCHED[ReduceLROnPlateau]
@@ -926,7 +1045,8 @@ flowchart LR
 
     subgraph "Output"
         EARLY --> SAVE[Save best_model.pt]
-        SAVE --> METRICS[Test Metrics<br/>MAE, R2]
+        SAVE --> SHAP[Compute SHAP Values]
+        SHAP --> METRICS[Test Metrics<br/>MAE, R2, SHAP]
     end
 ```
 
@@ -960,22 +1080,41 @@ TRAINING PIPELINE
    |  Train 70%  |  Val 15%  |  Test 15%      |
    +------------------------------------------+
 
-4. TRAINING LOOP
-   +----------+     +----------+     +----------+
-   | Forward  |---->| Huber    |---->| Backward |
-   | Pass     |     | Loss     |     | Pass     |
-   +----------+     +----------+     +----------+
-                                          |
-                                          v
+4. FEATURE SELECTION (Optional)
+   +---------------+     +------------------+
+   | STG Gates     |---->| L0 Reg Loss      |
+   | (learnable)   |     | lambda*sum(P(z)) |
+   +---------------+     +------------------+
+        or
+   +---------------+     +------------------+
+   | LassoNet      |---->| Hier Constraint  |
+   | Skip + Hidden |     | ||W|| <= M|theta||
+   +---------------+     +------------------+
+
+5. TRAINING LOOP
+   +----------+     +---------------+     +----------+
+   | Forward  |---->| Huber Loss    |---->| Backward |
+   | Pass     |     | + FS Reg Loss |     | Pass     |
+   +----------+     +---------------+     +----------+
+                                               |
+                                               v
    +----------+     +----------+     +----------+
    | Early    |<----| LR       |<----| AdamW    |
    | Stopping |     | Scheduler|     | Optimizer|
    +----------+     +----------+     +----------+
 
-5. OUTPUT
-   - best_model.pt    (Model weights)
-   - preprocessor.pkl (Scalers, encoders)
-   - Test MAE, R2     (Final metrics)
+6. POST-TRAINING
+   +-------------+     +-------------+     +-------------+
+   | Save Model  |---->| Compute     |---->| Save SHAP   |
+   | best.pt     |     | SHAP Values |     | Cache       |
+   +-------------+     +-------------+     +-------------+
+
+7. OUTPUT
+   - best_model.pt              (Model weights)
+   - preprocessor.pkl           (Scalers, encoders)
+   - shap_cache.npz             (SHAP values for visualization)
+   - feature_selection_summary  (Selected/eliminated features)
+   - Test MAE, R2, SHAP plots   (Final metrics)
 ```
 
 ### Apple Silicon Optimization
@@ -1095,9 +1234,18 @@ Result: Sites in top 10% have score ~1.0
 | Data Service | `src/services/data_service.py` |
 | Training Service | `src/services/training_service.py` |
 | Highway Service | `src/services/interstate_distance.py` |
+| SHAP Service | `src/services/shap_service.py` |
 | ML Model | `site_scoring/model.py` |
 | ML Config | `site_scoring/config.py` |
 | Data Loader | `site_scoring/data_loader.py` |
+| Feature Selection | `site_scoring/feature_selection/` |
+| - STG Gates | `site_scoring/feature_selection/stochastic_gates.py` |
+| - LassoNet | `site_scoring/feature_selection/lassonet.py` |
+| - SHAP-Select | `site_scoring/feature_selection/shap_select.py` |
+| - TabNet | `site_scoring/feature_selection/tabnet_wrapper.py` |
+| - Gradient Analysis | `site_scoring/feature_selection/gradient_analyzer.py` |
+| - Integration | `site_scoring/feature_selection/integration.py` |
+| - Config | `site_scoring/feature_selection/config.py` |
 | Input Data | `data/input/` |
 | Model Outputs | `site_scoring/outputs/` |
 
@@ -1122,6 +1270,10 @@ http://localhost:8080
 | Backend | pandas | Data manipulation |
 | ML | PyTorch | Neural network training |
 | ML | Polars | Fast CSV parsing |
+| ML | SHAP | Feature importance (Shapley values) |
+| Feature Selection | STG | Stochastic Gates (L0 regularization) |
+| Feature Selection | LassoNet | Hierarchical L1 constraints |
+| Feature Selection | TabNet | Sparsemax attention |
 | Geospatial | GeoPandas | Highway calculations |
 | Geospatial | Shapely | Spatial operations |
 

@@ -67,32 +67,6 @@ class TestSitesAPI:
             assert 0 <= score <= 1, f"Score out of range [0,1]: {score}"
 
 
-class TestSiteDetailAPI:
-    """Tests for /api/site/<site_id> endpoint."""
-
-    def test_get_site_returns_200(self, client, single_site_id):
-        """API returns 200 OK for valid site ID."""
-        response = client.get(f"/api/site/{single_site_id}")
-        assert response.status_code == 200
-
-    def test_get_site_not_found(self, client):
-        """API returns 404 for invalid site ID."""
-        response = client.get("/api/site/NONEXISTENT_SITE_ID_12345")
-        assert response.status_code == 404
-
-    def test_site_detail_has_highway_info(self, client, single_site_id):
-        """Site detail includes highway distance information."""
-        response = client.get(f"/api/site/{single_site_id}")
-        data = response.get_json()
-
-        assert "site_id" in data
-        assert "latitude" in data
-        assert "longitude" in data
-        assert "nearest_highway" in data
-        assert "distance_miles" in data
-        assert "highway_point" in data
-
-
 class TestSiteDetailsAPI:
     """Tests for /api/site-details/<site_id> endpoint."""
 

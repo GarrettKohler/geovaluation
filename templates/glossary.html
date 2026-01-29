@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glossary - GSTV Site Visualization</title>
+    <!-- Google Fonts - Inter for Kepler.gl style -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           Kepler.gl Dark Theme - Glossary
+           Based on Uber's Kepler.gl design system
+           ============================================ */
+        :root {
+            /* Kepler.gl Core Colors */
+            --kepler-active: #1FBAD6;
+            --kepler-active-hover: #3DD0E7;
+            --kepler-primary-btn: #0F9668;
+            --kepler-primary-btn-hover: #12B17C;
+            --kepler-secondary-btn: #6A7485;
+
+            /* Kepler.gl Backgrounds (dark theme hierarchy) */
+            --kepler-bg-base: #242730;
+            --kepler-bg-panel: #29323C;
+            --kepler-bg-content: #292E36;
+            --kepler-bg-input: #3A4552;
+            --kepler-bg-hover: #3A4552;
+
+            /* Kepler.gl Text Colors */
+            --kepler-text: #A0A7B4;
+            --kepler-text-highlight: #F0F0F0;
+            --kepler-text-label: #6A7485;
+            --kepler-text-secondary: #6A7485;
+
+            /* Kepler.gl Border & Accents */
+            --kepler-border: #3A414C;
+            --kepler-border-light: #4A5568;
+            --kepler-selection: rgba(31, 186, 214, 0.15);
+
+            /* Tag colors (dark theme adapted) */
+            --tag-metrics-bg: rgba(31, 186, 214, 0.15);
+            --tag-metrics-text: #1FBAD6;
+            --tag-training-bg: rgba(167, 139, 250, 0.15);
+            --tag-training-text: #A78BFA;
+            --tag-model-bg: rgba(96, 165, 250, 0.15);
+            --tag-model-text: #60A5FA;
+            --tag-data-bg: rgba(251, 191, 36, 0.15);
+            --tag-data-text: #FBBF24;
+            --tag-interpretability-bg: rgba(248, 113, 113, 0.15);
+            --tag-interpretability-text: #F87171;
+
+            /* Motion */
+            --kepler-transition: 200ms ease;
+
+            /* Shape */
+            --kepler-radius-sm: 2px;
+            --kepler-radius-md: 4px;
+            --kepler-radius-lg: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--kepler-bg-base);
+            color: var(--kepler-text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            background: var(--kepler-bg-panel);
+            padding: 16px 24px;
+            border-radius: var(--kepler-radius-lg);
+            border: 1px solid var(--kepler-border);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--kepler-text);
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 8px 14px;
+            border-radius: var(--kepler-radius-sm);
+            border: 1px solid var(--kepler-border);
+            background: transparent;
+            transition: all var(--kepler-transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .back-link:hover {
+            background: var(--kepler-bg-hover);
+            border-color: var(--kepler-active);
+            color: var(--kepler-active);
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--kepler-text-highlight);
+            letter-spacing: -0.01em;
+        }
+
+        .header-subtitle {
+            font-size: 0.75rem;
+            color: var(--kepler-text-label);
+            margin-top: 2px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Category filter - Kepler.gl style filter chips */
+        .category-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 14px;
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-sm);
+            background: transparent;
+            color: var(--kepler-text);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--kepler-transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-btn:hover {
+            background: var(--kepler-bg-hover);
+            border-color: var(--kepler-active);
+            color: var(--kepler-active);
+        }
+
+        .filter-btn.active {
+            background: var(--kepler-active);
+            border-color: var(--kepler-active);
+            color: var(--kepler-bg-base);
+        }
+
+        /* Glossary entries */
+        .glossary-section {
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--kepler-text-label);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--kepler-border);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .glossary-entry {
+            background: var(--kepler-bg-panel);
+            border-radius: var(--kepler-radius-md);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border: 1px solid var(--kepler-border);
+            transition: all var(--kepler-transition);
+        }
+
+        .glossary-entry:hover {
+            border-color: var(--kepler-border-light);
+            background: var(--kepler-bg-content);
+        }
+
+        .entry-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .entry-term {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--kepler-text-highlight);
+        }
+
+        .entry-abbr {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            padding: 3px 8px;
+            border-radius: var(--kepler-radius-sm);
+            color: var(--kepler-active);
+            background: rgba(31, 186, 214, 0.15);
+            font-family: 'Roboto Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .entry-tag {
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: var(--kepler-radius-sm);
+        }
+
+        .tag-metrics { background: var(--tag-metrics-bg); color: var(--tag-metrics-text); }
+        .tag-training { background: var(--tag-training-bg); color: var(--tag-training-text); }
+        .tag-model { background: var(--tag-model-bg); color: var(--tag-model-text); }
+        .tag-data { background: var(--tag-data-bg); color: var(--tag-data-text); }
+        .tag-interpretability { background: var(--tag-interpretability-bg); color: var(--tag-interpretability-text); }
+
+        .entry-definition {
+            font-size: 0.8125rem;
+            color: var(--kepler-text);
+            line-height: 1.7;
+        }
+
+        .entry-formula {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: var(--kepler-bg-base);
+            border-radius: var(--kepler-radius-sm);
+            border: 1px solid var(--kepler-border);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--kepler-active);
+        }
+
+        .entry-context {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: var(--kepler-text-secondary);
+            font-style: italic;
+            padding-left: 12px;
+            border-left: 2px solid var(--kepler-active);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+            }
+
+            .category-filter {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Home
+                </a>
+                <div>
+                    <h1>Glossary</h1>
+                    <div class="header-subtitle">Machine Learning & Statistics Terminology</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Category Filter -->
+        <div class="category-filter">
+            <button class="filter-btn active" data-category="all">All</button>
+            <button class="filter-btn" data-category="metrics">Metrics</button>
+            <button class="filter-btn" data-category="training">Training</button>
+            <button class="filter-btn" data-category="model">Model Architecture</button>
+            <button class="filter-btn" data-category="data">Data & Processing</button>
+            <button class="filter-btn" data-category="interpretability">Interpretability</button>
+        </div>
+
+        <!-- Metrics Section -->
+        <div class="glossary-section" data-section="metrics">
+            <div class="section-title">Evaluation Metrics</div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Mean Absolute Error</span>
+                    <span class="entry-abbr">MAE</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The average of absolute differences between predicted and actual values. Expressed in the same units as the target (dollars for revenue prediction). Lower is better.
+                    <div class="entry-formula">MAE = (1/n) * &Sigma;|predicted - actual|</div>
+                    <div class="entry-context">In this app: A MAE of $50 means predictions are off by $50/month on average.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Symmetric Mean Absolute Percentage Error</span>
+                    <span class="entry-abbr">SMAPE</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    A percentage-based error metric that treats over-predictions and under-predictions symmetrically. Ranges from 0% (perfect) to 200% (worst). Unlike MAPE, it doesn't explode when actual values are near zero.
+                    <div class="entry-formula">SMAPE = (1/n) * &Sigma;(|pred - actual| / ((|actual| + |pred|) / 2)) * 100%</div>
+                    <div class="entry-context">In this app: A SMAPE of 30% means predictions deviate by ~30% of the average of predicted and actual revenue.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Root Mean Squared Error</span>
+                    <span class="entry-abbr">RMSE</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The square root of the average squared differences between predicted and actual values. Penalizes large errors more heavily than MAE. Expressed in the same units as the target.
+                    <div class="entry-formula">RMSE = &radic;((1/n) * &Sigma;(predicted - actual)&sup2;)</div>
+                    <div class="entry-context">In this app: If RMSE is much larger than MAE, some sites have very large prediction errors (outliers).</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Coefficient of Determination</span>
+                    <span class="entry-abbr">R&sup2;</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    Measures how much variance in the target the model explains, compared to simply predicting the mean. Ranges from -&infin; to 1.0 where 1.0 is perfect and 0 means "no better than guessing the average."
+                    <div class="entry-formula">R&sup2; = 1 - (&Sigma;(actual - pred)&sup2; / &Sigma;(actual - mean)&sup2;)</div>
+                    <div class="entry-context">In this app: R&sup2; of 0.7 means the model explains 70% of the variance in site revenue.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Area Under the ROC Curve</span>
+                    <span class="entry-abbr">ROC-AUC</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    Measures how well the model distinguishes between positive and negative classes across all possible thresholds. Ranges from 0.5 (random guessing) to 1.0 (perfect separation). Used for classification tasks.
+                    <div class="entry-context">In this app: Used for the lookalike model to measure how well it identifies top-performing sites vs. others.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Loss</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The objective function that the model minimizes during training. Lower loss means better predictions. For regression, this app uses Huber Loss (robust to outliers). For classification, it uses Binary Cross-Entropy Loss.
+                    <div class="entry-context">In this app: Training loss should decrease over epochs. Validation loss that stops decreasing signals overfitting.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Accuracy</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The proportion of correct predictions out of total predictions. For classification only. Can be misleading with imbalanced classes (e.g., 90% accuracy by always predicting the majority class).
+                    <div class="entry-formula">Accuracy = correct predictions / total predictions</div>
+                    <div class="entry-context">In this app: Used alongside AUC for the lookalike model. AUC is the primary metric since classes are imbalanced (90/10 split).</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Section -->
+        <div class="glossary-section" data-section="training">
+            <div class="section-title">Training Parameters</div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Epoch</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    One complete pass through the entire training dataset. Multiple epochs allow the model to refine its parameters iteratively. Too many epochs can lead to overfitting; too few leads to underfitting.
+                    <div class="entry-context">In this app: Default is 50 epochs. Early stopping may halt training before reaching this limit if performance stops improving.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Batch Size</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    The number of training examples processed together before updating model weights. Larger batches provide more stable gradient estimates but use more GPU memory. Smaller batches add noise that can help escape local minima.
+                    <div class="entry-context">In this app: Default is 4096, optimized for Apple Silicon GPU (MPS) memory bandwidth.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Learning Rate</span>
+                    <span class="entry-abbr">LR</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    Controls how much model weights are adjusted in response to each batch's error gradient. Too high causes instability (loss oscillates or diverges). Too low causes extremely slow convergence.
+                    <div class="entry-context">In this app: Default is 0.0001 (1e-4). A scheduler automatically reduces LR when validation loss plateaus.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Dropout</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    A regularization technique that randomly sets a fraction of neuron outputs to zero during training. This prevents the network from relying too heavily on any single neuron, reducing overfitting.
+                    <div class="entry-context">In this app: Default is 0.2 (20% of neurons deactivated per layer during training). Only active during training, not prediction.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Early Stopping</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    Halts training when validation performance stops improving for a specified number of epochs (the "patience"). Prevents overfitting by keeping the model from memorizing training data noise.
+                    <div class="entry-context">In this app: Patience is 10 epochs. If validation loss doesn't improve for 10 consecutive epochs, training stops and the best model is restored.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Weight Decay</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    A regularization technique that penalizes large model weights by adding a fraction of the weight magnitude to the loss. Encourages simpler models that generalize better.
+                    <div class="entry-formula">effective_loss = loss + weight_decay * &Sigma;(w&sup2;)</div>
+                    <div class="entry-context">In this app: Default is 1e-5 (very small penalty). Helps prevent the model from becoming overconfident about any single feature.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="training">
+                <div class="entry-header">
+                    <span class="entry-term">Learning Rate Scheduler</span>
+                    <span class="entry-tag tag-training">Training</span>
+                </div>
+                <div class="entry-definition">
+                    Automatically adjusts the learning rate during training. This app uses "Reduce on Plateau" &mdash; when validation loss stops improving for a set number of epochs (scheduler patience), the learning rate is halved.
+                    <div class="entry-context">In this app: Scheduler patience is 5 epochs. The LR is multiplied by 0.5 each time the plateau is detected.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Architecture Section -->
+        <div class="glossary-section" data-section="model">
+            <div class="section-title">Model Architecture</div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Neural Network</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A machine learning model inspired by biological neurons. Composed of layers of interconnected nodes that transform input features through learned weights and non-linear activations to produce predictions.
+                    <div class="entry-context">In this app: A deep feedforward network with 4 hidden layers (512 &rarr; 256 &rarr; 128 &rarr; 64 neurons).</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Hidden Layers</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    The intermediate layers between input and output in a neural network. Each layer applies a linear transformation followed by a non-linear activation function. More/wider layers increase capacity but also risk overfitting.
+                    <div class="entry-context">In this app: Default is [512, 256, 128, 64] &mdash; a progressively narrowing architecture that forces the model to learn compact representations.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Embedding Dimension</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    The size of the dense vector representation learned for each categorical feature value. Embeddings capture relationships between categories (e.g., similar networks have similar embeddings) in a continuous space.
+                    <div class="entry-context">In this app: Each categorical feature (network, program, retailer, etc.) gets a 16-dimensional embedding vector.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Batch Normalization</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    Normalizes the output of each layer to have zero mean and unit variance. This stabilizes training, allows higher learning rates, and acts as mild regularization.
+                    <div class="entry-context">In this app: Applied after each hidden layer. Helps the model train faster and more reliably on the diverse site features.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Regression</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A task where the model predicts a continuous numeric value. The model outputs a single unbounded number representing the predicted quantity.
+                    <div class="entry-context">In this app: Predicts average monthly revenue per site. Uses Huber Loss and reports MAE, SMAPE, RMSE, R&sup2;.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Classification (Lookalike)</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A task where the model predicts which class an example belongs to. In binary classification, the model outputs a probability of belonging to the positive class (top performers).
+                    <div class="entry-context">In this app: The "lookalike" model identifies sites that resemble top 10% revenue performers. Uses BCEWithLogitsLoss and reports AUC.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Huber Loss</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A loss function that is quadratic for small errors and linear for large errors. This makes it less sensitive to outliers than pure squared error (MSE), while still being smooth and differentiable everywhere.
+                    <div class="entry-context">In this app: Used for regression with delta=1.0. Handles the fact that a few sites have extreme revenue values without distorting the model.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Binary Cross-Entropy Loss</span>
+                    <span class="entry-abbr">BCE</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    The standard loss function for binary classification. Measures how far predicted probabilities are from actual binary labels (0 or 1). Penalizes confident wrong predictions more heavily than uncertain ones.
+                    <div class="entry-context">In this app: Used with pos_weight=9.0 to compensate for the 90/10 class imbalance (only 10% of sites are top performers).</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Class Imbalance Weighting</span>
+                    <span class="entry-abbr">pos_weight</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A correction applied when one class is much rarer than the other. Multiplies the loss for the minority class by a weight (n_majority / n_minority) so the model doesn't learn to always predict the majority class.
+                    <div class="entry-context">In this app: pos_weight=9.0 because ~10% of sites are top performers. Each positive example counts 9x in the loss calculation.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Processing Section -->
+        <div class="glossary-section" data-section="data">
+            <div class="section-title">Data & Processing</div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Training Set</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    The portion of data used to train the model (learn weights). The model sees these examples repeatedly during training and optimizes its parameters to minimize prediction error on them.
+                    <div class="entry-context">In this app: 70% of active sites. Displayed as blue dots on the map.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Validation Set</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    Data used to monitor performance during training without training on it. Used for early stopping decisions and learning rate scheduling. Helps detect overfitting (train loss decreasing while val loss increases).
+                    <div class="entry-context">In this app: 15% of active sites. Metrics shown during training (val_loss, val_mae, etc.) come from this set.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Test Set</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    Data held out entirely until after training completes. Provides an unbiased estimate of final model performance. Never used for any training decisions.
+                    <div class="entry-context">In this app: 15% of active sites. Displayed as cyan dots on the map. Final reported metrics (Test MAE, Test R&sup2;, etc.) come from this set.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Feature Scaling</span>
+                    <span class="entry-abbr">StandardScaler</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    Transforms numeric features to have zero mean and unit standard deviation. Essential for neural networks because features on different scales (e.g., latitude vs. revenue) would otherwise dominate gradient updates unevenly.
+                    <div class="entry-formula">scaled = (value - mean) / std_deviation</div>
+                    <div class="entry-context">In this app: Applied to all 28 numeric features. The target (revenue) is also scaled during training, then inverse-transformed for reporting.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Data Leakage</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    When information about the target variable accidentally appears in the input features. This inflates metrics during training but produces useless predictions on new data. A common and dangerous pitfall in ML.
+                    <div class="entry-context">In this app: Revenue-derived features (total_revenue, revenue_per_screen, etc.) are automatically removed when predicting revenue to prevent leakage.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Percentile Clipping</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    Capping extreme values at specified percentiles (e.g., 1st and 99th) to reduce the influence of outliers. Values below P1 are set to P1, values above P99 are set to P99.
+                    <div class="entry-context">In this app: Both features and targets are clipped to [P1, P99]. Prevents a few extreme-revenue sites from distorting the model.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Top 10% Threshold</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    In classification mode, the 90th percentile of revenue is used as the cutoff to define "top performers." Sites at or above this threshold are labeled positive (1), all others negative (0).
+                    <div class="entry-context">In this app: Approximately $613/month avg revenue. ~2,610 out of ~26,100 active sites qualify as top performers.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Overfitting</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    When a model memorizes training data noise rather than learning generalizable patterns. Symptoms: training loss keeps decreasing but validation loss starts increasing. Remedies include dropout, early stopping, weight decay, and more data.
+                    <div class="entry-context">In this app: Monitored by comparing train_loss vs val_loss each epoch. Early stopping and dropout are the primary defenses.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interpretability Section -->
+        <div class="glossary-section" data-section="interpretability">
+            <div class="section-title">Model Interpretability</div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">SHAP</span>
+                    <span class="entry-abbr">SHapley Additive exPlanations</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A game-theoretic approach to explain the output of any machine learning model. SHAP assigns each feature an importance value (Shapley value) for a particular prediction, showing how much each feature pushes the prediction above or below the average.
+                    <div class="entry-context">In this app: After training completes, SHAP values are computed on test samples to identify which site features most influence revenue predictions or lookalike scores. View them via "View SHAP Values" in the training results.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">SHAP Value</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    The contribution of a single feature to the difference between the actual prediction and the average prediction (base value). Positive SHAP values push the prediction higher; negative values push it lower. The sum of all SHAP values equals the difference between the model's prediction and the base value.
+                    <div class="entry-formula">prediction = base_value + &Sigma; SHAP_values</div>
+                    <div class="entry-context">In this app: A positive SHAP value for "screen_count" means more screens pushes the predicted revenue higher for that site.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Base Value</span>
+                    <span class="entry-abbr">Expected Value</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    The average model output across the background dataset. This is the prediction the model would make if it had no information about a specific sample's features. SHAP values represent deviations from this baseline.
+                    <div class="entry-context">In this app: The base value represents the average predicted revenue (or lookalike score) across the background sample of ~100 sites.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Feature Importance (Global)</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    The mean absolute SHAP value for each feature across all explained samples. Features with higher mean |SHAP| have a greater overall impact on model predictions. This is the primary ranking shown in the SHAP bar chart.
+                    <div class="entry-formula">importance(feature) = mean(|SHAP_values|) across all samples</div>
+                    <div class="entry-context">In this app: The bar chart ranks all site features by their average impact on revenue predictions. Top features drive the most difference between high- and low-revenue sites.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Beeswarm Plot</span>
+                    <span class="entry-abbr">Summary Plot</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A visualization where each dot represents one sample's SHAP value for one feature. The x-axis shows the SHAP value (impact on prediction), and color indicates the feature value (red = high, blue = low). This reveals both importance and the direction of effect.
+                    <div class="entry-context">In this app: If "avg_household_income" shows red dots (high income) on the right (positive SHAP), it means higher-income areas predict higher revenue.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">KernelExplainer</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A model-agnostic method for computing SHAP values that works with any prediction function. It approximates Shapley values by sampling feature coalitions and measuring how predictions change. Slower than tree-specific methods but compatible with neural networks.
+                    <div class="entry-context">In this app: Used because the model is a PyTorch neural network. Computes SHAP on ~200 test samples using 100 background samples for efficiency.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Background Data</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A representative subset of training data used by the SHAP explainer to define the "expected" model behavior. SHAP measures each feature's contribution by comparing predictions with and without that feature, using background values as replacements.
+                    <div class="entry-context">In this app: 100 randomly sampled test instances are used as background. More samples increase accuracy but also increase computation time.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Shapley Values</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A concept from cooperative game theory that fairly distributes a "payout" (prediction) among "players" (features). Each feature's Shapley value is its average marginal contribution across all possible orderings of features. SHAP values are the ML application of this concept.
+                    <div class="entry-context">Properties: Shapley values are the only attribution method satisfying efficiency (values sum to prediction), symmetry, and linearity simultaneously.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Category filter
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                const category = this.dataset.category;
+                document.querySelectorAll('.glossary-section').forEach(section => {
+                    if (category === 'all') {
+                        section.style.display = '';
+                    } else {
+                        section.style.display = section.dataset.section === category ? '' : 'none';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

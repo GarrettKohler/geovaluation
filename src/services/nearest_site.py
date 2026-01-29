@@ -12,7 +12,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 INPUT_FILE = PROJECT_ROOT / "data" / "input" / "Sites - Base Data Set.csv"
-OUTPUT_DIR = PROJECT_ROOT / "distance_results"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "output"
 
 METERS_PER_MILE = 1609.344
 
