@@ -21,9 +21,16 @@ import traceback
 
 # Import from site_scoring module (at project root)
 from site_scoring.config import Config, DEFAULT_OUTPUT_DIR
-from site_scoring.model import SiteScoringModel
+from site_scoring.model import (
+    SiteScoringModel,
+    CatBoostModel,
+    XGBoostModel,
+    create_model,
+    CATBOOST_AVAILABLE,
+    XGBOOST_AVAILABLE,
+)
 from site_scoring.data_loader import DataProcessor, create_data_loaders
-from src.services.shap_service import compute_shap_values, ShapCache
+from src.services.shap_service import compute_shap_values, compute_shap_values_tree, ShapCache
 
 # Feature selection imports
 from site_scoring.feature_selection import (
@@ -314,6 +321,284 @@ class TrainingJob:
             'pipeline_path': str(explainability_dir),
         }
 
+    def _prepare_tabular_data(
+        self,
+        data_loader: DataLoader,
+        device: str = "cpu"
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Convert PyTorch DataLoader to numpy arrays for sklearn-style models.
+
+        Args:
+            data_loader: PyTorch DataLoader with (numeric, categorical, boolean, target) batches
+            device: Device to use (ignored for numpy conversion)
+
+        Returns:
+            Tuple of (X, y) numpy arrays where X is concatenated features
+        """
+        all_numeric = []
+        all_categorical = []
+        all_boolean = []
+        all_targets = []
+
+        for numeric, categorical, boolean, target in data_loader:
+            all_numeric.append(numeric.numpy())
+            all_categorical.append(categorical.numpy())
+            all_boolean.append(boolean.numpy())
+            all_targets.append(target.numpy())
+
+        # Concatenate batches
+        numeric_arr = np.vstack(all_numeric)
+        categorical_arr = np.vstack(all_categorical)
+        boolean_arr = np.vstack(all_boolean)
+        targets_arr = np.vstack(all_targets).ravel()
+
+        # Concatenate features: [numeric | categorical | boolean]
+        X = np.hstack([numeric_arr, categorical_arr, boolean_arr])
+
+        return X, targets_arr
+
+    def _run_gradient_boosting_training(
+        self,
+        model_type: str,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        test_loader: DataLoader,
+        processor,
+        pytorch_config,
+        start_time: float,
+    ) -> Dict:
+        """
+        Train a gradient boosting model (CatBoost or XGBoost).
+
+        Args:
+            model_type: "catboost" or "xgboost"
+            train_loader: Training data loader
+            val_loader: Validation data loader
+            test_loader: Test data loader
+            processor: Data processor with encoders
+            pytorch_config: Configuration object
+            start_time: Training start time for progress tracking
+
+        Returns:
+            Dict with training results and metrics
+        """
+        from sklearn.metrics import roc_auc_score
+
+        # Build feature names list
+        all_feature_names = (
+            list(pytorch_config.numeric_features) +
+            list(pytorch_config.categorical_features) +
+            list(pytorch_config.boolean_features)
+        )
+
+        # Report progress: preparing data
+        self._report_progress(TrainingProgress(
+            epoch=0,
+            total_epochs=1,  # Gradient boosting reports internally
+            train_loss=0,
+            val_loss=0,
+            val_mae=0,
+            val_smape=0,
+            val_rmse=0,
+            val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message=f"Preparing data for {model_type.upper()}..."
+        ))
+
+        # Convert DataLoaders to numpy arrays
+        X_train, y_train = self._prepare_tabular_data(train_loader)
+        X_val, y_val = self._prepare_tabular_data(val_loader)
+        X_test, y_test = self._prepare_tabular_data(test_loader)
+
+        print(f"[Training] Data shapes: train={X_train.shape}, val={X_val.shape}, test={X_test.shape}")
+
+        # Calculate categorical feature indices
+        n_numeric = processor.n_numeric_features
+        n_categorical = len(processor.categorical_vocab_sizes)
+        cat_feature_indices = list(range(n_numeric, n_numeric + n_categorical))
+
+        # Report progress: creating model
+        self._report_progress(TrainingProgress(
+            epoch=0,
+            total_epochs=1,
+            train_loss=0,
+            val_loss=0,
+            val_mae=0,
+            val_smape=0,
+            val_rmse=0,
+            val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message=f"Creating {model_type.upper()} model..."
+        ))
+
+        # Create model
+        if model_type == "catboost":
+            model = CatBoostModel(
+                task_type=self.config.task_type,
+                cat_feature_indices=cat_feature_indices,
+                feature_names=all_feature_names,
+                iterations=self.config.epochs * 20,  # More iterations for GB
+                learning_rate=self.config.learning_rate * 3,  # GB typically needs higher LR
+                depth=6,
+                early_stopping_rounds=50,
+                verbose=100,
+            )
+        else:  # xgboost
+            model = XGBoostModel(
+                task_type=self.config.task_type,
+                feature_names=all_feature_names,
+                n_estimators=self.config.epochs * 20,
+                learning_rate=self.config.learning_rate * 3,
+                max_depth=6,
+                early_stopping_rounds=50,
+            )
+
+        # Report progress: training
+        self._report_progress(TrainingProgress(
+            epoch=0,
+            total_epochs=1,
+            train_loss=0,
+            val_loss=0,
+            val_mae=0,
+            val_smape=0,
+            val_rmse=0,
+            val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message=f"Training {model_type.upper()} (this may take a few minutes)..."
+        ))
+
+        # Train model
+        model.fit(X_train, y_train, X_val, y_val)
+
+        # Evaluate on test set
+        predictions = model.predict(X_test)
+
+        if self.config.task_type == "lookalike":
+            # Classification metrics
+            if hasattr(model, 'predict_proba'):
+                predictions_prob = model.predict_proba(X_test)[:, 1]
+            else:
+                predictions_prob = predictions
+            try:
+                test_auc = float(roc_auc_score(y_test, predictions_prob))
+            except ValueError:
+                test_auc = 0.0
+            test_accuracy = float(np.mean((predictions_prob >= 0.5) == y_test))
+            test_mae, test_smape, test_rmse, test_r2 = 0.0, 0.0, 0.0, test_auc
+        else:
+            # Regression metrics - inverse transform predictions
+            predictions_orig = processor.target_scaler.inverse_transform(predictions.reshape(-1, 1))
+            targets_orig = processor.target_scaler.inverse_transform(y_test.reshape(-1, 1))
+            test_errors = predictions_orig - targets_orig
+            test_mae = float(np.mean(np.abs(test_errors)))
+            test_rmse = float(np.sqrt(np.mean(test_errors ** 2)))
+            denominator = (np.abs(targets_orig) + np.abs(predictions_orig)) / 2
+            nonzero_mask = denominator > 0
+            if nonzero_mask.any():
+                test_smape = float(np.mean(np.abs(test_errors[nonzero_mask]) / denominator[nonzero_mask]) * 100)
+            else:
+                test_smape = 0.0
+            ss_res = np.sum(test_errors ** 2)
+            ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
+            test_r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+        # Save model
+        output_dir = pytorch_config.output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        import pickle
+        model_path = output_dir / f"{model_type}_model.pkl"
+        with open(model_path, 'wb') as f:
+            pickle.dump(model, f)
+        print(f"[Training] Model saved to {model_path}")
+
+        # Get feature importance (built-in to gradient boosting)
+        feature_importance = model.get_feature_importance()
+
+        # Save feature importance
+        importance_path = output_dir / f"{model_type}_feature_importance.json"
+        with open(importance_path, 'w') as f:
+            json.dump(feature_importance, f, indent=2)
+
+        # Compute SHAP values using TreeExplainer (much faster than KernelExplainer)
+        self._report_progress(TrainingProgress(
+            epoch=1,
+            total_epochs=1,
+            train_loss=0,
+            val_loss=0,
+            val_mae=test_mae if self.config.task_type != "lookalike" else 0.0,
+            val_smape=test_smape if self.config.task_type != "lookalike" else 0.0,
+            val_rmse=test_rmse if self.config.task_type != "lookalike" else 0.0,
+            val_r2=float(test_r2),
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Computing SHAP feature importance..."
+        ))
+
+        shap_success = compute_shap_values_tree(
+            model=model,
+            X_test=X_test,
+            feature_names=all_feature_names,
+            output_dir=output_dir,
+            n_explain=500,
+            task_type=self.config.task_type,
+            progress_callback=lambda msg: self._report_progress(TrainingProgress(
+                epoch=1,
+                total_epochs=1,
+                train_loss=0,
+                val_loss=0,
+                val_mae=test_mae if self.config.task_type != "lookalike" else 0.0,
+                val_smape=test_smape if self.config.task_type != "lookalike" else 0.0,
+                val_rmse=test_rmse if self.config.task_type != "lookalike" else 0.0,
+                val_r2=float(test_r2),
+                learning_rate=self.config.learning_rate,
+                elapsed_time=time.time() - start_time,
+                status="running",
+                message=msg
+            ))
+        )
+
+        # Build results
+        results = {
+            "model_type": model_type,
+            "task_type": self.config.task_type,
+            "test_mae": test_mae,
+            "test_rmse": test_rmse,
+            "test_smape": test_smape,
+            "test_r2": test_r2,
+            "best_iteration": model.best_iteration,
+            "feature_importance": feature_importance,
+            "model_path": str(model_path),
+            "n_features": len(all_feature_names),
+            "feature_names": all_feature_names,
+        }
+
+        # Report completion
+        self._report_progress(TrainingProgress(
+            epoch=1,
+            total_epochs=1,
+            train_loss=0,
+            val_loss=0,
+            val_mae=test_mae if self.config.task_type != "lookalike" else 0.0,
+            val_smape=test_smape if self.config.task_type != "lookalike" else 0.0,
+            val_rmse=test_rmse if self.config.task_type != "lookalike" else 0.0,
+            val_r2=float(test_r2),
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="completed",
+            message=f"{model_type.upper()} training complete! Test R²={test_r2:.4f}"
+        ))
+
+        return results
+
     def _run_training(self):
         """Main training loop - runs in background thread."""
         start_time = time.time()
@@ -414,6 +699,23 @@ class TrainingJob:
                 message=f"Data loaded. Creating model on {self.config.device}..."
             ))
 
+            # Branch based on model type
+            if self.config.model_type in ("catboost", "xgboost"):
+                # Use gradient boosting training path
+                results = self._run_gradient_boosting_training(
+                    model_type=self.config.model_type,
+                    train_loader=train_loader,
+                    val_loader=val_loader,
+                    test_loader=test_loader,
+                    processor=processor,
+                    pytorch_config=pytorch_config,
+                    start_time=start_time,
+                )
+                self.final_metrics = results
+                self.is_running = False
+                return  # Exit early - gradient boosting training is complete
+
+            # Neural Network training path (original code)
             # Create model
             model = SiteScoringModel(
                 n_numeric=processor.n_numeric_features,

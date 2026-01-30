@@ -224,3 +224,354 @@ class EnsembleModel(nn.Module):
     ) -> torch.Tensor:
         predictions = [model(numeric, categorical, boolean) for model in self.models]
         return torch.stack(predictions).mean(dim=0)
+
+
+# =============================================================================
+# Gradient Boosting Models (CatBoost & XGBoost)
+# =============================================================================
+
+try:
+    from catboost import CatBoostRegressor, CatBoostClassifier
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
+
+try:
+    from xgboost import XGBRegressor, XGBClassifier
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+
+import numpy as np
+
+
+class CatBoostModel:
+    """
+    CatBoost wrapper for tabular regression/classification.
+
+    Advantages over neural networks for tabular data:
+    - Native handling of categorical features (no manual encoding needed)
+    - Typically faster training (5-10x)
+    - Often better accuracy on structured data
+    - Built-in feature importance
+    - Handles missing values automatically
+    """
+
+    def __init__(
+        self,
+        task_type: str = "regression",
+        cat_feature_indices: Optional[List[int]] = None,
+        feature_names: Optional[List[str]] = None,
+        iterations: int = 1000,
+        learning_rate: float = 0.03,
+        depth: int = 6,
+        early_stopping_rounds: int = 50,
+        verbose: int = 100,
+        random_seed: int = 42,
+    ):
+        """
+        Initialize CatBoost model.
+
+        Args:
+            task_type: "regression" or "lookalike" (classification)
+            cat_feature_indices: Indices of categorical features in the input array
+            feature_names: Names of all features (for interpretability)
+            iterations: Number of boosting iterations
+            learning_rate: Learning rate (eta)
+            depth: Tree depth
+            early_stopping_rounds: Stop if no improvement for N rounds
+            verbose: Print progress every N iterations
+            random_seed: Random seed for reproducibility
+        """
+        if not CATBOOST_AVAILABLE:
+            raise ImportError("CatBoost not installed. Run: pip install catboost")
+
+        self.task_type = task_type
+        self.cat_feature_indices = cat_feature_indices or []
+        self.feature_names = feature_names
+        self.is_fitted = False
+
+        common_params = {
+            'iterations': iterations,
+            'learning_rate': learning_rate,
+            'depth': depth,
+            'early_stopping_rounds': early_stopping_rounds,
+            'verbose': verbose,
+            'random_seed': random_seed,
+            'cat_features': self.cat_feature_indices,
+            'thread_count': -1,  # Use all cores
+        }
+
+        if task_type == "regression":
+            self.model = CatBoostRegressor(
+                loss_function='RMSE',
+                eval_metric='RMSE',
+                **common_params
+            )
+        else:  # lookalike / classification
+            self.model = CatBoostClassifier(
+                loss_function='Logloss',
+                eval_metric='AUC',
+                **common_params
+            )
+
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+        progress_callback: Optional[callable] = None,
+    ) -> 'CatBoostModel':
+        """
+        Train the CatBoost model.
+
+        Args:
+            X_train: Training features (n_samples, n_features)
+            y_train: Training targets (n_samples,)
+            X_val: Validation features (optional, for early stopping)
+            y_val: Validation targets
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            self (fitted model)
+        """
+        eval_set = None
+        if X_val is not None and y_val is not None:
+            eval_set = (X_val, y_val)
+
+        self.model.fit(
+            X_train, y_train,
+            eval_set=eval_set,
+            use_best_model=True if eval_set else False,
+        )
+        self.is_fitted = True
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predict target values."""
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        return self.model.predict(X)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Predict class probabilities (classification only)."""
+        if self.task_type == "regression":
+            raise ValueError("predict_proba not available for regression")
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        return self.model.predict_proba(X)
+
+    def get_feature_importance(self) -> Dict[str, float]:
+        """Get feature importance scores."""
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+
+        importance = self.model.get_feature_importance()
+
+        if self.feature_names and len(self.feature_names) == len(importance):
+            return dict(zip(self.feature_names, importance))
+        return dict(enumerate(importance))
+
+    @property
+    def best_iteration(self) -> int:
+        """Get the best iteration (with early stopping)."""
+        return self.model.best_iteration_ if self.is_fitted else 0
+
+
+class XGBoostModel:
+    """
+    XGBoost wrapper for tabular regression/classification.
+
+    Advantages:
+    - Very fast training with histogram-based algorithm
+    - Excellent performance on structured data
+    - GPU acceleration support
+    - Built-in feature importance
+    """
+
+    def __init__(
+        self,
+        task_type: str = "regression",
+        feature_names: Optional[List[str]] = None,
+        n_estimators: int = 1000,
+        learning_rate: float = 0.03,
+        max_depth: int = 6,
+        early_stopping_rounds: int = 50,
+        verbosity: int = 1,
+        random_state: int = 42,
+        n_jobs: int = -1,
+    ):
+        """
+        Initialize XGBoost model.
+
+        Args:
+            task_type: "regression" or "lookalike" (classification)
+            feature_names: Names of all features (for interpretability)
+            n_estimators: Number of boosting rounds
+            learning_rate: Learning rate (eta)
+            max_depth: Maximum tree depth
+            early_stopping_rounds: Stop if no improvement for N rounds
+            verbosity: Verbosity level (0=silent, 1=warnings, 2=info)
+            random_state: Random seed for reproducibility
+            n_jobs: Number of parallel threads (-1 for all cores)
+        """
+        if not XGBOOST_AVAILABLE:
+            raise ImportError("XGBoost not installed. Run: pip install xgboost")
+
+        self.task_type = task_type
+        self.feature_names = feature_names
+        self.early_stopping_rounds = early_stopping_rounds
+        self.is_fitted = False
+
+        common_params = {
+            'n_estimators': n_estimators,
+            'learning_rate': learning_rate,
+            'max_depth': max_depth,
+            'verbosity': verbosity,
+            'random_state': random_state,
+            'n_jobs': n_jobs,
+            'tree_method': 'hist',  # Fast histogram-based algorithm
+            'enable_categorical': True,  # Native categorical support (XGBoost 2.0+)
+        }
+
+        if task_type == "regression":
+            self.model = XGBRegressor(
+                objective='reg:squarederror',
+                eval_metric='rmse',
+                **common_params
+            )
+        else:  # lookalike / classification
+            self.model = XGBClassifier(
+                objective='binary:logistic',
+                eval_metric='auc',
+                **common_params
+            )
+
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+        progress_callback: Optional[callable] = None,
+    ) -> 'XGBoostModel':
+        """
+        Train the XGBoost model.
+
+        Args:
+            X_train: Training features (n_samples, n_features)
+            y_train: Training targets (n_samples,)
+            X_val: Validation features (optional, for early stopping)
+            y_val: Validation targets
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            self (fitted model)
+        """
+        fit_params = {}
+
+        if X_val is not None and y_val is not None:
+            fit_params['eval_set'] = [(X_val, y_val)]
+            fit_params['verbose'] = 100  # Print every 100 iterations
+
+        self.model.fit(X_train, y_train, **fit_params)
+        self.is_fitted = True
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predict target values."""
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        return self.model.predict(X)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """Predict class probabilities (classification only)."""
+        if self.task_type == "regression":
+            raise ValueError("predict_proba not available for regression")
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        return self.model.predict_proba(X)
+
+    def get_feature_importance(self) -> Dict[str, float]:
+        """Get feature importance scores."""
+        if not self.is_fitted:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+
+        importance = self.model.feature_importances_
+
+        if self.feature_names and len(self.feature_names) == len(importance):
+            return dict(zip(self.feature_names, importance))
+        return dict(enumerate(importance))
+
+    @property
+    def best_iteration(self) -> int:
+        """Get the best iteration (with early stopping)."""
+        return getattr(self.model, 'best_iteration', self.model.n_estimators) if self.is_fitted else 0
+
+
+def create_model(
+    model_type: str,
+    task_type: str,
+    n_numeric: int,
+    n_boolean: int,
+    categorical_vocab_sizes: Dict[str, int],
+    feature_names: Optional[List[str]] = None,
+    config: Optional[Config] = None,
+    **kwargs
+):
+    """
+    Factory function to create a model based on type.
+
+    Args:
+        model_type: "neural_network", "catboost", or "xgboost"
+        task_type: "regression" or "lookalike"
+        n_numeric: Number of numeric features
+        n_boolean: Number of boolean features
+        categorical_vocab_sizes: Dict mapping categorical feature names to vocab sizes
+        feature_names: List of all feature names (in order)
+        config: Optional Config object for neural network settings
+        **kwargs: Additional arguments passed to the model constructor
+
+    Returns:
+        Model instance (SiteScoringModel, CatBoostModel, or XGBoostModel)
+    """
+    if model_type == "neural_network":
+        if config is not None:
+            return SiteScoringModel.from_config(config, categorical_vocab_sizes)
+        return SiteScoringModel(
+            n_numeric=n_numeric,
+            n_boolean=n_boolean,
+            categorical_vocab_sizes=categorical_vocab_sizes,
+            **kwargs
+        )
+
+    elif model_type == "catboost":
+        # CatBoost uses indices for categorical features
+        # Categorical features come after numeric features in our data layout
+        cat_start_idx = n_numeric
+        cat_end_idx = n_numeric + len(categorical_vocab_sizes)
+        cat_feature_indices = list(range(cat_start_idx, cat_end_idx))
+
+        return CatBoostModel(
+            task_type=task_type,
+            cat_feature_indices=cat_feature_indices,
+            feature_names=feature_names,
+            iterations=kwargs.get('epochs', 1000),
+            learning_rate=kwargs.get('learning_rate', 0.03),
+            depth=kwargs.get('depth', 6),
+            early_stopping_rounds=kwargs.get('early_stopping_rounds', 50),
+        )
+
+    elif model_type == "xgboost":
+        return XGBoostModel(
+            task_type=task_type,
+            feature_names=feature_names,
+            n_estimators=kwargs.get('epochs', 1000),
+            learning_rate=kwargs.get('learning_rate', 0.03),
+            max_depth=kwargs.get('max_depth', 6),
+            early_stopping_rounds=kwargs.get('early_stopping_rounds', 50),
+        )
+
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}. Choose from: neural_network, catboost, xgboost")

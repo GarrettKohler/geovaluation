@@ -240,6 +240,102 @@ def compute_shap_values(
         return False
 
 
+def compute_shap_values_tree(
+    model,
+    X_test: np.ndarray,
+    feature_names: List[str],
+    output_dir: Path,
+    n_explain: int = 500,
+    task_type: str = "regression",
+    progress_callback=None,
+) -> bool:
+    """
+    Compute SHAP values for tree-based models (CatBoost, XGBoost) using TreeExplainer.
+
+    TreeExplainer is much faster than KernelExplainer for tree models because it
+    uses the tree structure directly to compute exact Shapley values.
+
+    Args:
+        model: Trained CatBoost or XGBoost model (wrapper or native)
+        X_test: Test data as numpy array (n_samples, n_features)
+        feature_names: List of all feature names
+        output_dir: Directory to save SHAP cache
+        n_explain: Number of samples to explain
+        task_type: "regression" or "lookalike"
+        progress_callback: Optional function to report progress messages
+
+    Returns:
+        True if SHAP computation succeeded, False otherwise
+    """
+    try:
+        import shap
+    except ImportError:
+        print("Warning: SHAP library not installed. Skipping SHAP computation.")
+        if progress_callback:
+            progress_callback("SHAP library not available - skipping feature importance")
+        return False
+
+    try:
+        if progress_callback:
+            progress_callback("Computing feature importance (SHAP TreeExplainer)...")
+
+        # Get the underlying model if wrapped
+        if hasattr(model, 'model'):
+            native_model = model.model
+        else:
+            native_model = model
+
+        # Select samples to explain
+        n_total = X_test.shape[0]
+        explain_size = min(n_explain, n_total)
+        explain_data = X_test[:explain_size]
+
+        if progress_callback:
+            progress_callback(f"SHAP: Explaining {explain_size} samples with TreeExplainer...")
+
+        # Create TreeExplainer (much faster for tree models)
+        explainer = shap.TreeExplainer(native_model)
+
+        # Compute SHAP values
+        shap_values = explainer.shap_values(explain_data)
+
+        # Handle classification (returns list of arrays for each class)
+        if isinstance(shap_values, list):
+            # For binary classification, use the positive class
+            shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+
+        # Get base value
+        if hasattr(explainer, 'expected_value'):
+            base_value = explainer.expected_value
+            if isinstance(base_value, (list, np.ndarray)):
+                base_value = base_value[1] if len(base_value) > 1 else base_value[0]
+            base_value = float(base_value)
+        else:
+            base_value = 0.0
+
+        # Save to cache
+        cache = ShapCache(output_dir)
+        cache.save(
+            shap_values=shap_values,
+            base_value=base_value,
+            feature_names=feature_names,
+            sample_data=explain_data
+        )
+
+        if progress_callback:
+            progress_callback("SHAP: Feature importance computed successfully (TreeExplainer)!")
+
+        return True
+
+    except Exception as e:
+        print(f"Warning: SHAP TreeExplainer computation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        if progress_callback:
+            progress_callback(f"SHAP computation skipped: {str(e)[:80]}")
+        return False
+
+
 def generate_shap_plots(output_dir: Path) -> Optional[Dict[str, str]]:
     """
     Generate SHAP visualization plots as base64-encoded PNG images.

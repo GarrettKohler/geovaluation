@@ -3312,11 +3312,13 @@
                 </div>
 
                 <div class="training-form-group">
-                    <label class="training-form-label" data-tooltip="Neural network architecture: Uses embeddings for categorical features combined with a residual MLP for optimal performance.">Model Type</label>
+                    <label class="training-form-label" data-tooltip="Choose the model architecture. Neural networks use embeddings + MLP. Gradient boosting models (CatBoost/XGBoost) often perform better on tabular data.">Model Type</label>
                     <select class="training-form-select" id="model-type">
                         <option value="neural_network" selected>Neural Network (PyTorch)</option>
+                        <option value="catboost">CatBoost (Gradient Boosting)</option>
+                        <option value="xgboost">XGBoost (Gradient Boosting)</option>
                     </select>
-                    <div class="training-form-hint">Embedding + Residual MLP optimized for M4 GPU</div>
+                    <div class="training-form-hint" id="model-type-hint">Embedding + Residual MLP optimized for M4 GPU</div>
                 </div>
 
                 <div class="training-form-group" id="target-variable-group">
@@ -6202,6 +6204,14 @@
                 taskTypeSelect.addEventListener('change', handleTaskTypeChange);
             }
 
+            // Model type selector handler (Neural Network vs CatBoost vs XGBoost)
+            const modelTypeSelect = document.getElementById('model-type');
+            if (modelTypeSelect) {
+                modelTypeSelect.addEventListener('change', handleModelTypeChange);
+                // Initialize visibility
+                handleModelTypeChange();
+            }
+
             // Feature selection method handler
             const fsMethodSelect = document.getElementById('feature-selection-method');
             if (fsMethodSelect) {
@@ -6231,6 +6241,74 @@
                 // Update metric labels for regression
                 if (metricR2Label) metricR2Label.textContent = 'R² Score';
                 if (resultR2Label) resultR2Label.textContent = 'Test R²';
+            }
+        }
+
+        function handleModelTypeChange() {
+            const modelType = document.getElementById('model-type').value;
+            const hintEl = document.getElementById('model-type-hint');
+
+            // Model type descriptions
+            const modelHints = {
+                'neural_network': 'Embedding + Residual MLP optimized for M4 GPU',
+                'catboost': 'Gradient boosting with native categorical support - often best for tabular data',
+                'xgboost': 'Fast gradient boosting - excellent baseline for tabular regression'
+            };
+
+            // Update hint text
+            if (hintEl) {
+                hintEl.textContent = modelHints[modelType] || 'Select a model type';
+            }
+
+            // Neural network specific options
+            const isNeuralNetwork = modelType === 'neural_network';
+
+            // Elements to show/hide for neural network only
+            const nnOnlyElements = [
+                'hidden-layers',
+                'embedding-dim',
+                'dropout'
+            ];
+
+            nnOnlyElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    const formGroup = element.closest('.training-form-group');
+                    if (formGroup) {
+                        formGroup.style.display = isNeuralNetwork ? 'block' : 'none';
+                    }
+                }
+            });
+
+            // Feature selection is also neural-network only (gradient boosting has built-in feature importance)
+            const fsMethodGroup = document.getElementById('feature-selection-method');
+            if (fsMethodGroup) {
+                const fsFormGroup = fsMethodGroup.closest('.training-form-group');
+                if (fsFormGroup) {
+                    fsFormGroup.style.display = isNeuralNetwork ? 'block' : 'none';
+                }
+                // Also hide STG params section
+                const stgParams = document.getElementById('stg-params');
+                if (stgParams) {
+                    stgParams.style.display = 'none';
+                }
+                const fsAdditional = document.getElementById('fs-additional-options');
+                if (fsAdditional) {
+                    fsAdditional.style.display = 'none';
+                }
+            }
+
+            // Update modal subtitle if visible
+            const modalSubtitle = document.getElementById('modal-model-type');
+            if (modalSubtitle) {
+                const taskType = document.getElementById('task-type').value;
+                const taskLabel = taskType === 'lookalike' ? 'Classification' : 'Regression';
+                const modelLabels = {
+                    'neural_network': 'Neural Network',
+                    'catboost': 'CatBoost',
+                    'xgboost': 'XGBoost'
+                };
+                modalSubtitle.textContent = `${modelLabels[modelType]} ${taskLabel} Model`;
             }
         }
 
