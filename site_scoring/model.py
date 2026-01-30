@@ -363,15 +363,16 @@ class CatBoostModel:
         return self.model.predict_proba(X)
 
     def get_feature_importance(self) -> Dict[str, float]:
-        """Get feature importance scores."""
+        """Get feature importance scores (as native Python floats for JSON serialization)."""
         if not self.is_fitted:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
         importance = self.model.get_feature_importance()
 
+        # Convert to native Python float for JSON serialization
         if self.feature_names and len(self.feature_names) == len(importance):
-            return dict(zip(self.feature_names, importance))
-        return dict(enumerate(importance))
+            return {name: float(val) for name, val in zip(self.feature_names, importance)}
+        return {i: float(val) for i, val in enumerate(importance)}
 
     @property
     def best_iteration(self) -> int:
@@ -494,15 +495,16 @@ class XGBoostModel:
         return self.model.predict_proba(X)
 
     def get_feature_importance(self) -> Dict[str, float]:
-        """Get feature importance scores."""
+        """Get feature importance scores (as native Python floats for JSON serialization)."""
         if not self.is_fitted:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
         importance = self.model.feature_importances_
 
+        # Convert numpy float32 to native Python float for JSON serialization
         if self.feature_names and len(self.feature_names) == len(importance):
-            return dict(zip(self.feature_names, importance))
-        return dict(enumerate(importance))
+            return {name: float(val) for name, val in zip(self.feature_names, importance)}
+        return {i: float(val) for i, val in enumerate(importance)}
 
     @property
     def best_iteration(self) -> int:
