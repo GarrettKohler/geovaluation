@@ -579,6 +579,7 @@ class TrainingJob:
             "model_path": str(model_path),
             "n_features": len(all_feature_names),
             "feature_names": all_feature_names,
+            "shap_available": shap_success,  # Enable SHAP values link in UI
         }
 
         # Report completion
