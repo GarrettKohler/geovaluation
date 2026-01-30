@@ -63,7 +63,8 @@ class Config:
         "avg_monthly_revenue",
         "log_total_revenue",
         # Geospatial distances (log-transformed for better distribution)
-        "log_nearest_site_distance_mi", "log_min_distance_to_interstate_mi",
+        "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
+        "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
         # Demographics
         "avg_household_income", "median_age",
         "pct_female", "pct_male",
@@ -180,7 +181,8 @@ class Config:
 _MODEL_B_NUMERIC = [
     "rs_Impressions", "rs_NVIs", "rs_Revenue", "rs_RevenuePerScreen",
     "avg_monthly_revenue", "log_total_revenue",
-    "log_nearest_site_distance_mi", "log_min_distance_to_interstate_mi",
+    "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
+    "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
     "avg_household_income", "median_age",
     "pct_female",
     # pct_male removed (collinear with pct_female)
@@ -211,7 +213,8 @@ _MODEL_A_NUMERIC = [
     "log_total_monthly_nvis_per_screen",
     "log_total_monthly_revenue_per_screen",
     # Geospatial distances
-    "log_nearest_site_distance_mi", "log_min_distance_to_interstate_mi",
+    "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
+    "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
     # Demographics (full set)
     "avg_household_income", "median_age",
     "pct_female", "pct_male",
