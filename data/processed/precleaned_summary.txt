@@ -2,13 +2,13 @@
 PRE-CLEANED DATASET SUMMARY REPORT
 ================================================================================
 
-Generated: 2026-01-26 12:26:48
+Generated: 2026-01-30 08:50:50
 
 ----------------------------------------
 DATASET OVERVIEW
 ----------------------------------------
 Total unique sites: 57,675
-Total columns: 90
+Total columns: 92
 Total active site-months: 1,475,761
 
 ----------------------------------------
@@ -53,7 +53,7 @@ AVERAGE PER ACTIVE SITE-MONTH
 ----------------------------------------
 COLUMN CATEGORIES
 ----------------------------------------
-  Site metadata columns: 78
+  Site metadata columns: 80
   Total metric columns: 6
   Avg monthly metric columns: 6
 
@@ -62,6 +62,8 @@ GEOSPATIAL FEATURES
 ----------------------------------------
   Sites with nearest site distance: 57,651 (100.0%)
   Sites with interstate distance: 57,651 (100.0%)
+  Sites with Kroger distance: 57,675 (100.0%)
+  Sites with McDonald's distance: 57,675 (100.0%)
 
 ----------------------------------------
 SAMPLE DATA (5 rows)

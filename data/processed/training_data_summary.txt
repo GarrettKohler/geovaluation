@@ -2,18 +2,18 @@
 TRAINING DATASET SUMMARY REPORT
 ================================================================================
 
-Generated: 2026-01-26 12:26:48
+Generated: 2026-01-30 08:50:50
 
 ----------------------------------------
 DATASET OVERVIEW
 ----------------------------------------
 Total sites (Active only): 26,099
-Total columns: 94
+Total columns: 98
 
 ----------------------------------------
 COLUMN BREAKDOWN
 ----------------------------------------
-  Log-transformed columns: 8
+  Log-transformed columns: 10
   One-hot encoded flags: 40
   Total metric columns: 6
   Average metric columns: 7
@@ -22,7 +22,9 @@ COLUMN BREAKDOWN
 LOG-TRANSFORMED COLUMNS
 ----------------------------------------
   log_min_distance_to_interstate_mi: min=0.0014, max=7.2673, mean=1.5886
-  log_nearest_site_distance_mi: min=0.0000, max=3.9228, mean=0.5897
+  log_min_distance_to_kroger_mi: min=0.0335, max=6.5464, mean=2.8873
+  log_min_distance_to_mcdonalds_mi: min=0.0003, max=4.4334, mean=0.9634
+  log_min_distance_to_nearest_site_mi: min=0.0000, max=3.9228, mean=0.5897
   log_total_monthly_impressions: min=0.0000, max=14.7641, mean=11.7057
   log_total_monthly_impressions_per_screen: min=0.0000, max=12.5537, mean=9.6016
   log_total_monthly_nvis: min=0.0000, max=14.7447, mean=11.6433

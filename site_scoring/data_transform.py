@@ -37,8 +37,8 @@ def load_site_scores(data_path: Path) -> pl.DataFrame:
     return df
 
 
-def load_auxiliary_data(data_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Load nearest site and interstate distance files."""
+def load_auxiliary_data(data_path: Path) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """Load nearest site, interstate, Kroger, and McDonald's distance files."""
     print("Loading auxiliary geospatial data...")
 
     # Nearest site distances
@@ -53,7 +53,15 @@ def load_auxiliary_data(data_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     ])
     print(f"  Interstate distances: {len(interstate_agg):,} unique sites")
 
-    return nearest, interstate_agg
+    # Kroger distances (pre-aggregated - one row per site)
+    kroger = pl.read_csv(data_path / "site_kroger_distances.csv")
+    print(f"  Kroger distances: {len(kroger):,} records")
+
+    # McDonald's distances (pre-aggregated - one row per site)
+    mcdonalds = pl.read_csv(data_path / "site_mcdonalds_distances.csv")
+    print(f"  McDonald's distances: {len(mcdonalds):,} records")
+
+    return nearest, interstate_agg, kroger, mcdonalds
 
 
 def calculate_relative_strength(
@@ -320,17 +328,19 @@ def aggregate_site_metrics(df: pl.DataFrame) -> pl.DataFrame:
 def join_geospatial_features(
     site_df: pl.DataFrame,
     nearest_df: pl.DataFrame,
-    interstate_df: pl.DataFrame
+    interstate_df: pl.DataFrame,
+    kroger_df: pl.DataFrame,
+    mcdonalds_df: pl.DataFrame
 ) -> pl.DataFrame:
     """Join auxiliary geospatial data to site dataset."""
     print("Joining geospatial features...")
 
-    # Join nearest site distances
+    # Join nearest site distances (rename to consistent naming convention)
     site_df = site_df.join(
         nearest_df.select([
             'GTVID',
             'nearest_site',
-            'nearest_site_distance_mi'
+            pl.col('nearest_site_distance_mi').alias('min_distance_to_nearest_site_mi')
         ]),
         left_on='gtvid',
         right_on='GTVID',
@@ -345,8 +355,28 @@ def join_geospatial_features(
         how='left'
     )
 
+    # Join Kroger distances
+    site_df = site_df.join(
+        kroger_df.select(['GTVID', 'min_distance_to_kroger_mi']),
+        left_on='gtvid',
+        right_on='GTVID',
+        how='left'
+    )
+
+    # Join McDonald's distances
+    site_df = site_df.join(
+        mcdonalds_df.select(['GTVID', 'min_distance_to_mcdonalds_mi']),
+        left_on='gtvid',
+        right_on='GTVID',
+        how='left'
+    )
+
     matched = site_df.filter(pl.col('nearest_site').is_not_null()).shape[0]
-    print(f"  Matched {matched:,} sites with geospatial features")
+    kroger_matched = site_df.filter(pl.col('min_distance_to_kroger_mi').is_not_null()).shape[0]
+    mcdonalds_matched = site_df.filter(pl.col('min_distance_to_mcdonalds_mi').is_not_null()).shape[0]
+    print(f"  Matched {matched:,} sites with nearest site features")
+    print(f"  Matched {kroger_matched:,} sites with Kroger distances")
+    print(f"  Matched {mcdonalds_matched:,} sites with McDonald's distances")
 
     return site_df
 
@@ -360,8 +390,9 @@ def add_log_transformations(df: pl.DataFrame) -> pl.DataFrame:
         'total_revenue', 'total_monthly_impressions', 'total_monthly_nvis',
         'total_monthly_impressions_per_screen', 'total_monthly_nvis_per_screen',
         'total_monthly_revenue_per_screen',
-        # Geospatial distances
-        'nearest_site_distance_mi', 'min_distance_to_interstate_mi',
+        # Geospatial distances (all use min_distance_to_X_mi naming convention)
+        'min_distance_to_nearest_site_mi', 'min_distance_to_interstate_mi',
+        'min_distance_to_kroger_mi', 'min_distance_to_mcdonalds_mi',
     ]
 
     for col in numeric_cols:
@@ -592,8 +623,12 @@ def generate_summary_report(site_df: pl.DataFrame, totals: dict) -> str:
     report.append("-" * 40)
     nearest_matched = site_df.filter(pl.col('nearest_site').is_not_null()).shape[0]
     interstate_matched = site_df.filter(pl.col('min_distance_to_interstate_mi').is_not_null()).shape[0]
+    kroger_matched = site_df.filter(pl.col('min_distance_to_kroger_mi').is_not_null()).shape[0] if 'min_distance_to_kroger_mi' in site_df.columns else 0
+    mcdonalds_matched = site_df.filter(pl.col('min_distance_to_mcdonalds_mi').is_not_null()).shape[0] if 'min_distance_to_mcdonalds_mi' in site_df.columns else 0
     report.append(f"  Sites with nearest site distance: {nearest_matched:,} ({nearest_matched/len(site_df)*100:.1f}%)")
     report.append(f"  Sites with interstate distance: {interstate_matched:,} ({interstate_matched/len(site_df)*100:.1f}%)")
+    report.append(f"  Sites with Kroger distance: {kroger_matched:,} ({kroger_matched/len(site_df)*100:.1f}%)")
+    report.append(f"  Sites with McDonald's distance: {mcdonalds_matched:,} ({mcdonalds_matched/len(site_df)*100:.1f}%)")
 
     # Sample rows
     report.append("\n" + "-" * 40)
@@ -686,13 +721,13 @@ def transform_data(
 
     # Load all data
     site_scores = load_site_scores(input_path)
-    nearest, interstate = load_auxiliary_data(input_path)
+    nearest, interstate, kroger, mcdonalds = load_auxiliary_data(input_path)
 
     # Aggregate to one row per site
     site_agg = aggregate_site_metrics(site_scores)
 
     # Join geospatial features
-    site_final = join_geospatial_features(site_agg, nearest, interstate)
+    site_final = join_geospatial_features(site_agg, nearest, interstate, kroger, mcdonalds)
 
     # Calculate dataset totals
     totals = calculate_dataset_totals(site_final)

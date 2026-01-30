@@ -47,8 +47,10 @@ IMMUTABLE_FEATURES = [
     'median_age',
     'pct_female',
     'pct_male',
-    'log_nearest_site_distance_mi',
+    'log_min_distance_to_nearest_site_mi',
     'log_min_distance_to_interstate_mi',
+    'log_min_distance_to_kroger_mi',
+    'log_min_distance_to_mcdonalds_mi',
     'nearest_interstate',
 
     # Site Identity
