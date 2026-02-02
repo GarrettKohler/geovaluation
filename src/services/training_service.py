@@ -23,6 +23,7 @@ import traceback
 from site_scoring.config import Config, DEFAULT_OUTPUT_DIR
 from site_scoring.model import (
     SiteScoringModel,
+    ClusteringModel,
     CatBoostModel,
     XGBoostModel,
     create_model,
@@ -30,7 +31,12 @@ from site_scoring.model import (
     XGBOOST_AVAILABLE,
 )
 from site_scoring.data_loader import DataProcessor, create_data_loaders
-from src.services.shap_service import compute_shap_values, compute_shap_values_tree, ShapCache
+from src.services.shap_service import (
+    compute_shap_values,
+    compute_shap_values_tree,
+    compute_cluster_shap_values,
+    ShapCache,
+)
 
 # Feature selection imports
 from site_scoring.feature_selection import (
@@ -106,6 +112,18 @@ class TrainingConfig:
     calibration_split: float = 0.5   # Fraction of validation data reserved for calibration
     conformal_alpha: float = 0.10    # Significance level (0.10 = 90% coverage)
 
+    # Lookalike classifier percentile bounds
+    # Sites with revenue percentile >= lower and <= upper are labeled as "top performers"
+    lookalike_lower_percentile: int = 90  # Lower bound (inclusive), 1-99
+    lookalike_upper_percentile: int = 100  # Upper bound (inclusive), 1-100
+
+    # Clustering configuration (for clustering task type)
+    n_clusters: int = 5  # Number of clusters to discover
+    latent_dim: int = 32  # Dimension of autoencoder latent space
+    cluster_probability_threshold: float = 0.5  # Min lookalike prob to include in clustering
+    pretrain_epochs: int = 20  # Epochs for autoencoder pretraining
+    clustering_epochs: int = 30  # Epochs for clustering refinement
+
 
 @dataclass
 class TrainingProgress:
@@ -126,6 +144,9 @@ class TrainingProgress:
     # Feature selection stats
     n_active_features: Optional[int] = None
     fs_reg_loss: float = 0.0
+    # Classification metrics (lookalike tasks)
+    val_f1: float = 0.0
+    val_logloss: float = 0.0
 
 
 class TrainingJob:
@@ -482,15 +503,27 @@ class TrainingJob:
 
         if self.config.task_type == "lookalike":
             # Classification metrics
+            from sklearn.metrics import f1_score, log_loss
             if hasattr(model, 'predict_proba'):
                 predictions_prob = model.predict_proba(X_test)[:, 1]
             else:
                 predictions_prob = predictions
+            predictions_binary = (predictions_prob >= 0.5).astype(int)
             try:
                 test_auc = float(roc_auc_score(y_test, predictions_prob))
             except ValueError:
                 test_auc = 0.0
-            test_accuracy = float(np.mean((predictions_prob >= 0.5) == y_test))
+            test_accuracy = float(np.mean(predictions_binary == y_test))
+            # F1 score: balance of precision and recall
+            try:
+                test_f1 = float(f1_score(y_test, predictions_binary, zero_division=0))
+            except ValueError:
+                test_f1 = 0.0
+            # Log loss (cross-entropy): measures prediction confidence
+            try:
+                test_logloss = float(log_loss(y_test, predictions_prob, labels=[0, 1]))
+            except ValueError:
+                test_logloss = 0.0
             test_mae, test_smape, test_rmse, test_r2 = 0.0, 0.0, 0.0, test_auc
         else:
             # Regression metrics - inverse transform predictions
@@ -508,6 +541,8 @@ class TrainingJob:
             ss_res = np.sum(test_errors ** 2)
             ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
             test_r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            # Regression doesn't use F1/logloss
+            test_f1, test_logloss = 0.0, 0.0
 
         # Save model
         output_dir = pytorch_config.output_dir
@@ -540,7 +575,9 @@ class TrainingJob:
             learning_rate=self.config.learning_rate,
             elapsed_time=time.time() - start_time,
             status="running",
-            message="Computing SHAP feature importance..."
+            message="Computing SHAP feature importance...",
+            val_f1=test_f1,
+            val_logloss=test_logloss,
         ))
 
         shap_success = compute_shap_values_tree(
@@ -562,7 +599,9 @@ class TrainingJob:
                 learning_rate=self.config.learning_rate,
                 elapsed_time=time.time() - start_time,
                 status="running",
-                message=msg
+                message=msg,
+                val_f1=test_f1,
+                val_logloss=test_logloss,
             ))
         )
 
@@ -574,6 +613,8 @@ class TrainingJob:
             "test_rmse": test_rmse,
             "test_smape": test_smape,
             "test_r2": test_r2,
+            "test_f1": test_f1,
+            "test_logloss": test_logloss,
             "best_iteration": model.best_iteration,
             "feature_importance": feature_importance,
             "model_path": str(model_path),
@@ -583,6 +624,10 @@ class TrainingJob:
         }
 
         # Report completion
+        if self.config.task_type == "lookalike":
+            completion_msg = f"{model_type.upper()} training complete! AUC={test_r2:.4f}, F1={test_f1:.4f}"
+        else:
+            completion_msg = f"{model_type.upper()} training complete! Test R²={test_r2:.4f}"
         self._report_progress(TrainingProgress(
             epoch=1,
             total_epochs=1,
@@ -595,7 +640,422 @@ class TrainingJob:
             learning_rate=self.config.learning_rate,
             elapsed_time=time.time() - start_time,
             status="completed",
-            message=f"{model_type.upper()} training complete! Test R²={test_r2:.4f}"
+            message=completion_msg,
+            val_f1=test_f1,
+            val_logloss=test_logloss,
+        ))
+
+        return results
+
+    def _run_clustering_training(
+        self,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        processor,
+        pytorch_config,
+        start_time: float,
+    ) -> Dict:
+        """
+        Train a Deep Embedded Clustering (DEC) model on top performers.
+
+        This method:
+        1. Loads a previously trained lookalike model
+        2. Filters to sites with high lookalike probability (top performers)
+        3. Pretrains an autoencoder for reconstruction
+        4. Initializes cluster centroids with k-means
+        5. Fine-tunes with KL-divergence clustering loss
+        6. Computes per-cluster SHAP feature importance
+
+        Args:
+            train_loader: Training data loader
+            val_loader: Validation data loader
+            processor: Data processor with encoders
+            pytorch_config: Configuration object
+            start_time: Training start time
+
+        Returns:
+            Dict with clustering results and metrics
+        """
+        from sklearn.metrics import silhouette_score, davies_bouldin_score
+
+        output_dir = pytorch_config.output_dir
+        device = torch.device(self.config.device)
+
+        # Step 1: Check for existing lookalike model
+        self._report_progress(TrainingProgress(
+            epoch=0, total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Loading lookalike model..."
+        ))
+
+        lookalike_model_path = output_dir / "best_model.pt"
+        if not lookalike_model_path.exists():
+            raise ValueError(
+                "No lookalike model found. Train a lookalike classifier first, "
+                "then run clustering on the identified top performers."
+            )
+
+        # Load lookalike model checkpoint
+        checkpoint = torch.load(lookalike_model_path, map_location=device)
+        lookalike_config = checkpoint.get('config')
+        if lookalike_config is None or getattr(lookalike_config, 'task_type', None) != 'lookalike':
+            raise ValueError(
+                "The saved model is not a lookalike classifier. "
+                "Train a lookalike model first."
+            )
+
+        # Step 2: Collect all data and get lookalike predictions
+        self._report_progress(TrainingProgress(
+            epoch=0, total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Collecting top performer data..."
+        ))
+
+        # Recreate lookalike model architecture
+        lookalike_model = SiteScoringModel(
+            n_numeric=processor.n_numeric_features,
+            n_boolean=processor.n_boolean_features,
+            categorical_vocab_sizes=processor.categorical_vocab_sizes,
+            embedding_dim=pytorch_config.embedding_dim,
+            hidden_dims=pytorch_config.hidden_dims,
+            dropout=pytorch_config.dropout,
+        ).to(device)
+        lookalike_model.load_state_dict(checkpoint['model_state_dict'])
+        lookalike_model.eval()
+
+        # Collect all data and predictions
+        all_numeric = []
+        all_categorical = []
+        all_boolean = []
+        all_probs = []
+
+        with torch.no_grad():
+            for loader in [train_loader, val_loader]:
+                for numeric, categorical, boolean, _ in loader:
+                    numeric = numeric.to(device, non_blocking=True)
+                    categorical = categorical.to(device, non_blocking=True)
+                    boolean = boolean.to(device, non_blocking=True)
+
+                    logits = lookalike_model(numeric, categorical, boolean)
+                    probs = torch.sigmoid(logits).cpu().numpy().flatten()
+
+                    all_numeric.append(numeric.cpu().numpy())
+                    all_categorical.append(categorical.cpu().numpy())
+                    all_boolean.append(boolean.cpu().numpy())
+                    all_probs.append(probs)
+
+        # Concatenate
+        X_numeric = np.vstack(all_numeric)
+        X_categorical = np.vstack(all_categorical)
+        X_boolean = np.vstack(all_boolean)
+        probs = np.concatenate(all_probs)
+
+        # Filter to top performers
+        threshold = self.config.cluster_probability_threshold
+        top_mask = probs >= threshold
+        n_top = top_mask.sum()
+
+        if n_top < self.config.n_clusters * 10:
+            raise ValueError(
+                f"Only {n_top} sites have probability >= {threshold}. "
+                f"Need at least {self.config.n_clusters * 10} for meaningful clustering. "
+                "Try lowering the threshold or training with different lookalike bounds."
+            )
+
+        X_numeric_top = X_numeric[top_mask]
+        X_categorical_top = X_categorical[top_mask]
+        X_boolean_top = X_boolean[top_mask]
+        probs_top = probs[top_mask]
+
+        print(f"[Clustering] {n_top} sites with prob >= {threshold} (of {len(probs)} total)")
+
+        # Step 3: Create clustering model
+        self._report_progress(TrainingProgress(
+            epoch=0, total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message=f"Creating clustering model for {n_top} top performers..."
+        ))
+
+        model = ClusteringModel(
+            n_numeric=processor.n_numeric_features,
+            n_boolean=processor.n_boolean_features,
+            categorical_vocab_sizes=processor.categorical_vocab_sizes,
+            embedding_dim=pytorch_config.embedding_dim,
+            latent_dim=self.config.latent_dim,
+            n_clusters=self.config.n_clusters,
+        ).to(device)
+
+        # Convert to tensors
+        numeric_t = torch.FloatTensor(X_numeric_top).to(device)
+        categorical_t = torch.LongTensor(X_categorical_top).to(device)
+        boolean_t = torch.FloatTensor(X_boolean_top).to(device)
+
+        # Step 4: Pretrain autoencoder
+        self._report_progress(TrainingProgress(
+            epoch=0, total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Phase 1: Pretraining autoencoder..."
+        ))
+
+        optimizer = AdamW(model.parameters(), lr=self.config.learning_rate * 10)
+        reconstruction_criterion = nn.MSELoss()
+
+        # Get original input for reconstruction target
+        with torch.no_grad():
+            x_original = model._prepare_input(numeric_t, categorical_t, boolean_t)
+
+        # Create mini-batches for pretraining
+        batch_size = min(self.config.batch_size, n_top)
+        n_batches = (n_top + batch_size - 1) // batch_size
+
+        best_recon_loss = float('inf')
+        for epoch in range(1, self.config.pretrain_epochs + 1):
+            model.train()
+            total_loss = 0.0
+
+            # Shuffle indices
+            perm = torch.randperm(n_top)
+
+            for batch_idx in range(n_batches):
+                start_idx = batch_idx * batch_size
+                end_idx = min(start_idx + batch_size, n_top)
+                batch_perm = perm[start_idx:end_idx]
+
+                optimizer.zero_grad()
+                output = model(
+                    numeric_t[batch_perm],
+                    categorical_t[batch_perm],
+                    boolean_t[batch_perm],
+                )
+                loss = reconstruction_criterion(output['x_reconstructed'], x_original[batch_perm])
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
+                total_loss += loss.item()
+
+            avg_loss = total_loss / n_batches
+            if avg_loss < best_recon_loss:
+                best_recon_loss = avg_loss
+
+            self._report_progress(TrainingProgress(
+                epoch=epoch,
+                total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+                train_loss=avg_loss,
+                val_loss=avg_loss,
+                val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+                learning_rate=optimizer.param_groups[0]['lr'],
+                elapsed_time=time.time() - start_time,
+                status="running",
+                message=f"Pretrain {epoch}/{self.config.pretrain_epochs} | Recon Loss: {avg_loss:.4f}"
+            ))
+
+        # Step 5: Initialize cluster centroids with k-means
+        self._report_progress(TrainingProgress(
+            epoch=self.config.pretrain_epochs,
+            total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=best_recon_loss, val_loss=best_recon_loss,
+            val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Initializing cluster centroids with k-means..."
+        ))
+
+        model.eval()
+        with torch.no_grad():
+            z_all = model.encode(numeric_t, categorical_t, boolean_t)
+            initial_labels = model.initialize_centroids(z_all)
+
+        # Step 6: Clustering refinement with KL-divergence
+        self._report_progress(TrainingProgress(
+            epoch=self.config.pretrain_epochs,
+            total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=best_recon_loss, val_loss=best_recon_loss,
+            val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Phase 2: Clustering refinement..."
+        ))
+
+        # Lower learning rate for fine-tuning
+        optimizer = AdamW(model.parameters(), lr=self.config.learning_rate)
+
+        # Update target distribution periodically
+        update_interval = 5
+
+        for epoch in range(1, self.config.clustering_epochs + 1):
+            model.train()
+
+            # Compute current soft assignments for all data
+            with torch.no_grad():
+                z_all = model.encode(numeric_t, categorical_t, boolean_t)
+                q_all = model.cluster_assignment(z_all)
+
+                # Update target distribution every few epochs
+                if epoch % update_interval == 1:
+                    p_all = model.target_distribution(q_all).detach()
+
+            # Train on mini-batches
+            total_loss = 0.0
+            perm = torch.randperm(n_top)
+
+            for batch_idx in range(n_batches):
+                start_idx = batch_idx * batch_size
+                end_idx = min(start_idx + batch_size, n_top)
+                batch_perm = perm[start_idx:end_idx]
+
+                optimizer.zero_grad()
+                output = model(
+                    numeric_t[batch_perm],
+                    categorical_t[batch_perm],
+                    boolean_t[batch_perm],
+                )
+
+                # Combined loss: reconstruction + clustering
+                recon_loss = reconstruction_criterion(output['x_reconstructed'], x_original[batch_perm])
+                cluster_loss = model.clustering_loss(output['q'], p_all[batch_perm])
+                loss = recon_loss + cluster_loss
+
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
+                total_loss += loss.item()
+
+            avg_loss = total_loss / n_batches
+
+            # Compute clustering metrics
+            with torch.no_grad():
+                z_all = model.encode(numeric_t, categorical_t, boolean_t)
+                assignments = model.get_cluster_assignments(z_all).cpu().numpy()
+
+            try:
+                sil_score = silhouette_score(z_all.cpu().numpy(), assignments)
+                db_score = davies_bouldin_score(z_all.cpu().numpy(), assignments)
+            except Exception:
+                sil_score, db_score = 0.0, 0.0
+
+            # Cluster sizes
+            unique, counts = np.unique(assignments, return_counts=True)
+            cluster_sizes = dict(zip(unique.tolist(), counts.tolist()))
+
+            current_epoch = self.config.pretrain_epochs + epoch
+            self._report_progress(TrainingProgress(
+                epoch=current_epoch,
+                total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+                train_loss=avg_loss,
+                val_loss=avg_loss,
+                val_mae=sil_score,  # Repurpose: silhouette score
+                val_smape=db_score,  # Repurpose: Davies-Bouldin
+                val_rmse=0,
+                val_r2=sil_score,  # Display silhouette as main metric
+                learning_rate=optimizer.param_groups[0]['lr'],
+                elapsed_time=time.time() - start_time,
+                status="running",
+                message=f"Cluster {epoch}/{self.config.clustering_epochs} | Silhouette: {sil_score:.3f} | Sizes: {list(cluster_sizes.values())}"
+            ))
+
+        # Step 7: Final evaluation and SHAP
+        self._report_progress(TrainingProgress(
+            epoch=self.config.pretrain_epochs + self.config.clustering_epochs,
+            total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=avg_loss, val_loss=avg_loss,
+            val_mae=sil_score, val_smape=db_score, val_rmse=0, val_r2=sil_score,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="running",
+            message="Computing per-cluster feature importance..."
+        ))
+
+        # Get final assignments
+        model.eval()
+        with torch.no_grad():
+            z_all = model.encode(numeric_t, categorical_t, boolean_t)
+            final_assignments = model.get_cluster_assignments(z_all).cpu().numpy()
+
+        # Combine features for SHAP
+        X_combined = np.hstack([X_numeric_top, X_categorical_top, X_boolean_top])
+
+        # Build feature names
+        all_feature_names = (
+            list(pytorch_config.numeric_features) +
+            list(pytorch_config.categorical_features) +
+            list(pytorch_config.boolean_features)
+        )
+
+        # Compute per-cluster SHAP values
+        cluster_shap_results = compute_cluster_shap_values(
+            model=model,
+            cluster_assignments=final_assignments,
+            X_data=X_combined,
+            feature_names=all_feature_names,
+            n_numeric=processor.n_numeric_features,
+            n_categorical=len(processor.categorical_vocab_sizes),
+            output_dir=output_dir,
+            n_explain=50,
+            progress_callback=lambda msg: self._report_progress(TrainingProgress(
+                epoch=self.config.pretrain_epochs + self.config.clustering_epochs,
+                total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+                train_loss=avg_loss, val_loss=avg_loss,
+                val_mae=sil_score, val_smape=db_score, val_rmse=0, val_r2=sil_score,
+                learning_rate=self.config.learning_rate,
+                elapsed_time=time.time() - start_time,
+                status="running", message=msg
+            ))
+        )
+
+        # Save model
+        output_dir.mkdir(parents=True, exist_ok=True)
+        clustering_path = output_dir / "clustering_model.pt"
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'config': pytorch_config,
+            'n_clusters': self.config.n_clusters,
+            'latent_dim': self.config.latent_dim,
+            'cluster_assignments': final_assignments,
+            'top_performer_mask': top_mask,
+            'silhouette_score': sil_score,
+            'davies_bouldin_score': db_score,
+            'cluster_sizes': cluster_sizes,
+        }, clustering_path)
+        print(f"[Clustering] Model saved to {clustering_path}")
+
+        # Final metrics
+        results = {
+            'model_type': 'clustering',
+            'task_type': 'clustering',
+            'n_clusters': self.config.n_clusters,
+            'n_top_performers': int(n_top),
+            'silhouette_score': float(sil_score),
+            'davies_bouldin_score': float(db_score),
+            'cluster_sizes': cluster_sizes,
+            'cluster_shap': cluster_shap_results,
+            'model_path': str(clustering_path),
+            'threshold': threshold,
+        }
+
+        # Report completion
+        self._report_progress(TrainingProgress(
+            epoch=self.config.pretrain_epochs + self.config.clustering_epochs,
+            total_epochs=self.config.pretrain_epochs + self.config.clustering_epochs,
+            train_loss=avg_loss, val_loss=avg_loss,
+            val_mae=sil_score, val_smape=db_score, val_rmse=0, val_r2=sil_score,
+            learning_rate=self.config.learning_rate,
+            elapsed_time=time.time() - start_time,
+            status="completed",
+            message=f"Clustering complete! {self.config.n_clusters} clusters, Silhouette: {sil_score:.3f}"
         ))
 
         return results
@@ -640,6 +1100,10 @@ class TrainingJob:
             pytorch_config.pin_memory = self.config.pin_memory
             pytorch_config.prefetch_factor = self.config.prefetch_factor
             pytorch_config.task_type = self.config.task_type
+
+            # Lookalike classifier percentile bounds
+            pytorch_config.lookalike_lower_percentile = self.config.lookalike_lower_percentile
+            pytorch_config.lookalike_upper_percentile = self.config.lookalike_upper_percentile
 
             # Apply model preset (controls which features are included)
             if self.config.model_preset:
@@ -700,7 +1164,7 @@ class TrainingJob:
                 message=f"Data loaded. Creating model on {self.config.device}..."
             ))
 
-            # Branch based on model type
+            # Branch based on model type / task type
             if self.config.model_type in ("catboost", "xgboost"):
                 # Use gradient boosting training path
                 results = self._run_gradient_boosting_training(
@@ -715,6 +1179,19 @@ class TrainingJob:
                 self.final_metrics = results
                 self.is_running = False
                 return  # Exit early - gradient boosting training is complete
+
+            if self.config.task_type == "clustering":
+                # Use clustering training path (Deep Embedded Clustering)
+                results = self._run_clustering_training(
+                    train_loader=train_loader,
+                    val_loader=val_loader,
+                    processor=processor,
+                    pytorch_config=pytorch_config,
+                    start_time=start_time,
+                )
+                self.final_metrics = results
+                self.is_running = False
+                return  # Exit early - clustering training is complete
 
             # Neural Network training path (original code)
             # Create model
@@ -915,14 +1392,25 @@ class TrainingJob:
 
                 if self.config.task_type == "lookalike":
                     # Classification metrics
-                    from sklearn.metrics import roc_auc_score
+                    from sklearn.metrics import roc_auc_score, f1_score, log_loss
                     predictions_prob = 1 / (1 + np.exp(-predictions_np.flatten()))  # sigmoid
                     targets_binary = targets_np.flatten()
+                    predictions_binary = (predictions_prob >= 0.5).astype(int)
                     try:
                         auc = float(roc_auc_score(targets_binary, predictions_prob))
                     except ValueError:
                         auc = 0.0  # Edge case: only one class in batch
-                    accuracy = float(np.mean((predictions_prob >= 0.5) == targets_binary))
+                    accuracy = float(np.mean(predictions_binary == targets_binary))
+                    # F1 score: balance of precision and recall
+                    try:
+                        f1 = float(f1_score(targets_binary, predictions_binary, zero_division=0))
+                    except ValueError:
+                        f1 = 0.0
+                    # Log loss (cross-entropy): measures prediction confidence
+                    try:
+                        logloss = float(log_loss(targets_binary, predictions_prob, labels=[0, 1]))
+                    except ValueError:
+                        logloss = 0.0
                     # Map to progress fields: val_r2 → AUC (frontend uses this for display)
                     mae, smape, rmse, r2 = 0.0, 0.0, 0.0, auc
                 else:
@@ -941,6 +1429,8 @@ class TrainingJob:
                     ss_res = np.sum(errors ** 2)
                     ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
                     r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+                    # Regression doesn't use F1/logloss
+                    f1, logloss = 0.0, 0.0
 
                 # Update scheduler
                 scheduler.step(val_loss)
@@ -984,6 +1474,8 @@ class TrainingJob:
                     best_val_loss=best_val_loss,
                     n_active_features=n_active_features,
                     fs_reg_loss=fs_reg_loss_avg,
+                    val_f1=f1,
+                    val_logloss=logloss,
                 ))
 
                 # Early stopping
@@ -1020,14 +1512,25 @@ class TrainingJob:
 
             if self.config.task_type == "lookalike":
                 # Classification test metrics
-                from sklearn.metrics import roc_auc_score
+                from sklearn.metrics import roc_auc_score, f1_score, log_loss
                 predictions_prob = 1 / (1 + np.exp(-predictions_np.flatten()))  # sigmoid
                 targets_binary = targets_np.flatten()
+                predictions_binary = (predictions_prob >= 0.5).astype(int)
                 try:
                     test_auc = float(roc_auc_score(targets_binary, predictions_prob))
                 except ValueError:
                     test_auc = 0.0
-                test_accuracy = float(np.mean((predictions_prob >= 0.5) == targets_binary))
+                test_accuracy = float(np.mean(predictions_binary == targets_binary))
+                # F1 score: balance of precision and recall
+                try:
+                    test_f1 = float(f1_score(targets_binary, predictions_binary, zero_division=0))
+                except ValueError:
+                    test_f1 = 0.0
+                # Log loss (cross-entropy): measures prediction confidence
+                try:
+                    test_logloss = float(log_loss(targets_binary, predictions_prob, labels=[0, 1]))
+                except ValueError:
+                    test_logloss = 0.0
                 test_mae, test_smape, test_rmse, test_r2 = 0.0, 0.0, 0.0, test_auc
             else:
                 # Regression test metrics
@@ -1045,6 +1548,8 @@ class TrainingJob:
                 ss_res = np.sum(test_errors ** 2)
                 ss_tot = np.sum((targets_orig - np.mean(targets_orig)) ** 2)
                 test_r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+                # Regression doesn't use F1/logloss
+                test_f1, test_logloss = 0.0, 0.0
 
             # Save model
             output_dir = pytorch_config.output_dir
@@ -1057,6 +1562,8 @@ class TrainingJob:
                     "test_auc": test_auc,
                     "test_accuracy": test_accuracy,
                     "test_r2": test_auc,  # Frontend reads this field
+                    "test_f1": test_f1,
+                    "test_logloss": test_logloss,
                 }
             else:
                 test_metrics_dict = {
@@ -1430,7 +1937,41 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
             fit_explainability=config_dict.get("fit_explainability", True),
             calibration_split=float(config_dict.get("calibration_split", 0.5)),
             conformal_alpha=float(config_dict.get("conformal_alpha", 0.10)),
+            # Lookalike classifier percentile bounds
+            lookalike_lower_percentile=int(config_dict.get("lookalike_lower_percentile", 90)),
+            lookalike_upper_percentile=int(config_dict.get("lookalike_upper_percentile", 100)),
+            # Clustering parameters
+            n_clusters=int(config_dict.get("n_clusters", 5)),
+            latent_dim=int(config_dict.get("latent_dim", 32)),
+            cluster_probability_threshold=float(config_dict.get("cluster_probability_threshold", 0.5)),
+            pretrain_epochs=int(config_dict.get("pretrain_epochs", 20)),
+            clustering_epochs=int(config_dict.get("clustering_epochs", 30)),
         )
+
+        # Validate lookalike percentile bounds
+        if config.task_type == "lookalike":
+            lower = config.lookalike_lower_percentile
+            upper = config.lookalike_upper_percentile
+            if not (1 <= lower <= 99):
+                return False, f"Lower percentile must be between 1 and 99, got {lower}"
+            if not (1 <= upper <= 100):
+                return False, f"Upper percentile must be between 1 and 100, got {upper}"
+            if upper <= lower:
+                return False, f"Upper percentile ({upper}) must be greater than lower percentile ({lower})"
+            print(f"=== Lookalike Percentile Bounds ===")
+            print(f"Lower: p{lower}, Upper: p{upper}")
+            print(f"Training on sites in revenue percentile range [{lower}, {upper}]")
+
+        # Validate clustering configuration
+        if config.task_type == "clustering":
+            if not (2 <= config.n_clusters <= 10):
+                return False, f"Number of clusters must be between 2 and 10, got {config.n_clusters}"
+            if not (0.1 <= config.cluster_probability_threshold <= 0.9):
+                return False, f"Cluster threshold must be between 0.1 and 0.9, got {config.cluster_probability_threshold}"
+            print(f"=== Clustering Configuration ===")
+            print(f"Clusters: {config.n_clusters}, Latent Dim: {config.latent_dim}")
+            print(f"Probability Threshold: {config.cluster_probability_threshold}")
+            print(f"Pretrain: {config.pretrain_epochs} epochs, Clustering: {config.clustering_epochs} epochs")
 
         # Log model preset
         print(f"=== Model Preset ===")
@@ -1554,6 +2095,9 @@ def stream_training_progress() -> Generator[str, None, None]:
                 # Feature selection stats
                 "n_active_features": progress.n_active_features,
                 "fs_reg_loss": progress.fs_reg_loss,
+                # Classification metrics (lookalike tasks)
+                "val_f1": progress.val_f1,
+                "val_logloss": progress.val_logloss,
             }
 
             # Include final_metrics in the completion message so frontend gets it immediately

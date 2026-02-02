@@ -36,6 +36,20 @@ class Config:
     # Task type: "regression" (predict revenue) or "lookalike" (classify top performers)
     task_type: str = "regression"
 
+    # Lookalike classifier percentile bounds
+    # Sites with revenue percentile >= lower_percentile and <= upper_percentile are labeled as "top performers" (1)
+    # All other sites (below lower_percentile) are labeled as "non-performers" (0)
+    lookalike_lower_percentile: int = 90  # Default: top 10% (90th percentile and above)
+    lookalike_upper_percentile: int = 100  # Default: include all above lower bound
+
+    # Clustering configuration (Deep Embedded Clustering)
+    # Used to segment top performers identified by lookalike classifier
+    n_clusters: int = 5  # Number of clusters to discover (2-10 recommended)
+    latent_dim: int = 32  # Dimension of autoencoder latent space
+    pretrain_epochs: int = 20  # Epochs for autoencoder pretraining
+    clustering_epochs: int = 30  # Epochs for clustering refinement with KL-divergence
+    cluster_probability_threshold: float = 0.5  # Min lookalike probability to include in clustering
+
     # Device - auto-detect M4 MPS
     device: str = field(default_factory=lambda: "mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -54,11 +68,14 @@ class Config:
     # These match the columns in site_training_data.parquet (one row per site)
     # Note: NVI, per-screen metrics, and raw coordinates excluded
     numeric_features: List[str] = field(default_factory=lambda: [
-        # Relative strength indicators (momentum: short-term vs long-term performance)
-        "rs_Impressions",       # Impression trend (monthly_impressions)
-        "rs_NVIs",              # Network video impression trend (monthly_nvis)
-        "rs_Revenue",           # Revenue trend
-        "rs_RevenuePerScreen",  # Per-screen revenue trend (normalized by screen count)
+        # Multi-horizon relative strength indicators (momentum features)
+        # Data is MONTHLY (1 record per site per month), windows calibrated for monthly points:
+        # Short-term (3/6 months = 95/185 days): Recent quarter vs half-year momentum
+        "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
+        # Medium-term (6/12 months = 185/370 days): Half-year vs annual
+        "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
+        # Long-term (12/24 months = 370/740 days): Annual vs 2-year trend
+        "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
         # Revenue metrics
         "avg_monthly_revenue",
         "log_total_revenue",
@@ -179,7 +196,11 @@ class Config:
 # Model B: Curated feature set — removes retailer, pct_male, nearest_interstate
 # Hypothesis: these features may be noise or proxies that don't generalize
 _MODEL_B_NUMERIC = [
-    "rs_Impressions", "rs_NVIs", "rs_Revenue", "rs_RevenuePerScreen",
+    # Multi-horizon RS (momentum) - reduces overfitting vs single horizon
+    # Horizons: 3/6 months, 6/12 months, 12/24 months
+    "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
+    "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
+    "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
     "avg_monthly_revenue", "log_total_revenue",
     "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
     "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
@@ -198,8 +219,11 @@ _MODEL_B_CATEGORICAL = [
 # Model A: All available features from site_training_data.parquet
 # Includes additional demographic, per-screen, and volume metrics
 _MODEL_A_NUMERIC = [
-    # Relative strength indicators
-    "rs_Impressions", "rs_NVIs", "rs_Revenue", "rs_RevenuePerScreen",
+    # Multi-horizon relative strength indicators (momentum)
+    # Horizons: 3/6 months, 6/12 months, 12/24 months
+    "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
+    "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
+    "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
     # Revenue metrics
     "avg_monthly_revenue", "log_total_revenue",
     # Volume metrics (additional)

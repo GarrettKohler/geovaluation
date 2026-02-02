@@ -206,6 +206,315 @@ class SiteScoringModel(nn.Module):
         )
 
 
+class ClusteringModel(nn.Module):
+    """
+    Deep Embedded Clustering (DEC) model combining autoencoder with learnable centroids.
+
+    Architecture:
+    - Phase 1 (Pretrain): Autoencoder learns compact latent representation
+    - Phase 2 (Clustering): Soft assignment using Student's t-distribution + KL-divergence loss
+
+    The model learns to:
+    1. Compress site features into a low-dimensional latent space
+    2. Discover natural clusters among top-performing sites
+    3. Identify distinguishing features for each cluster
+
+    Reference: Xie et al. "Unsupervised Deep Embedding for Clustering Analysis" (ICML 2016)
+    """
+
+    def __init__(
+        self,
+        n_numeric: int,
+        n_boolean: int,
+        categorical_vocab_sizes: Dict[str, int],
+        embedding_dim: int = 16,
+        latent_dim: int = 32,
+        n_clusters: int = 5,
+        encoder_dims: List[int] = None,
+        dropout: float = 0.2,
+        alpha: float = 1.0,  # Student's t-distribution degrees of freedom
+    ):
+        """
+        Initialize the clustering model.
+
+        Args:
+            n_numeric: Number of numeric features
+            n_boolean: Number of boolean features
+            categorical_vocab_sizes: Dict mapping categorical feature names to vocab sizes
+            embedding_dim: Dimension for categorical embeddings
+            latent_dim: Dimension of the latent space (z)
+            n_clusters: Number of clusters to learn
+            encoder_dims: Hidden layer dimensions for encoder (default: [512, 256, 128])
+            dropout: Dropout rate
+            alpha: Degrees of freedom for Student's t-distribution (default 1.0 = Cauchy)
+        """
+        super().__init__()
+        encoder_dims = encoder_dims or [512, 256, 128]
+
+        self.n_numeric = n_numeric
+        self.n_boolean = n_boolean
+        self.latent_dim = latent_dim
+        self.n_clusters = n_clusters
+        self.alpha = alpha
+
+        # Categorical embeddings (same as SiteScoringModel)
+        self.cat_embedding = CategoricalEmbedding(categorical_vocab_sizes, embedding_dim)
+
+        # Numeric normalization
+        self.numeric_bn = nn.BatchNorm1d(n_numeric) if n_numeric > 0 else None
+
+        # Calculate input dimension
+        total_input_dim = self.cat_embedding.output_dim + n_numeric + n_boolean
+        self.input_dim = total_input_dim
+
+        # Build encoder: input -> encoder_dims -> latent_dim
+        encoder_layers = []
+        in_dim = total_input_dim
+        for out_dim in encoder_dims:
+            encoder_layers.extend([
+                nn.Linear(in_dim, out_dim),
+                nn.BatchNorm1d(out_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+            ])
+            in_dim = out_dim
+        encoder_layers.append(nn.Linear(in_dim, latent_dim))
+        self.encoder = nn.Sequential(*encoder_layers)
+
+        # Build decoder: latent_dim -> reversed(encoder_dims) -> input
+        decoder_dims = list(reversed(encoder_dims))
+        decoder_layers = []
+        in_dim = latent_dim
+        for out_dim in decoder_dims:
+            decoder_layers.extend([
+                nn.Linear(in_dim, out_dim),
+                nn.BatchNorm1d(out_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+            ])
+            in_dim = out_dim
+        decoder_layers.append(nn.Linear(in_dim, total_input_dim))
+        self.decoder = nn.Sequential(*decoder_layers)
+
+        # Cluster centroids in latent space (learnable parameters)
+        # Initialized later with k-means
+        self.cluster_centers = nn.Parameter(torch.zeros(n_clusters, latent_dim))
+        self._centroids_initialized = False
+
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        """Initialize weights for stable training."""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight, gain=0.5)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Embedding):
+                nn.init.normal_(module.weight, mean=0, std=0.02)
+
+    def _prepare_input(
+        self,
+        numeric: torch.Tensor,
+        categorical: torch.Tensor,
+        boolean: torch.Tensor,
+    ) -> torch.Tensor:
+        """Combine all input features into a single tensor."""
+        # Process categorical through embeddings
+        cat_embedded = self.cat_embedding(categorical)
+
+        # Normalize numeric features
+        if self.numeric_bn is not None and self.n_numeric > 0:
+            numeric = self.numeric_bn(numeric)
+
+        # Concatenate all features
+        return torch.cat([cat_embedded, numeric, boolean], dim=1)
+
+    def encode(
+        self,
+        numeric: torch.Tensor,
+        categorical: torch.Tensor,
+        boolean: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Encode input features to latent space.
+
+        Args:
+            numeric: (batch, n_numeric) float tensor
+            categorical: (batch, n_categorical) long tensor
+            boolean: (batch, n_boolean) float tensor
+
+        Returns:
+            z: (batch, latent_dim) latent representation
+        """
+        x = self._prepare_input(numeric, categorical, boolean)
+        return self.encoder(x)
+
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Decode latent representation back to input space.
+
+        Args:
+            z: (batch, latent_dim) latent representation
+
+        Returns:
+            x_reconstructed: (batch, input_dim) reconstructed features
+        """
+        return self.decoder(z)
+
+    def cluster_assignment(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Compute soft cluster assignments using Student's t-distribution.
+
+        The soft assignment q_ij measures the probability that sample i
+        belongs to cluster j, using the similarity between z_i and centroid μ_j:
+
+        q_ij = (1 + ||z_i - μ_j||² / α)^(-(α+1)/2) / Σ_k (1 + ||z_i - μ_k||² / α)^(-(α+1)/2)
+
+        This is equivalent to the kernel used in t-SNE.
+
+        Args:
+            z: (batch, latent_dim) latent representations
+
+        Returns:
+            q: (batch, n_clusters) soft assignment probabilities
+        """
+        # Compute squared distances to all centroids
+        # z: (batch, latent_dim), cluster_centers: (n_clusters, latent_dim)
+        # ||z_i - μ_j||² = z² - 2*z*μ + μ²
+        z_sq = (z ** 2).sum(dim=1, keepdim=True)  # (batch, 1)
+        mu_sq = (self.cluster_centers ** 2).sum(dim=1)  # (n_clusters,)
+        cross = torch.mm(z, self.cluster_centers.t())  # (batch, n_clusters)
+        dist_sq = z_sq - 2 * cross + mu_sq  # (batch, n_clusters)
+
+        # Student's t-distribution kernel
+        q = (1.0 + dist_sq / self.alpha) ** (-(self.alpha + 1.0) / 2.0)
+        q = q / q.sum(dim=1, keepdim=True)  # Normalize to probabilities
+
+        return q
+
+    def target_distribution(self, q: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the target distribution p for KL-divergence loss.
+
+        The target distribution sharpens q to emphasize high-confidence assignments:
+        p_ij = (q_ij² / f_j) / Σ_k (q_ik² / f_k)
+
+        where f_j = Σ_i q_ij is the soft cluster frequency.
+
+        This auxiliary target helps the model learn more discriminative clusters.
+
+        Args:
+            q: (batch, n_clusters) soft assignment probabilities
+
+        Returns:
+            p: (batch, n_clusters) target distribution
+        """
+        # f_j = soft cluster frequencies
+        f = q.sum(dim=0)  # (n_clusters,)
+
+        # Compute p = q² / f, then normalize
+        p = (q ** 2) / f
+        p = p / p.sum(dim=1, keepdim=True)
+
+        return p
+
+    def clustering_loss(self, q: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+        """
+        Compute KL-divergence clustering loss: KL(P || Q).
+
+        This loss encourages the model to make confident cluster assignments
+        by minimizing the divergence from the sharpened target distribution.
+
+        Args:
+            q: (batch, n_clusters) soft assignment probabilities
+            p: (batch, n_clusters) target distribution (detached, no gradient)
+
+        Returns:
+            loss: scalar KL-divergence loss
+        """
+        # KL(P || Q) = Σ p * log(p / q)
+        # Use log_softmax for numerical stability
+        return torch.sum(p * (torch.log(p + 1e-10) - torch.log(q + 1e-10))) / q.size(0)
+
+    def forward(
+        self,
+        numeric: torch.Tensor,
+        categorical: torch.Tensor,
+        boolean: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass through the complete model.
+
+        Args:
+            numeric: (batch, n_numeric) float tensor
+            categorical: (batch, n_categorical) long tensor
+            boolean: (batch, n_boolean) float tensor
+
+        Returns:
+            Dict containing:
+                - z: latent representation
+                - x_reconstructed: decoder output
+                - q: soft cluster assignments (if centroids initialized)
+        """
+        # Encode to latent space
+        z = self.encode(numeric, categorical, boolean)
+
+        # Decode for reconstruction
+        x_reconstructed = self.decode(z)
+
+        result = {
+            'z': z,
+            'x_reconstructed': x_reconstructed,
+        }
+
+        # Add cluster assignments if centroids are initialized
+        if self._centroids_initialized:
+            result['q'] = self.cluster_assignment(z)
+
+        return result
+
+    def initialize_centroids(self, z_all: torch.Tensor):
+        """
+        Initialize cluster centroids using k-means on latent representations.
+
+        This should be called after pretraining the autoencoder but before
+        the clustering refinement phase.
+
+        Args:
+            z_all: (n_samples, latent_dim) all latent representations
+        """
+        from sklearn.cluster import KMeans
+
+        # Run k-means on CPU
+        z_np = z_all.detach().cpu().numpy()
+        kmeans = KMeans(n_clusters=self.n_clusters, n_init=20, random_state=42)
+        kmeans.fit(z_np)
+
+        # Set centroids as model parameters
+        with torch.no_grad():
+            self.cluster_centers.copy_(
+                torch.from_numpy(kmeans.cluster_centers_).to(self.cluster_centers.device)
+            )
+        self._centroids_initialized = True
+
+        return kmeans.labels_
+
+    def get_cluster_assignments(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Get hard cluster assignments (argmax of soft assignments).
+
+        Args:
+            z: (batch, latent_dim) latent representations
+
+        Returns:
+            assignments: (batch,) cluster indices
+        """
+        q = self.cluster_assignment(z)
+        return torch.argmax(q, dim=1)
+
+
 class EnsembleModel(nn.Module):
     """
     Ensemble of multiple models for improved predictions.
@@ -575,5 +884,15 @@ def create_model(
             early_stopping_rounds=kwargs.get('early_stopping_rounds', 50),
         )
 
+    elif model_type == "clustering":
+        return ClusteringModel(
+            n_numeric=n_numeric,
+            n_boolean=n_boolean,
+            categorical_vocab_sizes=categorical_vocab_sizes,
+            embedding_dim=kwargs.get('embedding_dim', 16),
+            latent_dim=kwargs.get('latent_dim', 32),
+            n_clusters=kwargs.get('n_clusters', 5),
+        )
+
     else:
-        raise ValueError(f"Unknown model_type: {model_type}. Choose from: neural_network, catboost, xgboost")
+        raise ValueError(f"Unknown model_type: {model_type}. Choose from: neural_network, catboost, xgboost, clustering")

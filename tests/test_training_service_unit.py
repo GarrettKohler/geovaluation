@@ -359,7 +359,6 @@ class TestTrainingProgress:
             val_mae=500.0,
             val_smape=100.0,
             val_rmse=600.0,
-            val_mse=360000.0,
             val_r2=0.85,
             learning_rate=0.001,
             elapsed_time=30.5,
@@ -375,7 +374,7 @@ class TestTrainingProgress:
 
         progress = TrainingProgress(
             epoch=1, total_epochs=50, train_loss=0, val_loss=0,
-            val_mae=0, val_smape=0, val_rmse=0, val_mse=0, val_r2=0, learning_rate=0.001,
+            val_mae=0, val_smape=0, val_rmse=0, val_r2=0, learning_rate=0.001,
             elapsed_time=0, status="running"
         )
         assert progress.best_val_loss == float('inf')
@@ -386,7 +385,7 @@ class TestTrainingProgress:
 
         progress = TrainingProgress(
             epoch=1, total_epochs=50, train_loss=0, val_loss=0,
-            val_mae=0, val_smape=0, val_rmse=0, val_mse=0, val_r2=0, learning_rate=0.001,
+            val_mae=0, val_smape=0, val_rmse=0, val_r2=0, learning_rate=0.001,
             elapsed_time=0, status="running"
         )
         assert progress.message == ""

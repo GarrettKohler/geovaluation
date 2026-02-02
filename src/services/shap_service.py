@@ -336,6 +336,173 @@ def compute_shap_values_tree(
         return False
 
 
+def compute_cluster_shap_values(
+    model,
+    cluster_assignments: np.ndarray,
+    X_data: np.ndarray,
+    feature_names: List[str],
+    n_numeric: int,
+    n_categorical: int,
+    output_dir: Path,
+    n_explain: int = 100,
+    progress_callback=None,
+) -> Optional[Dict]:
+    """
+    Compute per-cluster SHAP feature importance for the clustering model.
+
+    For each cluster, this computes SHAP values on the encoder to understand
+    which features drive membership in that cluster.
+
+    Args:
+        model: Trained ClusteringModel (or its encoder)
+        cluster_assignments: (n_samples,) cluster indices for each sample
+        X_data: (n_samples, n_features) input features (numeric + categorical + boolean concatenated)
+        feature_names: List of all feature names
+        n_numeric: Number of numeric features
+        n_categorical: Number of categorical features
+        output_dir: Directory to save results
+        n_explain: Number of samples to explain per cluster
+        progress_callback: Optional function to report progress
+
+    Returns:
+        Dict with per-cluster feature importance:
+        {
+            "cluster_0": {
+                "size": 523,
+                "top_features": [{"feature": "...", "importance": 0.34}, ...]
+            },
+            ...
+            "silhouette_score": 0.42,
+            "n_clusters": 5
+        }
+    """
+    try:
+        import shap
+    except ImportError:
+        print("Warning: SHAP library not installed. Skipping cluster SHAP computation.")
+        if progress_callback:
+            progress_callback("SHAP library not available - skipping cluster feature importance")
+        return None
+
+    try:
+        if progress_callback:
+            progress_callback("Computing per-cluster feature importance (SHAP)...")
+
+        import torch
+        from sklearn.metrics import silhouette_score
+
+        # Get unique clusters
+        unique_clusters = np.unique(cluster_assignments)
+        n_clusters = len(unique_clusters)
+
+        # Create prediction function for SHAP (uses encoder)
+        # Move model to CPU for SHAP compatibility
+        device = next(model.parameters()).device
+        model_cpu = model.cpu()
+        model_cpu.eval()
+
+        def encode_fn(X):
+            """Wrapper that returns latent encoding for SHAP."""
+            with torch.no_grad():
+                numeric_t = torch.FloatTensor(X[:, :n_numeric])
+                categorical_t = torch.LongTensor(X[:, n_numeric:n_numeric + n_categorical].astype(int))
+                boolean_t = torch.FloatTensor(X[:, n_numeric + n_categorical:])
+                z = model_cpu.encode(numeric_t, categorical_t, boolean_t)
+                return z.numpy()
+
+        # Compute SHAP values for each cluster
+        cluster_results = {}
+
+        # Use a sample of data as background for all clusters
+        n_background = min(100, len(X_data) // 2)
+        bg_indices = np.random.choice(len(X_data), n_background, replace=False)
+        background_data = X_data[bg_indices]
+
+        # Create explainer once
+        explainer = shap.KernelExplainer(encode_fn, background_data)
+
+        for cluster_id in unique_clusters:
+            if progress_callback:
+                progress_callback(f"SHAP: Analyzing cluster {cluster_id + 1}/{n_clusters}...")
+
+            # Get samples in this cluster
+            cluster_mask = cluster_assignments == cluster_id
+            cluster_indices = np.where(cluster_mask)[0]
+            cluster_size = len(cluster_indices)
+
+            # Sample subset for SHAP computation
+            n_explain_cluster = min(n_explain, cluster_size)
+            explain_indices = np.random.choice(cluster_indices, n_explain_cluster, replace=False)
+            explain_data = X_data[explain_indices]
+
+            # Compute SHAP values
+            shap_values = explainer.shap_values(explain_data, nsamples=100, silent=True)
+
+            # shap_values is (n_samples, n_features, latent_dim) - aggregate across latent dims
+            if isinstance(shap_values, list):
+                # Multiple outputs - stack and mean
+                shap_values = np.mean(np.abs(np.stack(shap_values, axis=-1)), axis=-1)
+            elif len(shap_values.shape) == 3:
+                # (samples, features, latent_dims) - mean across latent dims
+                shap_values = np.mean(np.abs(shap_values), axis=2)
+            else:
+                shap_values = np.abs(shap_values)
+
+            # Mean absolute SHAP value per feature for this cluster
+            importance = np.mean(shap_values, axis=0)
+
+            # Get top features
+            sorted_idx = np.argsort(importance)[::-1][:15]  # Top 15
+            top_features = []
+            for i in sorted_idx:
+                top_features.append({
+                    'feature': feature_names[i],
+                    'importance': float(importance[i]),
+                })
+
+            cluster_results[f"cluster_{cluster_id}"] = {
+                'size': int(cluster_size),
+                'top_features': top_features,
+            }
+
+        # Compute silhouette score for overall clustering quality
+        try:
+            sil_score = float(silhouette_score(X_data, cluster_assignments))
+        except Exception:
+            sil_score = None
+
+        # Move model back to original device
+        if str(device) != 'cpu':
+            model.to(device)
+
+        # Combine results
+        results = {
+            **cluster_results,
+            'silhouette_score': sil_score,
+            'n_clusters': n_clusters,
+            'n_samples': len(cluster_assignments),
+        }
+
+        # Save to file
+        output_dir.mkdir(parents=True, exist_ok=True)
+        cluster_shap_path = output_dir / "cluster_shap_values.json"
+        with open(cluster_shap_path, 'w') as f:
+            json.dump(results, f, indent=2)
+
+        if progress_callback:
+            progress_callback(f"SHAP: Cluster analysis complete ({n_clusters} clusters)")
+
+        return results
+
+    except Exception as e:
+        print(f"Warning: Cluster SHAP computation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        if progress_callback:
+            progress_callback(f"Cluster SHAP skipped: {str(e)[:80]}")
+        return None
+
+
 def generate_shap_plots(output_dir: Path) -> Optional[Dict[str, str]]:
     """
     Generate SHAP visualization plots as base64-encoded PNG images.

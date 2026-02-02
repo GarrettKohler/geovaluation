@@ -10,6 +10,10 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- Chart.js for training visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- deck.gl for advanced visualizations (hexbins, heatmaps) -->
+    <script src="https://unpkg.com/deck.gl@9.0.16/dist.min.js"></script>
     <!-- Google Fonts - Inter for Kepler.gl style -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -547,6 +551,174 @@
             align-self: stretch;
         }
 
+        /* Stats Panel - Collapsible Secondary Stats */
+        .stats-primary {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .stats-secondary {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+            padding: 0;
+        }
+
+        .stats-secondary.show {
+            max-height: 100px;
+            opacity: 1;
+            padding-top: 12px;
+            margin-top: 12px;
+            border-top: 1px solid var(--kepler-border);
+        }
+
+        .stats-toggle {
+            background: transparent;
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            color: var(--kepler-text-label);
+            padding: 6px 10px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all var(--kepler-transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stats-toggle:hover {
+            background: var(--kepler-bg-hover);
+            color: var(--kepler-text-highlight);
+            border-color: var(--kepler-active);
+        }
+
+        .stats-toggle svg {
+            width: 12px;
+            height: 12px;
+            transition: transform 0.3s ease;
+        }
+
+        .stats-toggle.expanded svg {
+            transform: rotate(180deg);
+        }
+
+        /* Connection stats - only visible when multi-select active */
+        .stats-connections {
+            display: none;
+            gap: 20px;
+            align-items: center;
+            padding-left: 15px;
+            margin-left: 15px;
+            border-left: 1px solid var(--kepler-border);
+        }
+
+        .stats-connections.show {
+            display: flex;
+        }
+
+        /* Stat tooltips */
+        .stat-with-tooltip {
+            position: relative;
+        }
+
+        .stat-tooltip {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            color: var(--kepler-text);
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: var(--kepler-shadow-dropdown);
+            margin-bottom: 8px;
+        }
+
+        .stat-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--kepler-bg-panel);
+        }
+
+        .stat-with-tooltip:hover .stat-tooltip {
+            display: block;
+        }
+
+        /* Filter Button in Header */
+        .filter-btn {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 8px 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--kepler-text);
+            transition: all var(--kepler-transition);
+            position: relative;
+        }
+
+        .filter-btn:hover {
+            background: var(--kepler-active);
+            border-color: var(--kepler-active);
+            color: #FFFFFF;
+        }
+
+        .filter-btn.has-filters {
+            border-color: var(--kepler-active);
+            color: var(--kepler-active);
+        }
+
+        .filter-btn.has-filters:hover {
+            background: var(--kepler-active);
+            color: #FFFFFF;
+        }
+
+        .filter-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .filter-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--kepler-error);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+
+        .filter-badge.hidden {
+            display: none;
+        }
+
         .loading {
             position: fixed;
             top: 50%;
@@ -603,6 +775,157 @@
         .popup-detail {
             font-size: 0.85rem;
             color: var(--kepler-text);
+        }
+
+        /* View Mode Toggle (Points vs Hexbins) */
+        .view-mode-toggle {
+            position: fixed;
+            left: 20px;
+            bottom: 140px;
+            z-index: 1500;
+        }
+
+        .view-mode-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            color: var(--kepler-text);
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all var(--kepler-transition);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .view-mode-btn:hover {
+            background: var(--kepler-bg-hover);
+            border-color: var(--kepler-active);
+            color: var(--kepler-text-highlight);
+        }
+
+        .view-mode-btn.active {
+            background: rgba(31, 186, 214, 0.15);
+            border-color: var(--kepler-active);
+            color: var(--kepler-active);
+        }
+
+        .view-mode-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .view-mode-options {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 8px;
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            min-width: 160px;
+        }
+
+        .view-mode-toggle.open .view-mode-options {
+            display: block;
+        }
+
+        .view-mode-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            color: var(--kepler-text);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all var(--kepler-transition);
+            border-bottom: 1px solid var(--kepler-border);
+        }
+
+        .view-mode-option:last-child {
+            border-bottom: none;
+        }
+
+        .view-mode-option:hover {
+            background: var(--kepler-bg-hover);
+            color: var(--kepler-text-highlight);
+        }
+
+        .view-mode-option.selected {
+            background: rgba(31, 186, 214, 0.1);
+            color: var(--kepler-active);
+        }
+
+        .view-mode-option svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.7;
+        }
+
+        .view-mode-option.selected svg {
+            opacity: 1;
+        }
+
+        /* Hexbin radius slider */
+        .hexbin-controls {
+            display: none;
+            position: fixed;
+            left: 20px;
+            bottom: 200px;
+            z-index: 1500;
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            min-width: 180px;
+        }
+
+        .hexbin-controls.visible {
+            display: block;
+        }
+
+        .hexbin-controls label {
+            display: block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--kepler-text-label);
+            margin-bottom: 8px;
+        }
+
+        .hexbin-controls input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: var(--kepler-bg-input);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .hexbin-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--kepler-active);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .hexbin-value {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--kepler-text);
+            margin-top: 4px;
+            font-family: 'Roboto Mono', monospace;
         }
 
         /* Legend */
@@ -1841,6 +2164,94 @@
             margin-top: 4px;
         }
 
+        /* Metric Help Tooltips */
+        .metric-with-help {
+            position: relative;
+            cursor: help;
+        }
+
+        .metric-help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            background: var(--kepler-border);
+            border-radius: 50%;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--kepler-text-label);
+            margin-left: 4px;
+            cursor: help;
+            transition: all var(--kepler-transition);
+        }
+
+        .metric-help-icon:hover {
+            background: var(--kepler-info);
+            color: white;
+        }
+
+        .metric-explanation {
+            font-size: 0.65rem;
+            color: var(--kepler-text-label);
+            font-weight: 400;
+            margin-top: 2px;
+            font-style: italic;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .metric-help-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-info);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px 12px;
+            font-size: 0.75rem;
+            color: var(--kepler-text);
+            width: 200px;
+            z-index: 1000;
+            box-shadow: var(--kepler-shadow-dropdown);
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        .metric-help-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--kepler-info);
+        }
+
+        .metric-with-help:hover .metric-help-tooltip {
+            display: block;
+        }
+
+        .metric-help-title {
+            font-weight: 600;
+            color: var(--kepler-info);
+            margin-bottom: 4px;
+        }
+
+        .metric-help-link {
+            display: block;
+            margin-top: 6px;
+            color: var(--kepler-active);
+            text-decoration: none;
+            font-size: 0.7rem;
+        }
+
+        .metric-help-link:hover {
+            text-decoration: underline;
+        }
+
         .progress-log {
             background: var(--kepler-bg-base);
             border: 1px solid var(--kepler-border);
@@ -1863,6 +2274,35 @@
 
         .progress-log-entry.error {
             color: var(--kepler-error);
+        }
+
+        /* Training Charts */
+        .training-charts {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 15px 0;
+        }
+
+        .training-chart-container {
+            background: var(--kepler-bg-base);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 12px;
+        }
+
+        .training-chart-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .training-chart-container canvas {
+            width: 100% !important;
+            height: 120px !important;
         }
 
         /* Results section - Kepler.gl Dark Theme */
@@ -1925,6 +2365,15 @@
             border-radius: var(--kepler-radius-md);
             padding: 12px;
             margin-bottom: 15px;
+        }
+
+        .dataset-preset-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--kepler-text);
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--kepler-border);
         }
 
         .dataset-info-title {
@@ -2003,13 +2452,62 @@
 
         .feature-list {
             display: none;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 4px;
             padding: 6px 0 2px 0;
+            max-height: 150px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: var(--kepler-active) transparent;
+        }
+
+        .feature-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .feature-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .feature-list::-webkit-scrollbar-thumb {
+            background: var(--kepler-btn-secondary);
+            border-radius: 3px;
+        }
+
+        .feature-list::-webkit-scrollbar-thumb:hover {
+            background: var(--kepler-active);
         }
 
         .feature-list.show {
             display: flex;
+        }
+
+        /* Fixed-height scrollable container for feature selection */
+        #training-features-content {
+            max-height: 320px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--kepler-active) transparent;
+        }
+
+        #training-features-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #training-features-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #training-features-content::-webkit-scrollbar-thumb {
+            background: var(--kepler-btn-secondary);
+            border-radius: 3px;
+        }
+
+        #training-features-content::-webkit-scrollbar-thumb:hover {
+            background: var(--kepler-active);
         }
 
         .feature-chip {
@@ -2121,11 +2619,12 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 3px 8px;
+            padding: 4px 8px;
             border-radius: var(--kepler-radius-sm);
             cursor: pointer;
             transition: all var(--kepler-transition);
             user-select: none;
+            flex-shrink: 0;
         }
 
         .feature-checkbox-item:hover {
@@ -2177,7 +2676,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 140px;
+            flex: 1;
         }
 
         .feature-selection-warning {
@@ -2593,11 +3092,14 @@
             border-radius: var(--kepler-radius-lg);
             border: 1px solid var(--kepler-border);
             box-shadow: var(--kepler-shadow-dropdown);
-            width: 380px;
-            max-width: calc(100vw - 80px);
+            width: 340px;
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 40px);
             z-index: 10001;
             animation: card-appear 0.3s ease-out;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes card-appear {
@@ -2613,8 +3115,9 @@
 
         .walkthrough-card-header {
             background: linear-gradient(135deg, var(--kepler-active) 0%, var(--kepler-info) 100%);
-            padding: 16px 20px;
+            padding: 12px 16px;
             color: white;
+            flex-shrink: 0;
         }
 
         .walkthrough-card-step {
@@ -2631,23 +3134,26 @@
         }
 
         .walkthrough-card-body {
-            padding: 20px;
+            padding: 16px;
             text-align: center;
             overflow-wrap: break-word;
             word-wrap: break-word;
             background: var(--kepler-bg-content);
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
         }
 
         .walkthrough-card-content {
-            font-size: 0.875rem;
-            line-height: 1.6;
+            font-size: 0.8125rem;
+            line-height: 1.5;
             color: var(--kepler-text);
             text-align: center;
             max-width: 100%;
         }
 
         .walkthrough-card-content p {
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
 
         .walkthrough-card-content p:last-child {
@@ -2659,14 +3165,14 @@
         }
 
         .walkthrough-card-content ul {
-            margin: 10px auto;
-            padding-left: 20px;
+            margin: 8px auto;
+            padding-left: 18px;
             text-align: left;
             display: inline-block;
         }
 
         .walkthrough-card-content li {
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .walkthrough-card-content .metric-highlight {
@@ -2696,12 +3202,13 @@
 
         /* Walkthrough Footer with Navigation - Kepler.gl */
         .walkthrough-card-footer {
-            padding: 16px 20px;
+            padding: 12px 16px;
             background: var(--kepler-bg-base);
             border-top: 1px solid var(--kepler-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .walkthrough-progress {
@@ -2789,49 +3296,51 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 450px;
+            width: min(400px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
         }
 
         .walkthrough-card.modal-style .walkthrough-card-header {
-            padding: 30px 24px;
+            padding: 20px;
             text-align: center;
+            flex-shrink: 0;
         }
 
         .walkthrough-card.modal-style .walkthrough-card-title {
-            font-size: 1.4rem;
+            font-size: 1.25rem;
         }
 
         .walkthrough-card.modal-style .walkthrough-card-body {
-            padding: 24px;
+            padding: 16px 20px;
         }
 
         /* Welcome screen specific */
         .welcome-icon {
-            width: 80px;
-            height: 80px;
+            width: 60px;
+            height: 60px;
             background: rgba(255, 255, 255, 0.15);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 16px;
+            margin: 0 auto 12px;
         }
 
         .welcome-icon svg {
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
         }
 
         /* Completion screen specific */
         .completion-checkmark {
-            width: 80px;
-            height: 80px;
+            width: 60px;
+            height: 60px;
             background: rgba(255, 255, 255, 0.15);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 16px;
+            margin: 0 auto 12px;
             animation: checkmark-pop 0.5s ease-out;
         }
 
@@ -2842,8 +3351,8 @@
         }
 
         .completion-checkmark svg {
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
         }
 
         /* Arrow pointer from card to target */
@@ -2893,27 +3402,27 @@
         .walkthrough-metrics-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 12px 0;
+            gap: 8px;
+            margin: 10px 0;
         }
 
         .walkthrough-metric-item {
             background: var(--kepler-bg-base);
             border-radius: var(--kepler-radius-md);
-            padding: 10px;
+            padding: 8px;
             text-align: center;
             border: 1px solid var(--kepler-border);
         }
 
         .walkthrough-metric-value {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--kepler-active);
             font-family: 'Roboto Mono', monospace;
         }
 
         .walkthrough-metric-label {
-            font-size: 0.6875rem;
+            font-size: 0.625rem;
             color: var(--kepler-text-label);
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -2924,9 +3433,9 @@
         .walkthrough-sites-preview {
             background: var(--kepler-bg-base);
             border-radius: var(--kepler-radius-md);
-            padding: 12px;
+            padding: 10px;
             border: 1px solid var(--kepler-border);
-            margin: 12px 0;
+            margin: 10px 0;
         }
 
         .walkthrough-site-row {
@@ -3033,6 +3542,13 @@
         <header>
             <h1>GSTV Site Visualization</h1>
             <div class="controls">
+                <button id="filter-header-btn" class="filter-btn" title="Filter Sites">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                    </svg>
+                    Filter
+                    <span class="filter-badge hidden" id="filter-badge">0</span>
+                </button>
                 <button id="help-btn" class="help-btn" title="Start Tutorial">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -3062,6 +3578,57 @@
                     <line x1="12" y1="16" x2="17" y2="16"/>
                 </svg>
             </div>
+        </div>
+
+        <!-- View Mode Toggle (Points vs Hexbins) -->
+        <div class="view-mode-toggle" id="view-mode-toggle">
+            <button class="view-mode-btn" id="view-mode-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <circle cx="6" cy="6" r="2"/>
+                    <circle cx="18" cy="6" r="2"/>
+                    <circle cx="6" cy="18" r="2"/>
+                    <circle cx="18" cy="18" r="2"/>
+                </svg>
+                <span id="view-mode-label">Points</span>
+            </button>
+            <div class="view-mode-options">
+                <div class="view-mode-option selected" data-mode="points">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <circle cx="6" cy="6" r="2"/>
+                        <circle cx="18" cy="6" r="2"/>
+                        <circle cx="6" cy="18" r="2"/>
+                        <circle cx="18" cy="18" r="2"/>
+                    </svg>
+                    Points
+                </div>
+                <div class="view-mode-option" data-mode="hexbin">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/>
+                        <line x1="12" y1="2" x2="12" y2="22"/>
+                        <line x1="2" y1="8.5" x2="22" y2="8.5"/>
+                        <line x1="2" y1="15.5" x2="22" y2="15.5"/>
+                    </svg>
+                    Hexbins
+                </div>
+                <div class="view-mode-option" data-mode="heatmap">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <circle cx="12" cy="12" r="6" fill="currentColor" opacity="0.3"/>
+                        <circle cx="12" cy="12" r="4" fill="currentColor" opacity="0.5"/>
+                        <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.8"/>
+                    </svg>
+                    Heatmap
+                </div>
+            </div>
+        </div>
+
+        <!-- Hexbin Controls -->
+        <div class="hexbin-controls" id="hexbin-controls">
+            <label>Hexbin Radius</label>
+            <input type="range" id="hexbin-radius" min="5000" max="100000" value="25000" step="5000">
+            <div class="hexbin-value"><span id="hexbin-radius-value">25</span> km</div>
         </div>
 
         <!-- Legend Modal -->
@@ -3165,35 +3732,59 @@
         </div>
 
         <div class="stats-panel">
-            <div class="stat">
-                <span class="stat-label">Total Sites</span>
-                <span class="stat-value" id="total-sites">-</span>
+            <!-- Primary Stats (always visible) -->
+            <div class="stats-primary">
+                <div class="stat stat-with-tooltip">
+                    <span class="stat-tooltip">All sites in the database</span>
+                    <span class="stat-label">Total Sites</span>
+                    <span class="stat-value" id="total-sites">-</span>
+                </div>
+                <div class="stat stat-with-tooltip">
+                    <span class="stat-tooltip">Sites selected via click or lasso</span>
+                    <span class="stat-label">Selected</span>
+                    <span class="stat-value" id="selected-count">0</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat stat-with-tooltip">
+                    <span class="stat-tooltip">Sites matching your filter criteria</span>
+                    <span class="stat-label">Filtered</span>
+                    <span class="stat-value" id="summary-site-count">0</span>
+                </div>
+                <div class="stat stat-with-tooltip">
+                    <span class="stat-tooltip">Average monthly revenue per filtered site</span>
+                    <span class="stat-label">Avg Monthly Rev</span>
+                    <span class="stat-value" id="summary-avg-revenue">$0</span>
+                </div>
+
+                <!-- Connection stats - shown only when multi-select active -->
+                <div class="stats-connections" id="stats-connections">
+                    <div class="stat stat-with-tooltip">
+                        <span class="stat-tooltip">Connections between selected sites</span>
+                        <span class="stat-label">Connections</span>
+                        <span class="stat-value" id="connections-count">0</span>
+                    </div>
+                    <div class="stat stat-with-tooltip">
+                        <span class="stat-tooltip">Average distance between connected sites</span>
+                        <span class="stat-label">Avg Distance</span>
+                        <span class="stat-value" id="avg-distance">-</span>
+                    </div>
+                </div>
+
+                <button class="stats-toggle" id="stats-toggle" title="Show more stats">
+                    <span>More</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
             </div>
-            <div class="stat">
-                <span class="stat-label">Selected</span>
-                <span class="stat-value" id="selected-count">0</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat">
-                <span class="stat-label">Filtered Sites</span>
-                <span class="stat-value" id="summary-site-count">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Avg Monthly Rev</span>
-                <span class="stat-value" id="summary-avg-revenue">$0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Total Historic Rev</span>
-                <span class="stat-value highlight-green" id="summary-total-revenue">$0</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat">
-                <span class="stat-label">Connections</span>
-                <span class="stat-value" id="connections-count">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Avg Distance</span>
-                <span class="stat-value" id="avg-distance">-</span>
+
+            <!-- Secondary Stats (collapsible) -->
+            <div class="stats-secondary" id="stats-secondary">
+                <div class="stat stat-with-tooltip">
+                    <span class="stat-tooltip">Sum of all historic revenue for filtered sites</span>
+                    <span class="stat-label">Total Historic Rev</span>
+                    <span class="stat-value highlight-green" id="summary-total-revenue">$0</span>
+                </div>
             </div>
         </div>
 
@@ -3240,49 +3831,12 @@
             <button class="training-panel-close" id="training-panel-close">&times;</button>
         </div>
         <div class="training-panel-content">
-            <!-- Model Preset Selector (Top of Panel) -->
-            <div class="training-section" id="model-preset-section">
-                <div class="training-section-header">Model Preset</div>
-                <div class="training-form-group" style="margin-bottom: 0;">
-                    <select class="training-form-select" id="model-preset" style="font-weight: 600; font-size: 0.9rem;">
-                        <option value="model_b" selected>Train Model B — Curated</option>
-                        <option value="model_a">Train Model A — All Features</option>
-                    </select>
-                    <div class="training-form-hint" id="model-preset-hint" style="margin-top: 4px;">
-                        Curated features (no retailer, pct_male, nearest_interstate) — 56 features
-                    </div>
-                </div>
-            </div>
-
-            <!-- System Info Section -->
-            <div class="training-section">
-                <div class="training-section-header">System Information</div>
-                <div class="system-info-card" id="system-info-card">
-                    <div class="system-info-item">
-                        <span class="system-info-label">Chip</span>
-                        <span class="system-info-value" id="detected-chip">Detecting...</span>
-                    </div>
-                    <div class="system-info-item">
-                        <span class="system-info-label">GPU Cores</span>
-                        <span class="system-info-value" id="gpu-cores">-</span>
-                    </div>
-                    <div class="system-info-item">
-                        <span class="system-info-label">Memory</span>
-                        <span class="system-info-value" id="unified-memory">-</span>
-                    </div>
-                    <div class="system-info-item">
-                        <span class="system-info-label">MPS Status</span>
-                        <span class="system-info-value" id="mps-status">Loading...</span>
-                    </div>
-                    <div class="system-info-item">
-                        <span class="system-info-label">PyTorch</span>
-                        <span class="system-info-value" id="pytorch-version">Loading...</span>
-                    </div>
-                </div>
-            </div>
+            <!-- Hidden preset value for JS compatibility -->
+            <input type="hidden" id="model-preset" value="model_a">
 
             <!-- Training Features (loaded dynamically from config) -->
             <div class="dataset-info" id="training-features-section">
+                <div class="dataset-preset-label">Platinum 1.0 Training Data</div>
                 <div class="dataset-info-title">Feature Selection</div>
                 <div class="feature-selection-header">
                     <span class="feature-selection-count">
@@ -3301,36 +3855,80 @@
             <div class="training-section" id="training-config-section">
                 <div class="training-section-header">Model Configuration</div>
 
-                <!-- Task Type Selector (Primary Choice) -->
+                <!-- Hidden inputs for backward compatibility -->
+                <input type="hidden" id="target-variable" value="avg_monthly_revenue">
+                <input type="hidden" id="task-type" value="regression">
+                <input type="hidden" id="model-type" value="xgboost">
+
+                <!-- Split Training Task and Model Selectors -->
                 <div class="task-type-selector">
-                    <label class="training-form-label" data-tooltip="Choose the modeling objective: Regression predicts exact revenue values. Lookalike finds sites similar to top 10% performers.">Task Type</label>
-                    <select class="training-form-select" id="task-type">
-                        <option value="regression" selected>Revenue Prediction (Regression)</option>
-                        <option value="lookalike">Top Performer Lookalike (Classification)</option>
+                    <label class="training-form-label" data-tooltip="What do you want the model to learn? Revenue prediction estimates dollar amounts. Lookalike finds sites similar to your top performers. Clustering segments your top performers into groups.">What to Predict</label>
+                    <select class="training-form-select" id="prediction-task">
+                        <option value="regression" selected>Predict Revenue</option>
+                        <option value="lookalike">Find Similar Top Sites</option>
+                        <option value="clustering" id="clustering-option" disabled>Cluster Top Performers</option>
                     </select>
-                    <div class="training-form-hint" id="task-type-hint">Predict actual revenue values for all sites</div>
+                    <div class="training-form-hint" id="prediction-task-hint">Estimate monthly revenue for each site</div>
                 </div>
 
-                <div class="training-form-group">
-                    <label class="training-form-label" data-tooltip="Choose the model architecture. Neural networks use embeddings + MLP. Gradient boosting models (CatBoost/XGBoost) often perform better on tabular data.">Model Type</label>
-                    <select class="training-form-select" id="model-type">
-                        <option value="neural_network" selected>Neural Network (PyTorch)</option>
-                        <option value="catboost">CatBoost (Gradient Boosting)</option>
-                        <option value="xgboost">XGBoost (Gradient Boosting)</option>
+                <div class="training-form-group" style="margin-top: 12px;">
+                    <label class="training-form-label" data-tooltip="XGBoost is fast and often best for tabular data. Neural networks can learn complex patterns with embeddings.">Model Type</label>
+                    <select class="training-form-select" id="model-algorithm">
+                        <option value="xgboost" selected>XGBoost (Fast, Recommended)</option>
+                        <option value="catboost">CatBoost (Best for Categories)</option>
+                        <option value="neural_network">Neural Network (Flexible)</option>
                     </select>
-                    <div class="training-form-hint" id="model-type-hint">Embedding + Residual MLP optimized for M4 GPU</div>
+                    <div class="training-form-hint" id="model-algorithm-hint">Gradient boosting - fast training, great accuracy</div>
                 </div>
 
-                <div class="training-form-group" id="target-variable-group">
-                    <label class="training-form-label" data-tooltip="The target value the model will learn to predict. Avg Monthly Revenue is recommended for interpretable predictions.">Target Variable</label>
-                    <select class="training-form-select" id="target-variable">
-                        <option value="avg_monthly_revenue" selected>Avg Monthly Revenue (Recommended)</option>
-                        <option value="total_revenue">Total Revenue (All Months)</option>
-                        <option value="total_monthly_impressions">Total Impressions</option>
-                    </select>
+                <!-- Hidden combined selector for backward compatibility -->
+                <select class="training-form-select" id="training-task" style="display: none;">
+                    <option value="regression_xgboost" selected>Revenue Prediction - XGBoost</option>
+                    <option value="regression_catboost">Revenue Prediction - CatBoost</option>
+                    <option value="regression_neural_network">Revenue Prediction - PyTorch Neural Network</option>
+                    <option value="lookalike_neural_network">Top Site Lookalike Classifier - PyTorch Neural Network</option>
+                </select>
+
+                <!-- Lookalike Percentile Bounds (visible only for lookalike task) -->
+                <div id="lookalike-percentile-config" style="display: none;">
+                    <div class="training-form-row">
+                        <div class="training-form-group">
+                            <label class="training-form-label" data-tooltip="Lower revenue percentile bound (inclusive). Sites at or above this percentile are considered 'top performers'. Must be between 1-99.">Lower Percentile</label>
+                            <input type="number" class="training-form-input" id="lookalike-lower-percentile" value="90" min="1" max="99" step="1">
+                        </div>
+                        <div class="training-form-group">
+                            <label class="training-form-label" data-tooltip="Upper revenue percentile bound (inclusive). Sites at or below this percentile are included. Use 100 to include all sites above the lower bound. Must be between 1-100 and greater than lower bound.">Upper Percentile</label>
+                            <input type="number" class="training-form-input" id="lookalike-upper-percentile" value="100" min="1" max="100" step="1">
+                        </div>
+                    </div>
+                    <div class="training-form-hint" id="percentile-hint">Top 10% of sites by revenue will be labeled as top performers</div>
+                    <div class="training-form-hint" id="percentile-error" style="color: #e74c3c; display: none;"></div>
                 </div>
 
-                <div class="training-form-group">
+                <!-- Clustering Configuration (visible only for clustering task) -->
+                <div id="clustering-config" style="display: none;">
+                    <div class="training-form-row">
+                        <div class="training-form-group">
+                            <label class="training-form-label" data-tooltip="Number of clusters to discover among top performers. More clusters reveal finer distinctions but may overfit with limited data.">Number of Clusters</label>
+                            <input type="number" class="training-form-input" id="n-clusters" value="5" min="2" max="10" step="1">
+                        </div>
+                        <div class="training-form-group">
+                            <label class="training-form-label" data-tooltip="Minimum lookalike probability to include a site in clustering. Higher values focus on higher-confidence top performers.">Probability Threshold</label>
+                            <input type="range" class="training-form-input" id="cluster-threshold" value="0.5" min="0.3" max="0.9" step="0.1" style="width: 100%;">
+                            <div class="training-form-hint" id="cluster-threshold-value">0.5 (50% confidence)</div>
+                        </div>
+                    </div>
+                    <div class="training-form-hint" id="clustering-hint">Segments top performers into distinct groups with shared characteristics</div>
+                    <div class="training-form-hint" id="clustering-prereq" style="color: #f39c12;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        Requires a trained lookalike model. Train lookalike first, then cluster.
+                    </div>
+                </div>
+
+                <!-- Hardware options (hidden for now) -->
+                <div class="training-form-group" style="display: none;">
                     <label class="training-form-label" data-tooltip="Select your Apple Silicon chip for optimized training. Higher-tier chips support larger batch sizes and faster training.">Apple Silicon</label>
                     <select class="training-form-select" id="apple-chip">
                         <option value="auto">Auto-Detect</option>
@@ -3360,7 +3958,7 @@
                     <div class="training-form-hint" id="chip-hint">Auto-detect will identify your chip</div>
                 </div>
 
-                <div class="training-form-group">
+                <div class="training-form-group" style="display: none;">
                     <label class="training-form-label" data-tooltip="Hardware for training: MPS uses Apple Silicon GPU for 2-5x speedup. CPU is slower but always available.">Device</label>
                     <select class="training-form-select" id="training-device">
                         <option value="mps">Apple GPU (MPS)</option>
@@ -3435,67 +4033,10 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Feature Selection Section -->
-            <div class="training-section" id="feature-selection-section">
-                <div class="training-section-header">
-                    Feature Selection
-                    <span style="font-size: 11px; font-weight: normal; color: #6b7280; margin-left: 8px;">(Advanced)</span>
-                </div>
-
-                <div class="training-form-group">
-                    <label class="training-form-label" data-tooltip="Automatically identify and remove features that don't contribute to predictions. This can improve model generalization and reduce overfitting.">Method</label>
-                    <select class="training-form-select" id="feature-selection-method">
-                        <option value="none" selected>None (Use all features)</option>
-                        <option value="stg_light">STG Light (Gentle feature pruning)</option>
-                        <option value="stg_aggressive">STG Aggressive (Strong pruning + SHAP validation)</option>
-                        <option value="hybrid_stg_shap">Hybrid (STG + SHAP + Gradient tracking)</option>
-                        <option value="shap_only">SHAP-Select Only (Post-training elimination)</option>
-                        <option value="gradient_analysis">Gradient Analysis (Weight/gradient monitoring)</option>
-                    </select>
-                    <div class="training-form-hint" id="fs-method-hint">No feature selection - all features will be used</div>
-                </div>
-
-                <!-- STG Parameters (shown when STG method selected) -->
-                <div class="training-form-row" id="stg-params" style="display: none;">
-                    <div class="training-form-group">
-                        <label class="training-form-label" data-tooltip="L0 regularization strength. Higher values eliminate more features. Start with 0.1 and increase if too many features remain.">STG Lambda (λ)</label>
-                        <select class="training-form-select" id="stg-lambda">
-                            <option value="0.05">0.05 (Very Light)</option>
-                            <option value="0.1" selected>0.1 (Light)</option>
-                            <option value="0.2">0.2 (Medium)</option>
-                            <option value="0.3">0.3 (Aggressive)</option>
-                            <option value="0.5">0.5 (Very Aggressive)</option>
-                        </select>
-                    </div>
-                    <div class="training-form-group">
-                        <label class="training-form-label" data-tooltip="Gate distribution spread. Controls randomness in gate sampling during training. 0.5 is standard.">STG Sigma (σ)</label>
-                        <select class="training-form-select" id="stg-sigma">
-                            <option value="0.3">0.3 (Narrow)</option>
-                            <option value="0.5" selected>0.5 (Standard)</option>
-                            <option value="0.7">0.7 (Wide)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Additional Options -->
-                <div class="training-form-row" id="fs-additional-options" style="display: none;">
-                    <div class="training-form-group">
-                        <label class="training-form-label">
-                            <input type="checkbox" id="run-shap-validation" style="margin-right: 6px;">
-                            Run SHAP Validation
-                        </label>
-                        <div class="training-form-hint">Statistical significance testing after training</div>
-                    </div>
-                    <div class="training-form-group">
-                        <label class="training-form-label">
-                            <input type="checkbox" id="track-gradients" style="margin-right: 6px;">
-                            Track Gradients
-                        </label>
-                        <div class="training-form-hint">Monitor weight/gradient profiles during training</div>
-                    </div>
-                </div>
-            </div>
+            <!-- Hidden feature selection inputs for backward compatibility -->
+            <input type="hidden" id="feature-selection-method" value="none">
+            <input type="hidden" id="stg-lambda" value="0.1">
+            <input type="hidden" id="stg-sigma" value="0.5">
 
             <!-- Train Button -->
             <div class="training-section" id="train-button-section">
@@ -3505,6 +4046,33 @@
                     </svg>
                     Start Training
                 </button>
+            </div>
+
+            <!-- System Info Section -->
+            <div class="training-section">
+                <div class="training-section-header">System Information</div>
+                <div class="system-info-card" id="system-info-card">
+                    <div class="system-info-item">
+                        <span class="system-info-label">Chip</span>
+                        <span class="system-info-value" id="detected-chip">Detecting...</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">GPU Cores</span>
+                        <span class="system-info-value" id="gpu-cores">-</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Memory</span>
+                        <span class="system-info-value" id="unified-memory">-</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">MPS Status</span>
+                        <span class="system-info-value" id="mps-status">Loading...</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">PyTorch</span>
+                        <span class="system-info-value" id="pytorch-version">Loading...</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Progress Section (hidden by default) -->
@@ -3521,33 +4089,101 @@
                 </div>
 
                 <div class="progress-metrics">
-                    <div class="progress-metric">
+                    <div class="progress-metric metric-with-help">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Training Loss</div>
+                            How wrong the model is on training data. Lower is better. Should decrease over time.
+                            <a href="/glossary#loss" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-train-loss">-</div>
-                        <div class="progress-metric-label">Train Loss</div>
+                        <div class="progress-metric-label">Train Loss <span class="metric-help-icon">?</span></div>
                     </div>
-                    <div class="progress-metric">
+                    <div class="progress-metric metric-with-help">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Validation Loss</div>
+                            How wrong the model is on unseen data. If this rises while train loss falls, the model is overfitting.
+                            <a href="/glossary#validation" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-val-loss">-</div>
-                        <div class="progress-metric-label">Val Loss</div>
+                        <div class="progress-metric-label">Val Loss <span class="metric-help-icon">?</span></div>
                     </div>
-                    <div class="progress-metric" id="metric-mae-container">
+                    <div class="progress-metric metric-with-help" id="metric-mae-container">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Mean Absolute Error</div>
+                            Average $ difference between predicted and actual revenue. E.g., MAE of $50 means predictions are typically off by ±$50.
+                            <a href="/glossary#mae" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-mae">-</div>
-                        <div class="progress-metric-label" id="metric-mae-label">MAE</div>
+                        <div class="progress-metric-label" id="metric-mae-label">MAE <span class="metric-help-icon">?</span></div>
+                        <div class="metric-explanation" id="metric-mae-explain"></div>
                     </div>
-                    <div class="progress-metric" id="metric-mape-container">
+                    <div class="progress-metric metric-with-help" id="metric-mape-container">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Symmetric Mean Absolute % Error</div>
+                            Percentage error that works well for both high and low values. 10% means predictions are typically 10% off.
+                            <a href="/glossary#smape" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-mape">-</div>
-                        <div class="progress-metric-label" id="metric-mape-label">SMAPE</div>
+                        <div class="progress-metric-label" id="metric-mape-label">SMAPE <span class="metric-help-icon">?</span></div>
+                        <div class="metric-explanation" id="metric-mape-explain"></div>
                     </div>
-                    <div class="progress-metric" id="metric-rmse-container">
+                    <div class="progress-metric metric-with-help" id="metric-rmse-container">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Root Mean Square Error</div>
+                            Like MAE but penalizes large errors more. Use when big misses are worse than many small ones.
+                            <a href="/glossary#rmse" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-rmse">-</div>
-                        <div class="progress-metric-label">RMSE</div>
+                        <div class="progress-metric-label">RMSE <span class="metric-help-icon">?</span></div>
                     </div>
-                    <div class="progress-metric">
+                    <div class="progress-metric metric-with-help">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">R² (Coefficient of Determination)</div>
+                            How much of the revenue variation the model explains. 0.85 means 85% of variation is explained. Higher is better.
+                            <a href="/glossary#r2" class="metric-help-link">Learn more →</a>
+                        </div>
                         <div class="progress-metric-value" id="metric-r2">-</div>
-                        <div class="progress-metric-label" id="metric-r2-label">R² Score</div>
+                        <div class="progress-metric-label" id="metric-r2-label">R² Score <span class="metric-help-icon">?</span></div>
+                        <div class="metric-explanation" id="metric-r2-explain"></div>
+                    </div>
+                    <div class="progress-metric metric-with-help" id="metric-f1-container" style="display: none;">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">F1 Score</div>
+                            Balance between precision and recall. 1.0 is perfect. 0.7+ is good for imbalanced data like top-performer detection.
+                            <a href="/glossary#f1" class="metric-help-link">Learn more →</a>
+                        </div>
+                        <div class="progress-metric-value" id="metric-f1">-</div>
+                        <div class="progress-metric-label">F1 Score <span class="metric-help-icon">?</span></div>
+                        <div class="metric-explanation" id="metric-f1-explain"></div>
+                    </div>
+                    <div class="progress-metric metric-with-help" id="metric-logloss-container" style="display: none;">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Log Loss (Cross-Entropy)</div>
+                            Measures prediction confidence. Penalizes confident wrong predictions. Lower is better. Below 0.3 is typically good.
+                            <a href="/glossary#logloss" class="metric-help-link">Learn more →</a>
+                        </div>
+                        <div class="progress-metric-value" id="metric-logloss">-</div>
+                        <div class="progress-metric-label">Log Loss <span class="metric-help-icon">?</span></div>
+                        <div class="metric-explanation" id="metric-logloss-explain"></div>
                     </div>
                     <div class="progress-metric" id="metric-features-container" style="display: none;">
                         <div class="progress-metric-value" id="metric-features">-</div>
                         <div class="progress-metric-label">Active Features</div>
+                    </div>
+                </div>
+
+                <!-- Training Charts -->
+                <div class="training-charts" id="training-charts">
+                    <!-- Loss Curve Chart -->
+                    <div class="training-chart-container">
+                        <div class="training-chart-title">Loss Curve</div>
+                        <canvas id="loss-chart"></canvas>
+                    </div>
+
+                    <!-- Performance Chart (R²/AUC over epochs) -->
+                    <div class="training-chart-container">
+                        <div class="training-chart-title" id="performance-chart-title">R² Score</div>
+                        <canvas id="performance-chart"></canvas>
                     </div>
                 </div>
 
@@ -3574,24 +4210,61 @@
                         Training Complete
                     </div>
                     <div id="result-preset-badge" style="display: none; margin-bottom: 10px; padding: 4px 10px; background: rgba(59, 176, 165, 0.15); border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: #3bb0a5; text-align: center;">
-                        Model B — Curated
+                        Platinum 1.0 Training Data
                     </div>
                     <div class="results-grid">
-                        <div class="result-item" id="result-mae-container">
+                        <div class="result-item metric-with-help" id="result-mae-container">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">Mean Absolute Error</div>
+                                Predictions are typically off by this dollar amount.
+                            </div>
                             <div class="result-value" id="result-mae">-</div>
-                            <div class="result-label" id="result-mae-label">Test MAE</div>
+                            <div class="result-label" id="result-mae-label">Test MAE <span class="metric-help-icon">?</span></div>
+                            <div class="metric-explanation" id="result-mae-explain"></div>
                         </div>
-                        <div class="result-item" id="result-mape-container">
+                        <div class="result-item metric-with-help" id="result-mape-container">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">Symmetric Mean Absolute % Error</div>
+                                Predictions are typically off by this percentage.
+                            </div>
                             <div class="result-value" id="result-mape">-</div>
-                            <div class="result-label" id="result-mape-label">Test SMAPE</div>
+                            <div class="result-label" id="result-mape-label">Test SMAPE <span class="metric-help-icon">?</span></div>
+                            <div class="metric-explanation" id="result-mape-explain"></div>
                         </div>
-                        <div class="result-item" id="result-rmse-container">
+                        <div class="result-item metric-with-help" id="result-rmse-container">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">Root Mean Square Error</div>
+                                Like MAE but penalizes large errors more heavily.
+                            </div>
                             <div class="result-value" id="result-rmse">-</div>
-                            <div class="result-label">Test RMSE</div>
+                            <div class="result-label">Test RMSE <span class="metric-help-icon">?</span></div>
                         </div>
-                        <div class="result-item">
+                        <div class="result-item metric-with-help">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">R² Score</div>
+                                Percentage of revenue variation the model explains. Higher is better.
+                            </div>
                             <div class="result-value" id="result-r2">-</div>
-                            <div class="result-label" id="result-r2-label">Test R²</div>
+                            <div class="result-label" id="result-r2-label">Test R² <span class="metric-help-icon">?</span></div>
+                            <div class="metric-explanation" id="result-r2-explain"></div>
+                        </div>
+                        <div class="result-item metric-with-help" id="result-f1-container" style="display: none;">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">F1 Score</div>
+                                Balance between precision and recall. Higher is better.
+                            </div>
+                            <div class="result-value" id="result-f1">-</div>
+                            <div class="result-label">Test F1 <span class="metric-help-icon">?</span></div>
+                            <div class="metric-explanation" id="result-f1-explain"></div>
+                        </div>
+                        <div class="result-item metric-with-help" id="result-logloss-container" style="display: none;">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">Log Loss</div>
+                                Prediction confidence penalty. Lower is better.
+                            </div>
+                            <div class="result-value" id="result-logloss">-</div>
+                            <div class="result-label">Log Loss <span class="metric-help-icon">?</span></div>
+                            <div class="metric-explanation" id="result-logloss-explain"></div>
                         </div>
                         <div class="result-item">
                             <div class="result-value" id="result-loss">-</div>
@@ -3775,11 +4448,6 @@
             <button class="filter-apply-btn" id="filter-apply-btn" style="display: none;">Select All Filtered Sites</button>
         </div>
 
-        <!-- Resize Handle -->
-        <div class="panel-resize-handle" id="panel-resize-handle">
-            <div class="panel-resize-grip"></div>
-        </div>
-
         <div class="side-panel-content" id="side-panel-content">
             <!-- Content loaded dynamically -->
         </div>
@@ -3824,6 +4492,11 @@
         let backgroundSitesLayer;
         let glifyPoints = null;  // WebGL points layer (fill)
         let glifyBorderPoints = null;  // WebGL points layer (border/outline)
+
+        // deck.gl layers for advanced visualization
+        let deckOverlay = null;
+        let currentViewMode = 'points';  // 'points', 'hexbin', or 'heatmap'
+        let hexbinRadius = 25000;  // meters
 
         // Lasso-select state
         let selectModeActive = false;
@@ -3944,6 +4617,9 @@
 
             // Setup legend modal
             setupLegend();
+
+            // Setup view mode toggle (Points/Hexbins/Heatmap)
+            setupViewModeToggle();
 
             // Update background marker sizes on zoom
             map.on('zoomend', updateBackgroundMarkerSizes);
@@ -4204,6 +4880,378 @@
             // Glify automatically updates on zoom via the size function
             // Just update selected markers (Canvas layer)
             updateMarkerSizes();
+        }
+
+        // ============================================
+        // deck.gl Advanced Visualization Layers
+        // ============================================
+
+        // Get data for deck.gl layers (respects filters)
+        function getDeckGLData() {
+            const data = [];
+            for (const site of allSites) {
+                // Skip if filtered out
+                if (filterModeActive && !filteredSiteIds.has(site.GTVID)) continue;
+
+                const metrics = revenueDataMap[site.GTVID] || {};
+                const revenue = metrics.avg_monthly || 0;
+
+                data.push({
+                    position: [site.Longitude, site.Latitude],
+                    revenue: revenue,
+                    score: metrics.score || 0,
+                    gtvid: site.GTVID
+                });
+            }
+            return data;
+        }
+
+        // Create deck.gl overlay on Leaflet map
+        function createDeckOverlay() {
+            try {
+                // Remove existing overlay
+                if (deckOverlay) {
+                    map.removeLayer(deckOverlay);
+                    deckOverlay = null;
+                }
+
+                // Check if deck.gl is available
+                if (typeof deck === 'undefined') {
+                    console.error('deck.gl library not loaded');
+                    return;
+                }
+
+                const data = getDeckGLData();
+                console.log(`getDeckGLData returned ${data.length} points for ${currentViewMode} mode`);
+
+                if (data.length === 0) {
+                    console.warn('No data available for deck.gl visualization');
+                    return;
+                }
+
+                // Calculate revenue statistics for color scale
+                const revenues = data.map(d => d.revenue).filter(r => r > 0);
+                const maxRevenue = revenues.length > 0 ? Math.max(...revenues) : 1;
+                const p90Revenue = revenues.length > 0 ? revenues.sort((a, b) => a - b)[Math.floor(revenues.length * 0.9)] : 1;
+                console.log(`Revenue stats: max=${maxRevenue}, p90=${p90Revenue}`);
+
+                let layers = [];
+
+                if (currentViewMode === 'hexbin') {
+                    console.log('Creating HexagonLayer with radius:', hexbinRadius);
+                    layers.push(new deck.HexagonLayer({
+                        id: 'hexbin-layer',
+                        data: data,
+                        getPosition: d => d.position,
+                        getElevationWeight: d => d.revenue,
+                        getColorWeight: d => d.revenue,
+                        elevationScale: 50,
+                        extruded: true,
+                        radius: hexbinRadius,
+                        coverage: 0.9,
+                        elevationRange: [0, 3000],
+                        colorRange: [
+                            [26, 152, 80],      // Low - Kepler green
+                            [102, 189, 99],
+                            [166, 217, 106],
+                            [253, 174, 97],
+                            [244, 109, 67],
+                            [215, 48, 39]       // High - Red
+                        ],
+                        elevationAggregation: 'SUM',
+                        colorAggregation: 'SUM',
+                        pickable: true,
+                        opacity: 0.8,
+                        material: {
+                            ambient: 0.64,
+                            diffuse: 0.6,
+                            shininess: 32,
+                            specularColor: [51, 51, 51]
+                        }
+                    }));
+                } else if (currentViewMode === 'heatmap') {
+                    console.log('Creating HeatmapLayer');
+                    layers.push(new deck.HeatmapLayer({
+                        id: 'heatmap-layer',
+                        data: data,
+                        getPosition: d => d.position,
+                        getWeight: d => Math.max(1, d.revenue / 1000),
+                        radiusPixels: 50,
+                        intensity: 1,
+                        threshold: 0.05,
+                        colorRange: [
+                            [26, 152, 80, 0],       // Transparent green
+                            [26, 152, 80, 128],     // Semi-transparent green
+                            [166, 217, 106, 180],   // Yellow-green
+                            [253, 174, 97, 200],    // Orange
+                            [244, 109, 67, 220],    // Red-orange
+                            [215, 48, 39, 255]      // Solid red
+                        ],
+                        opacity: 0.8
+                    }));
+                }
+
+                if (layers.length === 0) {
+                    console.warn('No layers created for mode:', currentViewMode);
+                    return;
+                }
+
+                // Create the deck.gl overlay using LeafletLayer (custom canvas overlay)
+                deckOverlay = new DeckGLLeafletLayer(layers);
+                map.addLayer(deckOverlay);
+
+                console.log(`Created deck.gl ${currentViewMode} layer with ${data.length} points`);
+            } catch (error) {
+                console.error('Error creating deck.gl overlay:', error);
+            }
+        }
+
+        // Custom Leaflet layer class for deck.gl
+        class DeckGLLeafletLayer extends L.Layer {
+            constructor(layers) {
+                super();
+                this._layers = layers;
+                this._deck = null;
+                this._container = null;
+                this._initialized = false;
+            }
+
+            onAdd(map) {
+                try {
+                    this._map = map;
+                    this._container = L.DomUtil.create('div', 'deck-gl-layer');
+                    this._container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 400;';
+
+                    const pane = map.getPane('overlayPane');
+                    if (!pane) {
+                        console.error('Could not find overlay pane');
+                        return this;
+                    }
+                    pane.appendChild(this._container);
+
+                    // Create deck.gl instance
+                    this._deck = new deck.Deck({
+                        parent: this._container,
+                        controller: false,
+                        style: { position: 'absolute', width: '100%', height: '100%' },
+                        views: new deck.MapView({ repeat: true }),
+                        layers: this._layers,
+                        onWebGLInitialized: (gl) => {
+                            console.log('deck.gl WebGL initialized');
+                            gl.enable(gl.BLEND);
+                        },
+                        onLoad: () => {
+                            console.log('deck.gl layer loaded');
+                            this._initialized = true;
+                            this._updateViewState();
+                        },
+                        onError: (error) => {
+                            console.error('deck.gl error:', error);
+                        }
+                    });
+
+                    // Initial view state update
+                    this._updateViewState();
+                    map.on('move', this._updateViewState, this);
+                    map.on('zoom', this._updateViewState, this);
+                    map.on('resize', this._onResize, this);
+                    map.on('moveend', this._updateViewState, this);
+
+                    console.log('DeckGLLeafletLayer added to map');
+                } catch (error) {
+                    console.error('Error adding DeckGLLeafletLayer:', error);
+                }
+
+                return this;
+            }
+
+            onRemove(map) {
+                try {
+                    map.off('move', this._updateViewState, this);
+                    map.off('zoom', this._updateViewState, this);
+                    map.off('resize', this._onResize, this);
+                    map.off('moveend', this._updateViewState, this);
+
+                    if (this._deck) {
+                        this._deck.finalize();
+                        this._deck = null;
+                    }
+                    if (this._container && this._container.parentNode) {
+                        this._container.parentNode.removeChild(this._container);
+                    }
+                    this._initialized = false;
+                    console.log('DeckGLLeafletLayer removed from map');
+                } catch (error) {
+                    console.error('Error removing DeckGLLeafletLayer:', error);
+                }
+            }
+
+            _updateViewState() {
+                if (!this._deck || !this._map) return;
+
+                try {
+                    const center = this._map.getCenter();
+                    const zoom = this._map.getZoom();
+                    const size = this._map.getSize();
+
+                    // Leaflet zoom to deck.gl zoom (they should be equivalent for web mercator)
+                    const viewState = {
+                        longitude: center.lng,
+                        latitude: center.lat,
+                        zoom: zoom,
+                        pitch: currentViewMode === 'hexbin' ? 45 : 0,
+                        bearing: 0,
+                        width: size.x,
+                        height: size.y
+                    };
+
+                    this._deck.setProps({ viewState });
+                } catch (error) {
+                    console.error('Error updating view state:', error);
+                }
+            }
+
+            _onResize() {
+                if (this._deck) {
+                    this._deck.setProps({});  // Triggers resize
+                }
+            }
+
+            updateLayers(layers) {
+                this._layers = layers;
+                if (this._deck) {
+                    this._deck.setProps({ layers: layers });
+                }
+            }
+        }
+
+        // Update deck.gl layer (called when filters change or data updates)
+        function updateDeckLayer() {
+            if (currentViewMode === 'points') return;
+            createDeckOverlay();
+        }
+
+        // Switch view mode
+        function setViewMode(mode) {
+            console.log(`setViewMode called with mode: ${mode}, current: ${currentViewMode}`);
+
+            if (mode === currentViewMode) {
+                console.log('Mode unchanged, returning');
+                return;
+            }
+
+            currentViewMode = mode;
+
+            // Update UI
+            document.querySelectorAll('.view-mode-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.mode === mode);
+            });
+            document.getElementById('view-mode-label').textContent =
+                mode === 'points' ? 'Points' : mode === 'hexbin' ? 'Hexbins' : 'Heatmap';
+
+            // Update button active state
+            const btn = document.getElementById('view-mode-btn');
+            btn.classList.toggle('active', mode !== 'points');
+
+            // Show/hide hexbin controls
+            const hexControls = document.getElementById('hexbin-controls');
+            hexControls.classList.toggle('visible', mode === 'hexbin');
+
+            // Show/hide layers
+            if (mode === 'points') {
+                console.log('Switching to points mode');
+                // Remove deck.gl overlay
+                if (deckOverlay) {
+                    try {
+                        map.removeLayer(deckOverlay);
+                    } catch (e) {
+                        console.warn('Error removing deck overlay:', e);
+                    }
+                    deckOverlay = null;
+                }
+                // Show glify points
+                drawBackgroundSites();
+            } else {
+                console.log(`Switching to ${mode} mode`);
+                // Hide glify points
+                if (glifyPoints) {
+                    try {
+                        glifyPoints.remove();
+                    } catch (e) {
+                        console.warn('Error removing glify points:', e);
+                    }
+                    glifyPoints = null;
+                }
+                if (glifyBorderPoints) {
+                    try {
+                        glifyBorderPoints.remove();
+                    } catch (e) {
+                        console.warn('Error removing glify border points:', e);
+                    }
+                    glifyBorderPoints = null;
+                }
+                // Create deck.gl visualization
+                console.log(`allSites count: ${allSites.length}`);
+                createDeckOverlay();
+            }
+
+            // Close dropdown
+            document.getElementById('view-mode-toggle').classList.remove('open');
+
+            console.log(`View mode changed to: ${mode}`);
+        }
+
+        // Setup view mode toggle
+        function setupViewModeToggle() {
+            const toggle = document.getElementById('view-mode-toggle');
+            const btn = document.getElementById('view-mode-btn');
+            const options = document.querySelectorAll('.view-mode-option');
+            const radiusSlider = document.getElementById('hexbin-radius');
+            const radiusValue = document.getElementById('hexbin-radius-value');
+
+            // Toggle dropdown - stop propagation to prevent document handler from closing it immediately
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggle.classList.toggle('open');
+            });
+
+            // Handle option selection - stop propagation to prevent conflicts
+            options.forEach(option => {
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const mode = option.dataset.mode;
+                    console.log('View mode option clicked:', mode);
+                    setViewMode(mode);
+                });
+            });
+
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                if (!toggle.contains(e.target)) {
+                    toggle.classList.remove('open');
+                }
+            });
+
+            // Hexbin radius slider
+            radiusSlider.addEventListener('input', () => {
+                hexbinRadius = parseInt(radiusSlider.value);
+                radiusValue.textContent = Math.round(hexbinRadius / 1000);
+            });
+
+            radiusSlider.addEventListener('change', () => {
+                if (currentViewMode === 'hexbin') {
+                    createDeckOverlay();
+                }
+            });
+        }
+
+        // Refresh the current visualization (call this when data/filters change)
+        function refreshVisualization() {
+            if (currentViewMode === 'points') {
+                drawBackgroundSites();
+            } else {
+                createDeckOverlay();
+            }
         }
 
         // Legend modal functions
@@ -4809,6 +5857,7 @@
             populateFieldDropdown();
             renderFilterPills();
             updateFilterCount();
+            updateFilterBadge();
             // Re-render site details to update active states
             if (currentSiteData) {
                 renderSiteDetails(currentSiteData);
@@ -4820,6 +5869,7 @@
             populateFieldDropdown();
             renderFilterPills();
             updateFilterCount();
+            updateFilterBadge();
         }
 
         function clearAllFilters() {
@@ -4838,9 +5888,10 @@
 
             populateFieldDropdown();
             renderFilterPills();
-            drawBackgroundSites();
+            refreshVisualization();
             updateLegendContent();
             updateStatsPanel();
+            updateFilterBadge();
         }
 
         // Format currency for display
@@ -5225,7 +6276,7 @@
                 document.getElementById('matching-count').textContent = '0';
                 filteredSiteIds = new Set();
                 filterModeActive = false;
-                drawBackgroundSites();
+                refreshVisualization();
                 updateLegendContent();
                 updateStatsPanel();
                 return;
@@ -5242,7 +6293,7 @@
                 filteredSiteIds = applyRangeToSet(lassoRegionIds);
                 filterModeActive = true;
                 document.getElementById('matching-count').textContent = filteredSiteIds.size.toLocaleString();
-                drawBackgroundSites();
+                refreshVisualization();
                 updateLegendContent();
                 updateStatsPanel();
                 console.log(`Lasso region filter: ${filteredSiteIds.size} sites`);
@@ -5254,7 +6305,7 @@
                 filteredSiteIds = new Set(allSites.filter(s => passesRangeFilters(s.GTVID)).map(s => s.GTVID));
                 filterModeActive = true;
                 document.getElementById('matching-count').textContent = filteredSiteIds.size.toLocaleString();
-                drawBackgroundSites();
+                refreshVisualization();
                 updateLegendContent();
                 updateStatsPanel();
                 console.log(`Range filter: ${filteredSiteIds.size} sites`);
@@ -5287,7 +6338,7 @@
                 filterModeActive = true;
 
                 // Redraw map
-                drawBackgroundSites();
+                refreshVisualization();
                 updateLegendContent();
                 updateStatsPanel();
 
@@ -5319,15 +6370,14 @@
                 // Draw connections for all selected sites
                 await drawConnections();
 
-                // Close the panel
-                closeSidePanel();
-
                 console.log(`Selected all ${siteIds.length} filtered sites`);
             } catch (error) {
                 console.error('Error applying filters:', error);
                 alert('Failed to select filtered sites');
             } finally {
                 showLoading(false);
+                // Always close the panel, even on error
+                closeSidePanel();
             }
         }
 
@@ -5630,6 +6680,7 @@
             linesLayer.clearLayers();
             map.setView([39.5, -98.35], 4);
             document.getElementById('selected-count').textContent = '0';
+            updateConnectionStatsVisibility();
 
             // Turn off select mode if active
             if (selectModeActive) {
@@ -5834,6 +6885,7 @@
                 const count = $('#site-select').val()?.length || 0;
                 document.getElementById('selected-count').textContent = count;
                 document.getElementById('draw-btn').disabled = count === 0;
+                updateConnectionStatsVisibility();
 
                 // Update the placeholder text to show count
                 const $container = $('.select2-selection--multiple');
@@ -5866,66 +6918,6 @@
 
             // DEBUG: Log score verification on page load
             logScoreVerification('PAGE LOAD');
-
-            // Side panel resize handle - drag to resize site info area
-            (function initPanelResize() {
-                const handle = document.getElementById('panel-resize-handle');
-                const panel = document.getElementById('side-panel');
-                const content = document.getElementById('side-panel-content');
-                let isDragging = false;
-                let startY = 0;
-                let startHeight = 0;
-
-                handle.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    isDragging = true;
-                    startY = e.clientY;
-                    startHeight = content.offsetHeight;
-                    handle.classList.add('active');
-                    document.body.style.cursor = 'ns-resize';
-                    document.body.style.userSelect = 'none';
-                });
-
-                document.addEventListener('mousemove', function(e) {
-                    if (!isDragging) return;
-                    // Dragging up = negative deltaY = increase content height
-                    const deltaY = startY - e.clientY;
-                    const newHeight = Math.max(80, Math.min(startHeight + deltaY, panel.offsetHeight - 150));
-                    content.style.flex = 'none';
-                    content.style.height = newHeight + 'px';
-                });
-
-                document.addEventListener('mouseup', function() {
-                    if (!isDragging) return;
-                    isDragging = false;
-                    handle.classList.remove('active');
-                    document.body.style.cursor = '';
-                    document.body.style.userSelect = '';
-                });
-
-                // Touch support for mobile
-                handle.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    isDragging = true;
-                    startY = e.touches[0].clientY;
-                    startHeight = content.offsetHeight;
-                    handle.classList.add('active');
-                }, { passive: false });
-
-                document.addEventListener('touchmove', function(e) {
-                    if (!isDragging) return;
-                    const deltaY = startY - e.touches[0].clientY;
-                    const newHeight = Math.max(80, Math.min(startHeight + deltaY, panel.offsetHeight - 150));
-                    content.style.flex = 'none';
-                    content.style.height = newHeight + 'px';
-                }, { passive: false });
-
-                document.addEventListener('touchend', function() {
-                    if (!isDragging) return;
-                    isDragging = false;
-                    handle.classList.remove('active');
-                });
-            })();
 
             // Panel hint - animated indicator (stays visible until panel opens)
             const panelHint = document.getElementById('panel-hint');
@@ -6020,6 +7012,7 @@
                 populateFieldDropdown();
                 renderFilterPills();
                 updateFilterCount();
+                updateFilterBadge();
             });
 
             // Filter apply button
@@ -6060,6 +7053,16 @@
 
         let trainingEventSource = null;
         let trainingStartTime = null;
+
+        // Training charts
+        let lossChart = null;
+        let performanceChart = null;
+        let trainingChartData = {
+            epochs: [],
+            trainLoss: [],
+            valLoss: [],
+            performance: []  // R² for regression, AUC for classification
+        };
 
         // Model training state for visualization
         let modelTrainingState = {
@@ -6114,17 +7117,7 @@
             loadSystemInfo();
             loadTrainingFeatures();
 
-            // Model preset change handler
-            document.getElementById('model-preset').addEventListener('change', function() {
-                const preset = this.value;
-                const hint = document.getElementById('model-preset-hint');
-                const presetDescriptions = {
-                    'model_a': 'All available features from source datasets — 75 features',
-                    'model_b': 'Curated features (no retailer, pct_male, nearest_interstate) — 56 features',
-                };
-                hint.textContent = presetDescriptions[preset] || '';
-                loadTrainingFeatures(preset);
-            });
+            // Model preset is now fixed to 'model_a' (Platinum 1.0 Training Data)
 
             // Training panel open/close handlers
             const trainingHint = document.getElementById('training-hint');
@@ -6198,66 +7191,333 @@
                 })
                 .catch(() => {}); // Silently ignore if endpoint unavailable
 
-            // Task type selector handler
-            const taskTypeSelect = document.getElementById('task-type');
-            if (taskTypeSelect) {
-                taskTypeSelect.addEventListener('change', handleTaskTypeChange);
+            // Combined training task selector handler
+            const trainingTaskSelect = document.getElementById('training-task');
+            if (trainingTaskSelect) {
+                trainingTaskSelect.addEventListener('change', handleTrainingTaskChange);
+                // Initialize visibility and hidden inputs
+                handleTrainingTaskChange();
             }
 
-            // Model type selector handler (Neural Network vs CatBoost vs XGBoost)
-            const modelTypeSelect = document.getElementById('model-type');
-            if (modelTypeSelect) {
-                modelTypeSelect.addEventListener('change', handleModelTypeChange);
-                // Initialize visibility
-                handleModelTypeChange();
+            // Lookalike percentile input event listeners
+            const lowerPercentileInput = document.getElementById('lookalike-lower-percentile');
+            const upperPercentileInput = document.getElementById('lookalike-upper-percentile');
+            if (lowerPercentileInput) {
+                lowerPercentileInput.addEventListener('input', updatePercentileHint);
+                lowerPercentileInput.addEventListener('change', updatePercentileHint);
+            }
+            if (upperPercentileInput) {
+                upperPercentileInput.addEventListener('input', updatePercentileHint);
+                upperPercentileInput.addEventListener('change', updatePercentileHint);
             }
 
-            // Feature selection method handler
-            const fsMethodSelect = document.getElementById('feature-selection-method');
-            if (fsMethodSelect) {
-                fsMethodSelect.addEventListener('change', handleFeatureSelectionMethodChange);
-                // Initialize hint text
-                handleFeatureSelectionMethodChange();
+            // Feature selection is now fixed to 'none' (use all features)
+
+            // === NEW UI IMPROVEMENTS ===
+
+            // Stats panel toggle handler
+            const statsToggle = document.getElementById('stats-toggle');
+            if (statsToggle) {
+                statsToggle.addEventListener('click', function() {
+                    const secondary = document.getElementById('stats-secondary');
+                    const isExpanded = secondary.classList.toggle('show');
+                    this.classList.toggle('expanded', isExpanded);
+                    this.querySelector('span').textContent = isExpanded ? 'Less' : 'More';
+                });
+            }
+
+            // Filter button in header - opens filter panel
+            const filterHeaderBtn = document.getElementById('filter-header-btn');
+            if (filterHeaderBtn) {
+                filterHeaderBtn.addEventListener('click', function() {
+                    const sidePanel = document.getElementById('side-panel');
+                    const overlay = document.getElementById('side-panel-overlay');
+                    const panelHint = document.getElementById('panel-hint');
+                    if (sidePanel && overlay) {
+                        sidePanel.classList.add('open');
+                        overlay.classList.add('show');
+                        if (panelHint) panelHint.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Split task/model dropdowns - sync to hidden combined selector
+            const predictionTaskSelect = document.getElementById('prediction-task');
+            const modelAlgorithmSelect = document.getElementById('model-algorithm');
+
+            function syncTrainingDropdowns() {
+                const predTask = predictionTaskSelect ? predictionTaskSelect.value : 'regression';
+                const modelAlg = modelAlgorithmSelect ? modelAlgorithmSelect.value : 'xgboost';
+
+                // Build the combined value
+                let combinedValue = predTask + '_' + modelAlg;
+
+                // Handle special cases - catboost not available for lookalike
+                if (predTask === 'lookalike' && modelAlg !== 'neural_network') {
+                    combinedValue = 'lookalike_neural_network';
+                    if (modelAlgorithmSelect) {
+                        modelAlgorithmSelect.value = 'neural_network';
+                    }
+                }
+
+                // Clustering always uses neural network (autoencoder)
+                if (predTask === 'clustering') {
+                    combinedValue = 'clustering_neural_network';
+                    if (modelAlgorithmSelect) {
+                        modelAlgorithmSelect.value = 'neural_network';
+                    }
+                }
+
+                // Update hidden combined selector
+                const trainingTaskSelect = document.getElementById('training-task');
+                if (trainingTaskSelect) {
+                    trainingTaskSelect.value = combinedValue;
+                    handleTrainingTaskChange();
+                }
+
+                // Update hint texts
+                const predHint = document.getElementById('prediction-task-hint');
+                const modelHint = document.getElementById('model-algorithm-hint');
+
+                const predHints = {
+                    'regression': 'Estimate monthly revenue for each site',
+                    'lookalike': 'Find sites similar to your top performers',
+                    'clustering': 'Segment top performers into distinct groups'
+                };
+
+                const modelHints = {
+                    'xgboost': 'Gradient boosting - fast training, great accuracy',
+                    'catboost': 'Handles categories natively - often best for mixed data',
+                    'neural_network': 'Deep learning - flexible, uses GPU acceleration'
+                };
+
+                if (predHint) predHint.textContent = predHints[predTask] || '';
+                if (modelHint) modelHint.textContent = modelHints[modelAlg] || '';
+
+                // Disable catboost for lookalike and clustering tasks
+                if (modelAlgorithmSelect) {
+                    const catboostOption = modelAlgorithmSelect.querySelector('option[value="catboost"]');
+                    const xgboostOption = modelAlgorithmSelect.querySelector('option[value="xgboost"]');
+                    if (catboostOption) {
+                        catboostOption.disabled = (predTask === 'lookalike' || predTask === 'clustering');
+                    }
+                    if (xgboostOption) {
+                        xgboostOption.disabled = (predTask === 'clustering');
+                    }
+                }
+
+                // Show/hide clustering config section
+                const clusteringConfig = document.getElementById('clustering-config');
+                if (clusteringConfig) {
+                    clusteringConfig.style.display = predTask === 'clustering' ? 'block' : 'none';
+                }
+
+                // Show/hide lookalike percentile config
+                const lookalikeConfig = document.getElementById('lookalike-percentile-config');
+                if (lookalikeConfig) {
+                    lookalikeConfig.style.display = predTask === 'lookalike' ? 'block' : 'none';
+                }
+            }
+
+            if (predictionTaskSelect) {
+                predictionTaskSelect.addEventListener('change', syncTrainingDropdowns);
+            }
+            if (modelAlgorithmSelect) {
+                modelAlgorithmSelect.addEventListener('change', syncTrainingDropdowns);
+            }
+
+            // Cluster threshold slider
+            const clusterThresholdSlider = document.getElementById('cluster-threshold');
+            const clusterThresholdValue = document.getElementById('cluster-threshold-value');
+            if (clusterThresholdSlider && clusterThresholdValue) {
+                clusterThresholdSlider.addEventListener('input', function() {
+                    const val = parseFloat(this.value);
+                    clusterThresholdValue.textContent = `${val.toFixed(1)} (${Math.round(val * 100)}% confidence)`;
+                });
+            }
+
+            // Check if lookalike model exists and enable/disable clustering option
+            function checkLookalikeModelExists() {
+                const clusteringOption = document.getElementById('clustering-option');
+                const clusteringPrereq = document.getElementById('clustering-prereq');
+
+                // Check if model is trained and is lookalike type
+                if (modelTrainingState.isModelTrained && modelTrainingState.taskType === 'lookalike') {
+                    if (clusteringOption) {
+                        clusteringOption.disabled = false;
+                        clusteringOption.textContent = 'Cluster Top Performers ✓';
+                    }
+                    if (clusteringPrereq) {
+                        clusteringPrereq.style.color = '#27ae60';
+                        clusteringPrereq.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                            Lookalike model ready. ${modelTrainingState.trainingSiteIds.size.toLocaleString()} top performers identified.
+                        `;
+                    }
+                } else {
+                    if (clusteringOption) {
+                        clusteringOption.disabled = true;
+                        clusteringOption.textContent = 'Cluster Top Performers';
+                    }
+                    if (clusteringPrereq) {
+                        clusteringPrereq.style.color = '#f39c12';
+                        clusteringPrereq.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                            Requires a trained lookalike model. Train lookalike first, then cluster.
+                        `;
+                    }
+                }
+            }
+
+            // Call on page load and after training completes
+            checkLookalikeModelExists();
+
+            // Initialize the sync
+            syncTrainingDropdowns();
+        }
+
+        // Update filter badge count
+        function updateFilterBadge() {
+            const badge = document.getElementById('filter-badge');
+            const btn = document.getElementById('filter-header-btn');
+            if (!badge || !btn) return;
+
+            const filterCount = Object.keys(activeFilters).length;
+            badge.textContent = filterCount;
+            badge.classList.toggle('hidden', filterCount === 0);
+            btn.classList.toggle('has-filters', filterCount > 0);
+        }
+
+        // Show/hide connection stats based on selection
+        function updateConnectionStatsVisibility() {
+            const connectionsEl = document.getElementById('stats-connections');
+            const selectedCount = parseInt(document.getElementById('selected-count').textContent) || 0;
+            if (connectionsEl) {
+                connectionsEl.classList.toggle('show', selectedCount > 1);
             }
         }
 
-        function handleTaskTypeChange() {
-            const taskType = document.getElementById('task-type').value;
-            const hintEl = document.getElementById('task-type-hint');
-            const targetGroup = document.getElementById('target-variable-group');
+        // Update plain English metric explanations
+        function updateMetricExplanations(metrics) {
+            // MAE explanation
+            const maeExplain = document.getElementById('metric-mae-explain');
+            const resultMaeExplain = document.getElementById('result-mae-explain');
+            if (metrics.mae !== undefined && metrics.mae !== '-') {
+                const maeVal = parseFloat(metrics.mae);
+                if (!isNaN(maeVal)) {
+                    const maeText = `±$${maeVal.toFixed(0)} typical error`;
+                    if (maeExplain) maeExplain.textContent = maeText;
+                    if (resultMaeExplain) resultMaeExplain.textContent = maeText;
+                }
+            }
+
+            // SMAPE explanation
+            const mapeExplain = document.getElementById('metric-mape-explain');
+            const resultMapeExplain = document.getElementById('result-mape-explain');
+            if (metrics.smape !== undefined && metrics.smape !== '-') {
+                const mapeVal = parseFloat(metrics.smape);
+                if (!isNaN(mapeVal)) {
+                    const mapeText = `~${mapeVal.toFixed(0)}% off on average`;
+                    if (mapeExplain) mapeExplain.textContent = mapeText;
+                    if (resultMapeExplain) resultMapeExplain.textContent = mapeText;
+                }
+            }
+
+            // R² explanation
+            const r2Explain = document.getElementById('metric-r2-explain');
+            const resultR2Explain = document.getElementById('result-r2-explain');
+            if (metrics.r2 !== undefined && metrics.r2 !== '-') {
+                const r2Val = parseFloat(metrics.r2);
+                if (!isNaN(r2Val)) {
+                    const r2Pct = (r2Val * 100).toFixed(0);
+                    const r2Text = `Explains ${r2Pct}% of variation`;
+                    if (r2Explain) r2Explain.textContent = r2Text;
+                    if (resultR2Explain) resultR2Explain.textContent = r2Text;
+                }
+            }
+
+            // F1 Score explanation
+            const f1Explain = document.getElementById('metric-f1-explain');
+            const resultF1Explain = document.getElementById('result-f1-explain');
+            if (metrics.f1 !== undefined && metrics.f1 !== '-') {
+                const f1Val = parseFloat(metrics.f1);
+                if (!isNaN(f1Val)) {
+                    let quality = 'needs improvement';
+                    if (f1Val >= 0.9) quality = 'excellent';
+                    else if (f1Val >= 0.8) quality = 'very good';
+                    else if (f1Val >= 0.7) quality = 'good';
+                    else if (f1Val >= 0.6) quality = 'fair';
+                    const f1Text = `${(f1Val * 100).toFixed(0)}% balanced accuracy (${quality})`;
+                    if (f1Explain) f1Explain.textContent = f1Text;
+                    if (resultF1Explain) resultF1Explain.textContent = f1Text;
+                }
+            }
+
+            // Log Loss explanation
+            const loglossExplain = document.getElementById('metric-logloss-explain');
+            const resultLoglossExplain = document.getElementById('result-logloss-explain');
+            if (metrics.logloss !== undefined && metrics.logloss !== '-') {
+                const llVal = parseFloat(metrics.logloss);
+                if (!isNaN(llVal)) {
+                    let quality = 'poor confidence';
+                    if (llVal <= 0.2) quality = 'high confidence';
+                    else if (llVal <= 0.4) quality = 'good confidence';
+                    else if (llVal <= 0.6) quality = 'moderate confidence';
+                    const llText = `${quality}`;
+                    if (loglossExplain) loglossExplain.textContent = llText;
+                    if (resultLoglossExplain) resultLoglossExplain.textContent = llText;
+                }
+            }
+        }
+
+        function handleTrainingTaskChange() {
+            const trainingTask = document.getElementById('training-task').value;
+            const hintEl = document.getElementById('training-task-hint');
             const metricR2Label = document.getElementById('metric-r2-label');
             const resultR2Label = document.getElementById('result-r2-label');
 
-            if (taskType === 'lookalike') {
-                hintEl.textContent = 'Train on top 10% ACTIVE sites, find INACTIVE lookalikes to reactivate';
-                // Hide target variable for lookalike (always uses revenue)
-                if (targetGroup) targetGroup.style.display = 'none';
-                // Update metric labels for classification
-                if (metricR2Label) metricR2Label.textContent = 'AUC';
-                if (resultR2Label) resultR2Label.textContent = 'Test AUC';
-            } else {
-                hintEl.textContent = 'Predict actual revenue values for all sites';
-                if (targetGroup) targetGroup.style.display = 'block';
-                // Update metric labels for regression
-                if (metricR2Label) metricR2Label.textContent = 'R² Score';
-                if (resultR2Label) resultR2Label.textContent = 'Test R²';
-            }
-        }
+            // Parse the combined value to get task type and model type
+            // Values: regression_xgboost, regression_neural_network, lookalike_neural_network, clustering_neural_network
+            const isLookalikeTask = trainingTask.startsWith('lookalike');
+            const isClusteringTask = trainingTask.startsWith('clustering');
+            let taskType = 'regression';
+            if (isLookalikeTask) taskType = 'lookalike';
+            if (isClusteringTask) taskType = 'clustering';
+            const modelType = trainingTask.includes('xgboost') ? 'xgboost' :
+                              trainingTask.includes('catboost') ? 'catboost' : 'neural_network';
 
-        function handleModelTypeChange() {
-            const modelType = document.getElementById('model-type').value;
-            const hintEl = document.getElementById('model-type-hint');
+            // Update hidden inputs for backward compatibility
+            document.getElementById('task-type').value = taskType;
+            document.getElementById('model-type').value = modelType;
 
-            // Model type descriptions
-            const modelHints = {
-                'neural_network': 'Embedding + Residual MLP optimized for M4 GPU',
-                'catboost': 'Gradient boosting with native categorical support - often best for tabular data',
-                'xgboost': 'Fast gradient boosting - excellent baseline for tabular regression'
+            // Training task descriptions
+            const taskHints = {
+                'regression_xgboost': 'Gradient boosting model for revenue prediction',
+                'regression_catboost': 'CatBoost model for revenue prediction',
+                'regression_neural_network': 'Deep learning model with embeddings for revenue prediction',
+                'lookalike_neural_network': 'Classifier to find inactive sites similar to top performers',
+                'clustering_neural_network': 'Deep Embedded Clustering to segment top performers'
             };
 
             // Update hint text
             if (hintEl) {
-                hintEl.textContent = modelHints[modelType] || 'Select a model type';
+                hintEl.textContent = taskHints[trainingTask] || 'Select a training task';
+            }
+
+            // Update metric labels based on task type
+            if (isClusteringTask) {
+                if (metricR2Label) metricR2Label.textContent = 'Silhouette';
+                if (resultR2Label) resultR2Label.textContent = 'Silhouette Score';
+            } else if (isLookalikeTask) {
+                if (metricR2Label) metricR2Label.textContent = 'AUC';
+                if (resultR2Label) resultR2Label.textContent = 'Test AUC';
+            } else {
+                if (metricR2Label) metricR2Label.textContent = 'R² Score';
+                if (resultR2Label) resultR2Label.textContent = 'Test R²';
             }
 
             // Neural network specific options
@@ -6301,14 +7561,60 @@
             // Update modal subtitle if visible
             const modalSubtitle = document.getElementById('modal-model-type');
             if (modalSubtitle) {
-                const taskType = document.getElementById('task-type').value;
-                const taskLabel = taskType === 'lookalike' ? 'Classification' : 'Regression';
+                const taskLabel = isLookalikeTask ? 'Classification' : 'Regression';
                 const modelLabels = {
                     'neural_network': 'Neural Network',
-                    'catboost': 'CatBoost',
                     'xgboost': 'XGBoost'
                 };
                 modalSubtitle.textContent = `${modelLabels[modelType]} ${taskLabel} Model`;
+            }
+
+            // Show/hide lookalike percentile configuration
+            const percentileConfig = document.getElementById('lookalike-percentile-config');
+            if (percentileConfig) {
+                percentileConfig.style.display = isLookalikeTask ? 'block' : 'none';
+                if (isLookalikeTask) {
+                    updatePercentileHint();
+                }
+            }
+        }
+
+        function updatePercentileHint() {
+            const lowerInput = document.getElementById('lookalike-lower-percentile');
+            const upperInput = document.getElementById('lookalike-upper-percentile');
+            const hintEl = document.getElementById('percentile-hint');
+            const errorEl = document.getElementById('percentile-error');
+
+            if (!lowerInput || !upperInput || !hintEl || !errorEl) return;
+
+            const lower = parseInt(lowerInput.value, 10);
+            const upper = parseInt(upperInput.value, 10);
+
+            // Validate
+            let error = '';
+            if (isNaN(lower) || lower < 1 || lower > 99) {
+                error = 'Lower percentile must be an integer between 1 and 99';
+            } else if (isNaN(upper) || upper < 1 || upper > 100) {
+                error = 'Upper percentile must be an integer between 1 and 100';
+            } else if (upper <= lower) {
+                error = 'Upper percentile must be greater than lower percentile';
+            }
+
+            if (error) {
+                errorEl.textContent = error;
+                errorEl.style.display = 'block';
+                hintEl.style.display = 'none';
+            } else {
+                errorEl.style.display = 'none';
+                hintEl.style.display = 'block';
+
+                // Calculate percentage of sites
+                const pctSites = upper >= 100 ? (100 - lower) : (upper - lower);
+                if (upper >= 100) {
+                    hintEl.textContent = `Top ${100 - lower}% of sites by revenue will be labeled as top performers`;
+                } else {
+                    hintEl.textContent = `Sites between p${lower} and p${upper} (${pctSites}% of sites) will be labeled as top performers`;
+                }
             }
         }
 
@@ -6659,7 +7965,14 @@
                 }
 
                 function buildInteractiveGroup(label, features, type, colorClass) {
-                    const checkboxes = features.map(f => {
+                    // Sort features alphabetically by display name
+                    const sortedFeatures = [...features].sort((a, b) => {
+                        const nameA = getFeatureDisplayName(a).toLowerCase();
+                        const nameB = getFeatureDisplayName(b).toLowerCase();
+                        return nameA.localeCompare(nameB);
+                    });
+
+                    const checkboxes = sortedFeatures.map(f => {
                         const isSelected = featureSelectionState[type].has(f);
                         const unselectedClass = isSelected ? '' : 'unselected';
                         return `
@@ -6784,6 +8097,14 @@
             // Only pass selected_features if user has deselected some (not all selected)
             const useCustomSelection = selectedFeatures.length < totalAvailable && selectedFeatures.length > 0;
 
+            // Lookalike percentile bounds
+            const lowerPercentile = parseInt(document.getElementById('lookalike-lower-percentile')?.value || '90', 10);
+            const upperPercentile = parseInt(document.getElementById('lookalike-upper-percentile')?.value || '100', 10);
+
+            // Clustering parameters
+            const nClusters = parseInt(document.getElementById('n-clusters')?.value || '5', 10);
+            const clusterThreshold = parseFloat(document.getElementById('cluster-threshold')?.value || '0.5');
+
             return {
                 task_type: taskType,
                 model_type: document.getElementById('model-type').value,
@@ -6806,12 +8127,47 @@
                 stg_sigma: parseFloat(document.getElementById('stg-sigma')?.value || '0.5'),
                 run_shap_validation: runShapValidation,
                 track_gradients: trackGradients,
+                // Lookalike classifier percentile bounds
+                lookalike_lower_percentile: lowerPercentile,
+                lookalike_upper_percentile: upperPercentile,
+                // Clustering parameters
+                n_clusters: nClusters,
+                cluster_probability_threshold: clusterThreshold,
             };
+        }
+
+        function validatePercentileBounds() {
+            const taskType = document.getElementById('task-type').value;
+            if (taskType !== 'lookalike') {
+                return { valid: true };
+            }
+
+            const lower = parseInt(document.getElementById('lookalike-lower-percentile')?.value || '90', 10);
+            const upper = parseInt(document.getElementById('lookalike-upper-percentile')?.value || '100', 10);
+
+            if (isNaN(lower) || lower < 1 || lower > 99) {
+                return { valid: false, error: 'Lower percentile must be an integer between 1 and 99' };
+            }
+            if (isNaN(upper) || upper < 1 || upper > 100) {
+                return { valid: false, error: 'Upper percentile must be an integer between 1 and 100' };
+            }
+            if (upper <= lower) {
+                return { valid: false, error: 'Upper percentile must be greater than lower percentile' };
+            }
+
+            return { valid: true };
         }
 
         async function startTraining() {
             const config = getTrainingConfig();
             const startBtn = document.getElementById('start-training-btn');
+
+            // Validate percentile bounds for lookalike task
+            const validation = validatePercentileBounds();
+            if (!validation.valid) {
+                alert('Invalid percentile configuration: ' + validation.error);
+                return;
+            }
 
             // Disable button and show loading
             startBtn.disabled = true;
@@ -6832,6 +8188,7 @@
                 if (result.success) {
                     trainingStartTime = Date.now();
                     showTrainingProgress();
+                    initializeTrainingCharts();
                     connectToProgressStream();
                 } else {
                     alert('Failed to start training: ' + result.error);
@@ -6858,7 +8215,6 @@
         function showTrainingProgress() {
             document.getElementById('training-config-section').style.display = 'none';
             document.getElementById('hyperparams-section').style.display = 'none';
-            document.getElementById('feature-selection-section').style.display = 'none';
             document.getElementById('train-button-section').style.display = 'none';
             document.getElementById('training-progress').classList.add('active');
             document.getElementById('training-results').classList.remove('show');
@@ -6886,9 +8242,18 @@
 
             // Reset labels and visibility based on current task type
             const currentTask = document.getElementById('task-type').value;
-            document.getElementById('metric-mae-label').textContent = currentTask === 'lookalike' ? 'ROC-AUC' : 'MAE';
-            document.getElementById('metric-mape-container').style.display = currentTask === 'lookalike' ? 'none' : '';
-            document.getElementById('metric-rmse-container').style.display = currentTask === 'lookalike' ? 'none' : '';
+            const isLookalike = currentTask === 'lookalike';
+            document.getElementById('metric-mae-label').textContent = isLookalike ? 'ROC-AUC' : 'MAE';
+            // Hide regression metrics for lookalike, show classification metrics
+            document.getElementById('metric-mae-container').style.display = isLookalike ? 'none' : '';
+            document.getElementById('metric-mape-container').style.display = isLookalike ? 'none' : '';
+            document.getElementById('metric-rmse-container').style.display = isLookalike ? 'none' : '';
+            // Show F1 and Log Loss for classification (lookalike) tasks
+            document.getElementById('metric-f1-container').style.display = isLookalike ? '' : 'none';
+            document.getElementById('metric-logloss-container').style.display = isLookalike ? '' : 'none';
+            // Reset F1 and Log Loss values
+            document.getElementById('metric-f1').textContent = '-';
+            document.getElementById('metric-logloss').textContent = '-';
 
             // Clear log
             document.getElementById('progress-log').innerHTML = '';
@@ -6957,15 +8322,15 @@
             }
             const currentTaskType = document.getElementById('task-type').value;
             if (currentTaskType === 'lookalike') {
-                // Classification: Show ROC-AUC, hide regression-specific metrics
-                document.getElementById('metric-mae-label').textContent = 'ROC-AUC';
-                if (data.val_r2 !== undefined && data.val_r2 !== 0) {
-                    document.getElementById('metric-mae').textContent = data.val_r2.toFixed(4);
-                }
+                // Classification: Hide MAE/AUC metrics (shown in chart), hide regression-specific metrics
+                document.getElementById('metric-mae-container').style.display = 'none';
                 document.getElementById('metric-mape-container').style.display = 'none';
                 document.getElementById('metric-rmse-container').style.display = 'none';
             } else {
                 // Regression: Show all metrics
+                document.getElementById('metric-mae-container').style.display = '';
+                document.getElementById('metric-mape-container').style.display = '';
+                document.getElementById('metric-rmse-container').style.display = '';
                 if (data.val_mae > 0) {
                     document.getElementById('metric-mae').textContent = '$' + data.val_mae.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
@@ -6980,6 +8345,23 @@
                 document.getElementById('metric-r2').textContent = data.val_r2.toFixed(4);
             }
 
+            // Update F1 Score and Log Loss for classification tasks
+            if (data.val_f1 !== undefined && data.val_f1 > 0) {
+                document.getElementById('metric-f1').textContent = data.val_f1.toFixed(4);
+            }
+            if (data.val_logloss !== undefined && data.val_logloss > 0) {
+                document.getElementById('metric-logloss').textContent = data.val_logloss.toFixed(4);
+            }
+
+            // Update plain English metric explanations
+            updateMetricExplanations({
+                mae: data.val_mae,
+                smape: data.val_smape,
+                r2: data.val_r2,
+                f1: data.val_f1,
+                logloss: data.val_logloss
+            });
+
             // Update active features count (feature selection)
             if (data.n_active_features !== undefined && data.n_active_features !== null) {
                 document.getElementById('metric-features-container').style.display = 'block';
@@ -6991,6 +8373,162 @@
                 const logClass = data.status === 'completed' ? 'success' : (data.status === 'error' ? 'error' : 'normal');
                 addLogEntry(data.message, logClass);
             }
+
+            // Update training charts
+            if (data.epoch > 0 && data.train_loss > 0) {
+                updateTrainingCharts(data);
+            }
+        }
+
+        function initializeTrainingCharts() {
+            // Check if Chart.js is available (may fail to load if offline)
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js not available - charts disabled');
+                document.getElementById('training-charts').style.display = 'none';
+                return;
+            }
+            document.getElementById('training-charts').style.display = 'flex';
+
+            const currentTaskType = document.getElementById('task-type').value;
+            const isLookalike = currentTaskType === 'lookalike';
+
+            // Reset chart data
+            trainingChartData = {
+                epochs: [],
+                trainLoss: [],
+                valLoss: [],
+                performance: []
+            };
+
+            // Update performance chart title based on task type
+            const perfTitle = document.getElementById('performance-chart-title');
+            perfTitle.textContent = isLookalike ? 'ROC-AUC' : 'R² Score';
+
+            // Chart.js default settings for dark theme
+            const chartDefaults = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#A0A7B4',
+                            font: { size: 10 },
+                            boxWidth: 12,
+                            padding: 8
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: { display: false },
+                        grid: { color: 'rgba(58, 65, 76, 0.5)' },
+                        ticks: { color: '#6A7485', font: { size: 9 } }
+                    },
+                    y: {
+                        display: true,
+                        title: { display: false },
+                        grid: { color: 'rgba(58, 65, 76, 0.5)' },
+                        ticks: { color: '#6A7485', font: { size: 9 } }
+                    }
+                }
+            };
+
+            // Destroy existing charts
+            if (lossChart) { lossChart.destroy(); }
+            if (performanceChart) { performanceChart.destroy(); }
+
+            // Create Loss Chart
+            const lossCtx = document.getElementById('loss-chart').getContext('2d');
+            lossChart = new Chart(lossCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Train Loss',
+                            data: [],
+                            borderColor: '#1FBAD6',
+                            backgroundColor: 'rgba(31, 186, 214, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Val Loss',
+                            data: [],
+                            borderColor: '#F9042C',
+                            backgroundColor: 'rgba(249, 4, 44, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: chartDefaults
+            });
+
+            // Create Performance Chart (R² or AUC)
+            const perfCtx = document.getElementById('performance-chart').getContext('2d');
+            performanceChart = new Chart(perfCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: isLookalike ? 'ROC-AUC' : 'R²',
+                            data: [],
+                            borderColor: '#47B275',
+                            backgroundColor: 'rgba(71, 178, 117, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        ...chartDefaults.scales,
+                        y: {
+                            ...chartDefaults.scales.y,
+                            min: 0,
+                            max: 1,
+                            ticks: {
+                                color: '#6A7485',
+                                font: { size: 9 },
+                                callback: (val) => val.toFixed(1)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTrainingCharts(data) {
+            // Skip if Chart.js unavailable or charts not initialized
+            if (typeof Chart === 'undefined' || !lossChart || !performanceChart) return;
+
+            // Add new data point
+            trainingChartData.epochs.push(data.epoch);
+            trainingChartData.trainLoss.push(data.train_loss);
+            trainingChartData.valLoss.push(data.val_loss);
+            trainingChartData.performance.push(data.val_r2 || 0);
+
+            // Update Loss Chart
+            lossChart.data.labels = trainingChartData.epochs;
+            lossChart.data.datasets[0].data = trainingChartData.trainLoss;
+            lossChart.data.datasets[1].data = trainingChartData.valLoss;
+            lossChart.update('none');  // 'none' disables animation for performance
+
+            // Update Performance Chart
+            performanceChart.data.labels = trainingChartData.epochs;
+            performanceChart.data.datasets[0].data = trainingChartData.performance;
+            performanceChart.update('none');
         }
 
         function addLogEntry(message, type) {
@@ -7048,7 +8586,7 @@
             // Show model preset badge
             const presetBadge = document.getElementById('result-preset-badge');
             const presetName = document.getElementById('model-preset').value;
-            const presetLabels = { 'model_a': 'Model A — All Features', 'model_b': 'Model B — Curated' };
+            const presetLabels = { 'model_a': 'Platinum 1.0 Training Data' };
             presetBadge.textContent = presetLabels[presetName] || presetName;
             presetBadge.style.display = 'block';
 
@@ -7128,13 +8666,21 @@
             if (taskType === 'lookalike') {
                 // For lookalike model, compute top 10% training sites and identify lookalikes
                 applyLookalikeVisualization();
+                // Enable clustering option now that lookalike model is trained
+                if (typeof checkLookalikeModelExists === 'function') {
+                    checkLookalikeModelExists();
+                }
+            } else if (taskType === 'clustering') {
+                // For clustering, show cluster-based visualization
+                // (Clustering results visualization can be added later)
+                applyRegressionVisualization();  // Fallback for now
             } else {
                 // For regression, apply revenue gradient visualization
                 applyRegressionVisualization();
             }
 
             // Redraw sites with new color scheme
-            drawBackgroundSites();
+            refreshVisualization();
             updateLegendContent();
 
             // Show/hide SHAP button based on availability
@@ -7978,7 +9524,6 @@ END OF FILE
             // Show config sections
             document.getElementById('training-config-section').style.display = 'block';
             document.getElementById('hyperparams-section').style.display = 'block';
-            document.getElementById('feature-selection-section').style.display = 'block';
             document.getElementById('train-button-section').style.display = 'block';
 
             // Hide progress and results
@@ -8020,7 +9565,7 @@ END OF FILE
             modelTrainingState.predictions = {};
 
             // Redraw sites with default color scheme
-            drawBackgroundSites();
+            refreshVisualization();
             updateLegendContent();
         }
 
@@ -8447,7 +9992,6 @@ END OF FILE
             const rect = target.getBoundingClientRect();
             const card = document.getElementById('walkthrough-card');
             const arrow = document.getElementById('walkthrough-arrow');
-            const cardRect = card.getBoundingClientRect();
             const padding = step.padding || 10;
 
             // Reset card positioning
@@ -8461,54 +10005,46 @@ END OF FILE
             arrow.className = 'walkthrough-arrow';
             arrow.style.display = 'block';
 
-            const gap = 20; // Gap between spotlight and card
+            const gap = 16; // Gap between spotlight and card
+            const margin = 16; // Minimum margin from viewport edges
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
+            const cardWidth = Math.min(340, viewportWidth - margin * 2);
+            const cardHeight = Math.min(card.scrollHeight, viewportHeight - margin * 2);
+
+            // Helper to clamp position within viewport
+            const clampX = (x) => Math.max(margin, Math.min(x, viewportWidth - cardWidth - margin));
+            const clampY = (y) => Math.max(margin, Math.min(y, viewportHeight - cardHeight - margin));
 
             switch (step.position) {
                 case 'top':
-                    card.style.left = Math.max(40, Math.min(rect.left + rect.width / 2 - 190, viewportWidth - 420)) + 'px';
-                    card.style.bottom = (viewportHeight - rect.top + padding + gap) + 'px';
+                    card.style.left = clampX(rect.left + rect.width / 2 - cardWidth / 2) + 'px';
+                    card.style.bottom = Math.max(margin, viewportHeight - rect.top + padding + gap) + 'px';
                     arrow.classList.add('bottom');
                     break;
 
                 case 'bottom':
-                    card.style.left = Math.max(40, Math.min(rect.left + rect.width / 2 - 190, viewportWidth - 420)) + 'px';
-                    card.style.top = (rect.bottom + padding + gap) + 'px';
+                    card.style.left = clampX(rect.left + rect.width / 2 - cardWidth / 2) + 'px';
+                    card.style.top = clampY(rect.bottom + padding + gap) + 'px';
                     arrow.classList.add('top');
                     break;
 
                 case 'left':
-                    const leftCardRight = viewportWidth - rect.left + padding + gap;
-                    const leftCardLeft = viewportWidth - leftCardRight - 380;
-                    if (leftCardLeft < 40) {
-                        // Card would be too close to left edge, position with min padding
-                        card.style.left = '40px';
-                    } else {
-                        card.style.right = leftCardRight + 'px';
-                    }
-                    card.style.top = Math.max(20, Math.min(rect.top + rect.height / 2 - 150, viewportHeight - 350)) + 'px';
+                    card.style.right = Math.max(margin, viewportWidth - rect.left + padding + gap) + 'px';
+                    card.style.top = clampY(rect.top + rect.height / 2 - 120) + 'px';
                     arrow.classList.add('right');
                     break;
 
                 case 'right':
-                    const rightCardLeft = rect.right + padding + gap;
-                    if (rightCardLeft + 380 > viewportWidth - 40) {
-                        // Card would be too close to right edge, position with min padding
-                        card.style.left = (viewportWidth - 380 - 40) + 'px';
-                    } else {
-                        card.style.left = rightCardLeft + 'px';
-                    }
-                    card.style.top = Math.max(20, Math.min(rect.top + rect.height / 2 - 150, viewportHeight - 350)) + 'px';
+                    card.style.left = clampX(rect.right + padding + gap) + 'px';
+                    card.style.top = clampY(rect.top + rect.height / 2 - 120) + 'px';
                     arrow.classList.add('left');
                     break;
 
                 case 'inside':
                     // Position card centered within the target element (overlay)
-                    const cardWidth = 380;
-                    const cardHeight = 300;
-                    card.style.left = Math.max(20, rect.left + (rect.width - cardWidth) / 2) + 'px';
-                    card.style.top = Math.max(20, Math.min(rect.top + (rect.height - cardHeight) / 2, viewportHeight - cardHeight - 20)) + 'px';
+                    card.style.left = clampX(rect.left + (rect.width - cardWidth) / 2) + 'px';
+                    card.style.top = clampY(rect.top + (rect.height - 280) / 2) + 'px';
                     arrow.style.display = 'none';
                     break;
 
