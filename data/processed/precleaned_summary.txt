@@ -2,13 +2,13 @@
 PRE-CLEANED DATASET SUMMARY REPORT
 ================================================================================
 
-Generated: 2026-01-30 08:50:50
+Generated: 2026-02-01 20:21:33
 
 ----------------------------------------
 DATASET OVERVIEW
 ----------------------------------------
 Total unique sites: 57,675
-Total columns: 92
+Total columns: 100
 Total active site-months: 1,475,761
 
 ----------------------------------------
@@ -53,7 +53,7 @@ AVERAGE PER ACTIVE SITE-MONTH
 ----------------------------------------
 COLUMN CATEGORIES
 ----------------------------------------
-  Site metadata columns: 80
+  Site metadata columns: 88
   Total metric columns: 6
   Avg monthly metric columns: 6
 

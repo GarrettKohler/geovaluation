@@ -18,7 +18,7 @@ from pathlib import Path
 
 # Data paths
 DATA_DIR = Path(__file__).parent.parent / "data" / "input"
-REVENUE_CSV = DATA_DIR / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv"
+REVENUE_CSV = DATA_DIR / "site_scores_revenue_and_diagnostics.csv"
 NEAREST_SITES_CSV = DATA_DIR / "nearest_site_distances.csv"
 
 

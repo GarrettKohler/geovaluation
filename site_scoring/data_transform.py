@@ -14,7 +14,8 @@ This creates the "pre-cleaned" dataset ready for ML pipeline cleaning.
 import polars as pl
 import numpy as np
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
+from typing import Optional, List, Tuple
 
 # Project root - dynamically resolved from this file's location
 # site_scoring/data_transform.py -> go up one level to get project root
@@ -29,7 +30,7 @@ def load_site_scores(data_path: Path) -> pl.DataFrame:
     """Load the main Site Scores CSV file."""
     print("Loading Site Scores data...")
     df = pl.read_csv(
-        data_path / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv",
+        data_path / "site_scores_revenue_and_diagnostics.csv",
         infer_schema_length=10000,
         null_values=["", "NA", "null", "Unknown"]
     )
@@ -69,7 +70,9 @@ def calculate_relative_strength(
     metric_col: str,
     output_col: str,
     short_days: int = 30,
-    long_days: int = 90
+    long_days: int = 90,
+    as_of_date: Optional[date] = None,
+    min_observations: int = 3,
 ) -> pl.DataFrame:
     """
     Calculate relative strength for any metric.
@@ -85,6 +88,10 @@ def calculate_relative_strength(
         output_col: Name for the output relative strength column
         short_days: Short-term window in days (default 30)
         long_days: Long-term window in days (default 90)
+        as_of_date: Reference date for calculations (default: max date in data).
+                    Use this in production to prevent look-ahead bias.
+        min_observations: Minimum observations required in each window to produce
+                          a valid RS value (default 3). Sites with fewer get RS=1.0.
 
     Returns:
         DataFrame with output_col added per site
@@ -97,34 +104,51 @@ def calculate_relative_strength(
     if 'date_parsed' not in df.columns:
         df = df.with_columns(pl.col('date').str.to_date().alias('date_parsed'))
 
-    # Get the most recent date in the dataset
-    max_date = df['date_parsed'].max()
+    # Use provided as_of_date or fall back to max date in dataset
+    if as_of_date is not None:
+        # Filter to only data available at as_of_date (prevents look-ahead bias)
+        df = df.filter(pl.col('date_parsed') <= as_of_date)
+        max_date = as_of_date
+    else:
+        max_date = df['date_parsed'].max()
 
     # Calculate cutoff dates
     short_cutoff = max_date - pl.duration(days=short_days)
     long_cutoff = max_date - pl.duration(days=long_days)
 
-    # Calculate short-term average per site (most recent short_days)
+    # Calculate short-term average per site with observation count
     short_term = (
         df.filter(pl.col('date_parsed') >= short_cutoff)
         .group_by('id_gbase')
-        .agg(pl.col(metric_col).mean().alias('short_avg'))
+        .agg([
+            pl.col(metric_col).mean().alias('short_avg'),
+            pl.col(metric_col).count().alias('short_count'),
+        ])
     )
 
-    # Calculate long-term average per site (most recent long_days)
+    # Calculate long-term average per site with observation count
     long_term = (
         df.filter(pl.col('date_parsed') >= long_cutoff)
         .group_by('id_gbase')
-        .agg(pl.col(metric_col).mean().alias('long_avg'))
+        .agg([
+            pl.col(metric_col).mean().alias('long_avg'),
+            pl.col(metric_col).count().alias('long_count'),
+        ])
     )
 
     # Join and calculate ratio
-    # Use smoothing (add small epsilon) to handle cases where long_avg is zero
-    epsilon = 1.0  # Small constant to avoid division by zero
-    rs_df = short_term.join(long_term, on='id_gbase', how='left').with_columns(
-        ((pl.col('short_avg') + epsilon) / (pl.col('long_avg') + epsilon))
+    # Use small epsilon (not 1.0 which biases small values significantly)
+    epsilon = 1e-6
+    rs_df = short_term.join(long_term, on='id_gbase', how='left').with_columns([
+        # Only calculate RS if both windows have enough observations
+        pl.when(
+            (pl.col('short_count') >= min_observations) &
+            (pl.col('long_count') >= min_observations)
+        )
+        .then((pl.col('short_avg') + epsilon) / (pl.col('long_avg') + epsilon))
+        .otherwise(None)
         .alias(output_col)
-    ).select(['id_gbase', output_col])
+    ]).select(['id_gbase', output_col])
 
     # Fill missing values with 1.0 (neutral - no trend data available)
     rs_df = rs_df.with_columns(
@@ -134,52 +158,90 @@ def calculate_relative_strength(
     return rs_df
 
 
-def calculate_all_relative_strength_features(df: pl.DataFrame, short_days: int = 30, long_days: int = 90) -> pl.DataFrame:
+def calculate_all_relative_strength_features(
+    df: pl.DataFrame,
+    horizons: Optional[List[Tuple[int, int]]] = None,
+    as_of_date: Optional[date] = None,
+    min_observations: int = 3,
+) -> pl.DataFrame:
     """
     Calculate all relative strength features for site metrics.
 
-    Creates momentum indicators for:
+    Creates momentum indicators for multiple metrics across multiple time horizons.
+    Multi-horizon RS helps capture both short-term momentum and longer-term trends,
+    reducing overfitting compared to a single horizon.
+
+    Default horizons (when horizons=None):
+    - 30/90 days: Medium-term momentum (monthly vs quarterly) - backward compatible
+
+    Recommended multi-horizon configuration:
+    - 7/21 days: Short-term momentum (weekly vs 3-week)
+    - 30/90 days: Medium-term momentum (monthly vs quarterly)
+    - 90/180 days: Long-term momentum (quarterly vs semi-annual)
+
+    Metrics tracked:
     - rs_Impressions: Impression trend (monthly_impressions)
     - rs_NVIs: Network video impression trend (monthly_nvis)
-    - rs_Revenue: Revenue trend (revenue)
-    - rs_RevenuePerScreen: Per-screen revenue trend (monthly_revenue_per_screen)
+    - rs_Revenue: Revenue trend
+    - rs_RevenuePerScreen: Per-screen revenue trend
 
     Args:
-        df: DataFrame with monthly data
-        short_days: Short-term window (default 30)
-        long_days: Long-term window (default 90)
+        df: DataFrame with monthly data (must have 'date', 'id_gbase', and metric columns)
+        horizons: List of (short_days, long_days) tuples. If None, uses [(30, 90)].
+                  When multiple horizons specified, column names include suffix
+                  like rs_Revenue_7_21, rs_Revenue_30_90, etc.
+        as_of_date: Reference date for calculations (prevents look-ahead bias in production)
+        min_observations: Minimum observations required per window (default 3)
 
     Returns:
         DataFrame with all RS features per site (id_gbase as key)
     """
-    print(f"Calculating relative strength features (short={short_days}d, long={long_days}d)...")
+    # Default to single horizon for backward compatibility
+    if horizons is None:
+        horizons = [(30, 90)]
+
+    multi_horizon = len(horizons) > 1
+    print(f"Calculating relative strength features for {len(horizons)} horizon(s)...")
 
     # Parse date once for all calculations
     df = df.with_columns(pl.col('date').str.to_date().alias('date_parsed'))
 
     # Define metrics to calculate RS for
     rs_metrics = [
-        ('monthly_impressions', 'rs_Impressions'),
-        ('monthly_nvis', 'rs_NVIs'),
-        ('revenue', 'rs_Revenue'),
-        ('monthly_revenue_per_screen', 'rs_RevenuePerScreen'),
+        ('monthly_impressions', 'Impressions'),
+        ('monthly_nvis', 'NVIs'),
+        ('revenue', 'Revenue'),
+        ('monthly_revenue_per_screen', 'RevenuePerScreen'),
     ]
 
-    # Calculate each RS feature
-    rs_dfs = []
-    for metric_col, output_col in rs_metrics:
-        rs_df = calculate_relative_strength(df, metric_col, output_col, short_days, long_days)
-        if len(rs_df) > 0:
-            rs_dfs.append(rs_df)
-            mean_val = rs_df[output_col].mean()
-            print(f"  {output_col}: {len(rs_df):,} sites (mean={mean_val:.3f})")
+    # Calculate RS for each metric and horizon combination
+    all_rs_dfs = []
+
+    for short_days, long_days in horizons:
+        # Add suffix for multi-horizon mode (e.g., _7_21, _30_90)
+        horizon_suffix = f"_{short_days}_{long_days}" if multi_horizon else ""
+        print(f"  Horizon: {short_days}/{long_days} days")
+
+        for metric_col, metric_name in rs_metrics:
+            output_col = f"rs_{metric_name}{horizon_suffix}"
+            rs_df = calculate_relative_strength(
+                df, metric_col, output_col,
+                short_days=short_days,
+                long_days=long_days,
+                as_of_date=as_of_date,
+                min_observations=min_observations,
+            )
+            if len(rs_df) > 0:
+                all_rs_dfs.append(rs_df)
+                mean_val = rs_df[output_col].mean()
+                print(f"    {output_col}: {len(rs_df):,} sites (mean={mean_val:.3f})")
 
     # Join all RS features together
-    if not rs_dfs:
+    if not all_rs_dfs:
         return pl.DataFrame({'id_gbase': []})
 
-    result = rs_dfs[0]
-    for rs_df in rs_dfs[1:]:
+    result = all_rs_dfs[0]
+    for rs_df in all_rs_dfs[1:]:
         # Use coalesce join to handle outer join properly
         result = result.join(rs_df, on='id_gbase', how='full', coalesce=True)
 
@@ -188,7 +250,7 @@ def calculate_all_relative_strength_features(df: pl.DataFrame, short_days: int =
     for col in rs_cols:
         result = result.with_columns(pl.col(col).fill_null(1.0))
 
-    print(f"  Total: {len(result):,} sites with RS features")
+    print(f"  Total: {len(result):,} sites with {len(rs_cols)} RS features")
     return result
 
 
@@ -311,9 +373,18 @@ def aggregate_site_metrics(df: pl.DataFrame) -> pl.DataFrame:
             )
 
     # Calculate and join all relative strength features (momentum indicators)
-    # These compare recent performance (30 days) to longer-term average (90 days)
+    # Multi-horizon RS: captures short, medium, and long-term momentum
+    # NOTE: Data is MONTHLY (1 record per site per month on the 1st), so windows must be
+    # calibrated for monthly data points. Using days that span month boundaries:
+    # - 3/6 months (95/185 days): Recent quarter vs half-year (short-term)
+    # - 6/12 months (185/370 days): Half-year vs year (medium-term)
+    # - 12/24 months (370/740 days): Year vs 2-year (long-term trend)
     if 'date' in df.columns:
-        rs_df = calculate_all_relative_strength_features(df, short_days=30, long_days=90)
+        rs_df = calculate_all_relative_strength_features(
+            df,
+            horizons=[(95, 185), (185, 370), (370, 740)],
+            min_observations=2,  # Require at least 2 months of data in each window
+        )
         if len(rs_df) > 0:
             site_agg = site_agg.join(rs_df, on='id_gbase', how='left')
             # Fill any missing RS values with 1.0 (neutral)
@@ -393,6 +464,8 @@ def add_log_transformations(df: pl.DataFrame) -> pl.DataFrame:
         # Geospatial distances (all use min_distance_to_X_mi naming convention)
         'min_distance_to_nearest_site_mi', 'min_distance_to_interstate_mi',
         'min_distance_to_kroger_mi', 'min_distance_to_mcdonalds_mi',
+        # Demographics
+        'avg_household_income',
     ]
 
     for col in numeric_cols:
@@ -483,6 +556,35 @@ def one_hot_encode_flags(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
+def bin_high_cardinality(
+    df: pl.DataFrame,
+    column: str,
+    top_n: int = 30,
+) -> pl.DataFrame:
+    """
+    Bin a high-cardinality categorical column by keeping the top N most
+    frequent values and replacing all others with 'Other'.
+    """
+    if column not in df.columns:
+        return df
+
+    value_counts = df[column].value_counts().sort('count', descending=True)
+    top_values = value_counts[column].head(top_n).to_list()
+    original_unique = df[column].n_unique()
+
+    df = df.with_columns(
+        pl.when(pl.col(column).is_in(top_values))
+        .then(pl.col(column))
+        .otherwise(pl.lit('Other'))
+        .alias(column)
+    )
+
+    new_unique = df[column].n_unique()
+    print(f"  Binned '{column}': {original_unique:,} → {new_unique} categories (top {top_n} + Other)")
+
+    return df
+
+
 def prepare_training_dataset(
     df: pl.DataFrame,
     active_only: bool = True,
@@ -516,6 +618,11 @@ def prepare_training_dataset(
         existing_geo_cols = [c for c in geo_cols_to_drop if c in df.columns]
         df = df.drop(existing_geo_cols)
         print(f"  Dropped geographic identifiers: {existing_geo_cols}")
+
+    # Bin high-cardinality categorical features
+    df = bin_high_cardinality(df, column='retailer', top_n=30)
+    df = bin_high_cardinality(df, column='brand_c_store', top_n=30)
+    df = bin_high_cardinality(df, column='brand_fuel', top_n=10)
 
     # Add log transformations
     df = add_log_transformations(df)

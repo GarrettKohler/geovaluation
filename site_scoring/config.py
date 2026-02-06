@@ -69,13 +69,12 @@ class Config:
     # Note: NVI, per-screen metrics, and raw coordinates excluded
     numeric_features: List[str] = field(default_factory=lambda: [
         # Multi-horizon relative strength indicators (momentum features)
-        # Data is MONTHLY (1 record per site per month), windows calibrated for monthly points:
-        # Short-term (3/6 months = 95/185 days): Recent quarter vs half-year momentum
-        "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
-        # Medium-term (6/12 months = 185/370 days): Half-year vs annual
-        "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
-        # Long-term (12/24 months = 370/740 days): Annual vs 2-year trend
-        "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
+        # Short-term (3/6 months)
+        "rs_NVIs_95_185", "rs_Revenue_95_185",
+        # Medium-term (6/12 months)
+        "rs_NVIs_185_370", "rs_Revenue_185_370",
+        # Long-term (12/24 months)
+        "rs_NVIs_370_740", "rs_Revenue_370_740",
         # Revenue metrics
         "avg_monthly_revenue",
         "log_total_revenue",
@@ -83,15 +82,16 @@ class Config:
         "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
         "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
         # Demographics
-        "avg_household_income", "median_age",
-        "pct_female", "pct_male",
+        "log_avg_household_income", "median_age",
+        "pct_female",
     ])
 
     categorical_features: List[str] = field(default_factory=lambda: [
         # Site metadata (no month/year - data is aggregated!)
         "network", "program", "experience_type", "hardware_type", "retailer",
-        "brand_fuel", "brand_restaurant", "brand_c_store",
-        "nearest_interstate",  # Geospatial
+        "brand_fuel", "brand_c_store",
+        # brand_restaurant removed — 95.8% null, no signal
+        # nearest_interstate removed — high cardinality (227 values), log distance is more informative
     ])
 
     boolean_features: List[str] = field(default_factory=lambda: [
@@ -196,61 +196,41 @@ class Config:
 # Model B: Curated feature set — removes retailer, pct_male, nearest_interstate
 # Hypothesis: these features may be noise or proxies that don't generalize
 _MODEL_B_NUMERIC = [
-    # Multi-horizon RS (momentum) - reduces overfitting vs single horizon
-    # Horizons: 3/6 months, 6/12 months, 12/24 months
-    "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
-    "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
-    "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
+    "rs_NVIs_95_185", "rs_Revenue_95_185",
+    "rs_NVIs_185_370", "rs_Revenue_185_370",
+    "rs_NVIs_370_740", "rs_Revenue_370_740",
     "avg_monthly_revenue", "log_total_revenue",
     "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
     "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
-    "avg_household_income", "median_age",
+    "log_avg_household_income", "median_age",
     "pct_female",
-    # pct_male removed (collinear with pct_female)
 ]
 
 _MODEL_B_CATEGORICAL = [
     "network", "program", "experience_type", "hardware_type",
     # retailer removed
-    "brand_fuel", "brand_restaurant", "brand_c_store",
+    "brand_fuel", "brand_c_store",
     # nearest_interstate removed
 ]
 
 # Model A: All available features from site_training_data.parquet
 # Includes additional demographic, per-screen, and volume metrics
 _MODEL_A_NUMERIC = [
-    # Multi-horizon relative strength indicators (momentum)
-    # Horizons: 3/6 months, 6/12 months, 12/24 months
-    "rs_Impressions_95_185", "rs_NVIs_95_185", "rs_Revenue_95_185", "rs_RevenuePerScreen_95_185",
-    "rs_Impressions_185_370", "rs_NVIs_185_370", "rs_Revenue_185_370", "rs_RevenuePerScreen_185_370",
-    "rs_Impressions_370_740", "rs_NVIs_370_740", "rs_Revenue_370_740", "rs_RevenuePerScreen_370_740",
-    # Revenue metrics
+    "rs_NVIs_95_185", "rs_Revenue_95_185",
+    "rs_NVIs_185_370", "rs_Revenue_185_370",
+    "rs_NVIs_370_740", "rs_Revenue_370_740",
     "avg_monthly_revenue", "log_total_revenue",
-    # Volume metrics (additional)
-    "avg_monthly_monthly_impressions", "avg_monthly_monthly_nvis",
-    "avg_monthly_monthly_impressions_per_screen",
-    "avg_monthly_monthly_nvis_per_screen",
-    "avg_monthly_monthly_revenue_per_screen",
-    # Log-transformed totals (additional)
-    "log_total_monthly_impressions", "log_total_monthly_nvis",
-    "log_total_monthly_impressions_per_screen",
-    "log_total_monthly_nvis_per_screen",
-    "log_total_monthly_revenue_per_screen",
-    # Geospatial distances
     "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
     "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
-    # Demographics (full set)
-    "avg_household_income", "median_age",
-    "pct_female", "pct_male",
+    "log_avg_household_income", "median_age",
+    "pct_female",
     "pct_african_american", "pct_asian", "pct_hispanic",
-    # Site characteristics
-    "screen_count", "dma_rank", "active_months",
+    "dma_rank",
 ]
 
 _MODEL_A_CATEGORICAL = [
     "network", "program", "experience_type", "hardware_type", "retailer",
-    "brand_fuel", "brand_restaurant", "brand_c_store",
-    "nearest_interstate",
+    "brand_fuel", "brand_c_store",
 ]
 
 # Boolean features are the same for both presets (all r_* and c_* flags)

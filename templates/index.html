@@ -12,8 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <!-- Chart.js for training visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <!-- deck.gl for advanced visualizations (hexbins, heatmaps) -->
-    <script src="https://unpkg.com/deck.gl@9.0.16/dist.min.js"></script>
     <!-- Google Fonts - Inter for Kepler.gl style -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -392,12 +390,6 @@
             letter-spacing: -0.01em;
         }
 
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
 
         .select-wrapper {
             min-width: 400px;
@@ -406,11 +398,22 @@
         .select2-container--default .select2-selection--multiple {
             background-color: var(--kepler-bg-input);
             border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
+            border-radius: 3px;
             min-height: 42px;
             padding: 4px 8px;
             max-height: 42px;
             overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+            transition: border-color 0.35s ease, box-shadow 0.35s ease;
+        }
+
+        .select2-container--default .select2-selection--multiple:hover {
+            border-color: var(--kepler-text-label);
+        }
+
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: var(--kepler-active);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(31, 186, 214, 0.15);
         }
 
         .select2-container--default .select2-selection--multiple .select2-selection__rendered {
@@ -438,17 +441,90 @@
         .select2-dropdown {
             background-color: var(--kepler-bg-panel);
             border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            box-shadow: var(--kepler-shadow-dropdown);
+            border-radius: 3px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            animation: dropdownReveal 0.3s ease;
         }
 
-        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
-            background-color: var(--kepler-active);
-            color: #FFFFFF;
+        @keyframes dropdownReveal {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .select2-results__options {
+            max-height: 260px;
         }
 
         .select2-container--default .select2-results__option--selectable {
             color: var(--kepler-text);
+            padding: 6px 12px 6px 32px;
+            position: relative;
+            transition: background 0.35s ease, color 0.35s ease;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            border-bottom: 1px solid rgba(58, 65, 76, 0.4);
+            font-size: 0.8125rem;
+        }
+
+        .select2-container--default .select2-results__option--selectable:last-child {
+            border-bottom: none;
+        }
+
+        /* Checkbox pseudo-element */
+        .select2-container--default .select2-results__option--selectable::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid var(--kepler-text-label);
+            border-radius: 2px;
+            background: transparent;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .select2-container--default .select2-results__option--selectable:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-left-color: var(--kepler-active);
+        }
+
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+            background-color: rgba(31, 186, 214, 0.18);
+            color: #FFFFFF;
+            border-left-color: var(--kepler-active);
+            transition: background 0.35s ease, color 0.2s ease;
+        }
+
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable::before {
+            border-color: var(--kepler-active);
+        }
+
+        .select2-container--default .select2-results__option[aria-selected="true"] {
+            background: rgba(31, 186, 214, 0.12);
+            color: var(--kepler-active);
+            font-weight: 500;
+            border-left-color: var(--kepler-active);
+        }
+
+        /* Checked checkbox */
+        .select2-container--default .select2-results__option[aria-selected="true"]::before {
+            background: var(--kepler-active);
+            border-color: var(--kepler-active);
+        }
+
+        .select2-container--default .select2-results__option[aria-selected="true"]::after {
+            content: '';
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-60%) rotate(45deg);
+            width: 4px;
+            height: 8px;
+            border: solid #FFFFFF;
+            border-width: 0 2px 2px 0;
         }
 
         .select2-container--default .select2-search--inline .select2-search__field {
@@ -459,7 +535,20 @@
             background-color: var(--kepler-bg-input);
             border: 1px solid var(--kepler-border);
             color: var(--kepler-text-highlight);
-            border-radius: var(--kepler-radius-md);
+            border-radius: 3px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            transition: border-color 0.35s ease, box-shadow 0.35s ease;
+        }
+
+        .select2-search--dropdown .select2-search__field:focus {
+            border-color: var(--kepler-active);
+            box-shadow: 0 0 0 3px rgba(31, 186, 214, 0.15);
+            outline: none;
+        }
+
+        .select2-search--dropdown {
+            padding: 10px;
         }
 
         .btn {
@@ -509,215 +598,7 @@
             border: 1px solid var(--kepler-border);
         }
 
-        .stats-panel {
-            background: var(--kepler-bg-panel);
-            border-radius: var(--kepler-radius-md);
-            padding: 15px 20px;
-            margin-top: 15px;
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-            border: 1px solid var(--kepler-border);
-        }
 
-        .stat {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-label {
-            font-size: 0.6875rem;
-            color: var(--kepler-text-label);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 500;
-        }
-
-        .stat-value {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--kepler-active);
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .stat-value.highlight-green {
-            color: var(--kepler-success);
-        }
-
-        .stat-divider {
-            width: 1px;
-            background: var(--kepler-border);
-            margin: 0 10px;
-            align-self: stretch;
-        }
-
-        /* Stats Panel - Collapsible Secondary Stats */
-        .stats-primary {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .stats-secondary {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            max-height: 0;
-            overflow: hidden;
-            opacity: 0;
-            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
-            padding: 0;
-        }
-
-        .stats-secondary.show {
-            max-height: 100px;
-            opacity: 1;
-            padding-top: 12px;
-            margin-top: 12px;
-            border-top: 1px solid var(--kepler-border);
-        }
-
-        .stats-toggle {
-            background: transparent;
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            color: var(--kepler-text-label);
-            padding: 6px 10px;
-            font-size: 0.7rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all var(--kepler-transition);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stats-toggle:hover {
-            background: var(--kepler-bg-hover);
-            color: var(--kepler-text-highlight);
-            border-color: var(--kepler-active);
-        }
-
-        .stats-toggle svg {
-            width: 12px;
-            height: 12px;
-            transition: transform 0.3s ease;
-        }
-
-        .stats-toggle.expanded svg {
-            transform: rotate(180deg);
-        }
-
-        /* Connection stats - only visible when multi-select active */
-        .stats-connections {
-            display: none;
-            gap: 20px;
-            align-items: center;
-            padding-left: 15px;
-            margin-left: 15px;
-            border-left: 1px solid var(--kepler-border);
-        }
-
-        .stats-connections.show {
-            display: flex;
-        }
-
-        /* Stat tooltips */
-        .stat-with-tooltip {
-            position: relative;
-        }
-
-        .stat-tooltip {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 8px 12px;
-            font-size: 0.75rem;
-            color: var(--kepler-text);
-            white-space: nowrap;
-            z-index: 1000;
-            box-shadow: var(--kepler-shadow-dropdown);
-            margin-bottom: 8px;
-        }
-
-        .stat-tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-top-color: var(--kepler-bg-panel);
-        }
-
-        .stat-with-tooltip:hover .stat-tooltip {
-            display: block;
-        }
-
-        /* Filter Button in Header */
-        .filter-btn {
-            background: var(--kepler-bg-content);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 8px 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            color: var(--kepler-text);
-            transition: all var(--kepler-transition);
-            position: relative;
-        }
-
-        .filter-btn:hover {
-            background: var(--kepler-active);
-            border-color: var(--kepler-active);
-            color: #FFFFFF;
-        }
-
-        .filter-btn.has-filters {
-            border-color: var(--kepler-active);
-            color: var(--kepler-active);
-        }
-
-        .filter-btn.has-filters:hover {
-            background: var(--kepler-active);
-            color: #FFFFFF;
-        }
-
-        .filter-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .filter-badge {
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background: var(--kepler-error);
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            min-width: 18px;
-            height: 18px;
-            border-radius: 9px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 4px;
-        }
-
-        .filter-badge.hidden {
-            display: none;
-        }
 
         .loading {
             position: fixed;
@@ -777,156 +658,6 @@
             color: var(--kepler-text);
         }
 
-        /* View Mode Toggle (Points vs Hexbins) */
-        .view-mode-toggle {
-            position: fixed;
-            left: 20px;
-            bottom: 140px;
-            z-index: 1500;
-        }
-
-        .view-mode-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 14px;
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            color: var(--kepler-text);
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all var(--kepler-transition);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        .view-mode-btn:hover {
-            background: var(--kepler-bg-hover);
-            border-color: var(--kepler-active);
-            color: var(--kepler-text-highlight);
-        }
-
-        .view-mode-btn.active {
-            background: rgba(31, 186, 214, 0.15);
-            border-color: var(--kepler-active);
-            color: var(--kepler-active);
-        }
-
-        .view-mode-btn svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .view-mode-options {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 8px;
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            min-width: 160px;
-        }
-
-        .view-mode-toggle.open .view-mode-options {
-            display: block;
-        }
-
-        .view-mode-option {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
-            color: var(--kepler-text);
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all var(--kepler-transition);
-            border-bottom: 1px solid var(--kepler-border);
-        }
-
-        .view-mode-option:last-child {
-            border-bottom: none;
-        }
-
-        .view-mode-option:hover {
-            background: var(--kepler-bg-hover);
-            color: var(--kepler-text-highlight);
-        }
-
-        .view-mode-option.selected {
-            background: rgba(31, 186, 214, 0.1);
-            color: var(--kepler-active);
-        }
-
-        .view-mode-option svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0.7;
-        }
-
-        .view-mode-option.selected svg {
-            opacity: 1;
-        }
-
-        /* Hexbin radius slider */
-        .hexbin-controls {
-            display: none;
-            position: fixed;
-            left: 20px;
-            bottom: 200px;
-            z-index: 1500;
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 12px 16px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            min-width: 180px;
-        }
-
-        .hexbin-controls.visible {
-            display: block;
-        }
-
-        .hexbin-controls label {
-            display: block;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--kepler-text-label);
-            margin-bottom: 8px;
-        }
-
-        .hexbin-controls input[type="range"] {
-            width: 100%;
-            height: 4px;
-            background: var(--kepler-bg-input);
-            border-radius: 2px;
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        .hexbin-controls input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
-            background: var(--kepler-active);
-            border-radius: 50%;
-            cursor: pointer;
-        }
-
-        .hexbin-value {
-            text-align: right;
-            font-size: 0.75rem;
-            color: var(--kepler-text);
-            margin-top: 4px;
-            font-family: 'Roboto Mono', monospace;
-        }
 
         /* Legend */
         /* Legend Button and Modal */
@@ -936,6 +667,11 @@
             bottom: 80px;
             z-index: 1500;
             cursor: pointer;
+            display: none;
+        }
+
+        .legend-hint.visible {
+            display: block;
         }
 
         .legend-hint-circle {
@@ -1339,7 +1075,7 @@
             background: var(--kepler-bg-content);
             border-bottom: 1px solid var(--kepler-border);
             padding: 15px;
-            max-height: 300px;
+            max-height: 60vh;
             overflow-y: auto;
         }
 
@@ -1373,12 +1109,20 @@
             gap: 6px;
             background: rgba(31, 186, 214, 0.15);
             border: 1px solid rgba(31, 186, 214, 0.3);
-            border-radius: var(--kepler-radius-sm);
+            border-radius: 3px;
             padding: 4px 8px 4px 10px;
             font-size: 0.75rem;
             color: var(--kepler-text);
             max-width: 100%;
             cursor: default;
+            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
+            transition: background 0.35s ease, box-shadow 0.35s ease;
+            animation: chipIn 0.25s ease;
+        }
+
+        .filter-pill:hover {
+            background: rgba(31, 186, 214, 0.22);
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.4);
         }
 
         .filter-pill span:not(.filter-pill-label) {
@@ -1401,104 +1145,217 @@
             font-size: 0.9rem;
             line-height: 1;
             padding: 0 2px;
-            transition: color var(--kepler-transition);
+            transition: color 0.35s ease, transform 0.2s ease;
         }
 
         .filter-pill-remove:hover {
             color: var(--kepler-error);
+            transform: scale(1.2);
         }
 
-        .filter-dropdown-row {
-            display: flex;
-            gap: 8px;
-            padding: 10px 15px;
+        /* Inline filter field rows */
+        #filter-fields-list {
+            margin-top: 8px;
         }
 
-        .filter-dropdown {
-            flex: 1;
-            background: var(--kepler-bg-input);
+        #filter-fields-list .filter-category {
+            margin-bottom: 10px;
+            background: var(--kepler-bg-panel);
+            border-radius: 3px;
+            padding: 0;
             border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            color: var(--kepler-text-highlight);
-            padding: 8px 10px;
-            font-size: 0.85rem;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        #filter-fields-list .category-header {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--kepler-active);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+            background: rgba(31, 186, 214, 0.06);
+            border-bottom: 1px solid var(--kepler-border);
+            margin-bottom: 0;
+        }
+
+        .filter-field-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 0.8125rem;
+            border-bottom: 1px solid rgba(58, 65, 76, 0.5);
             cursor: pointer;
+            position: relative;
+            transition: background 0.35s ease, transform 0.35s ease;
         }
 
-        .filter-dropdown:focus {
-            outline: none;
-            border-color: var(--kepler-active);
-            box-shadow: 0 0 0 3px rgba(31, 186, 214, 0.15);
+        .filter-field-row:last-of-type {
+            border-bottom: none;
         }
 
-        /* Select2 multi-select styling for filter values */
-        #filter-values-row .select2-container {
+        .filter-field-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Overlay hover effect (from reference CSS pattern) */
+        .filter-field-row::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+        }
+
+        .filter-field-row:active::after {
+            opacity: 1;
+        }
+
+        .filter-field-row.expanded {
+            background: rgba(31, 186, 214, 0.1);
+            border-left: 3px solid var(--kepler-active);
+        }
+
+        .filter-field-row.has-filter {
+            background: rgba(31, 186, 214, 0.06);
+        }
+
+        .filter-field-row.has-filter .filter-field-label {
+            color: var(--kepler-active);
+            font-weight: 500;
+        }
+
+        .filter-field-row.has-filter .filter-field-label::before {
+            content: '\2713';
+            margin-right: 5px;
+            font-size: 0.7rem;
+            display: inline-block;
+            animation: checkmarkIn 0.3s ease;
+        }
+
+        @keyframes checkmarkIn {
+            from { opacity: 0; transform: scale(0.5); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        .filter-field-label {
+            color: var(--kepler-text-label);
+            flex-shrink: 0;
+            margin-right: 10px;
+            transition: color 0.35s ease;
+        }
+
+        .filter-field-row:hover .filter-field-label {
+            color: var(--kepler-text);
+        }
+
+        .filter-field-value {
+            color: var(--kepler-text-highlight);
+            text-align: right;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.75rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+            transition: color 0.35s ease;
+        }
+
+        .filter-field-value.empty {
+            color: var(--kepler-text-label);
+            font-style: italic;
+        }
+
+        .filter-field-select-container {
+            display: none;
+            padding: 8px 12px 10px;
+            background: rgba(0, 0, 0, 0.12);
+            border-bottom: 1px solid rgba(58, 65, 76, 0.5);
+            animation: selectReveal 0.35s ease;
+        }
+
+        @keyframes selectReveal {
+            from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+            to   { opacity: 1; max-height: 200px; padding-top: 8px; padding-bottom: 10px; }
+        }
+
+        .filter-field-row.expanded + .filter-field-select-container {
+            display: block;
+        }
+
+        /* Select2 styling inside inline filter rows */
+        .filter-field-select-container .select2-container {
             width: 100% !important;
         }
 
-        #filter-values-row .select2-container--default .select2-selection--multiple {
+        .filter-field-select-container .select2-container--default .select2-selection--multiple {
             background-color: var(--kepler-bg-input);
             border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            min-height: 38px;
+            border-radius: 3px;
+            min-height: 34px;
             padding: 2px 6px;
-            max-height: 120px;
+            max-height: 100px;
             overflow-y: auto;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+            transition: border-color 0.35s ease, box-shadow 0.35s ease;
         }
 
-        #filter-values-row .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        .filter-field-select-container .select2-container--default .select2-selection--multiple:hover {
+            border-color: var(--kepler-active);
+        }
+
+        .filter-field-select-container .select2-container--default .select2-selection--multiple .select2-selection__choice {
             display: inline-flex;
             background: var(--kepler-active);
             color: #FFFFFF;
             border: none;
-            border-radius: var(--kepler-radius-sm);
-            padding: 2px 8px;
+            border-radius: 3px;
+            padding: 3px 10px;
             margin: 2px 4px 2px 0;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
+            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
+            transition: background 0.35s ease, transform 0.2s ease;
+            animation: chipIn 0.25s ease;
         }
 
-        #filter-values-row .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        @keyframes chipIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        .filter-field-select-container .select2-container--default .select2-selection--multiple .select2-selection__choice:hover {
+            background: var(--kepler-active-hover);
+        }
+
+        .filter-field-select-container .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
             display: inline;
             color: rgba(255, 255, 255, 0.8);
             margin-right: 4px;
+            transition: color 0.2s ease;
         }
 
-        #filter-values-row .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        .filter-field-select-container .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
             color: white;
         }
 
-        #filter-values-row .select2-container--default .select2-search--inline .select2-search__field {
+        .filter-field-select-container .select2-container--default .select2-search--inline .select2-search__field {
             color: var(--kepler-text-highlight);
-        }
-
-        .filter-add-btn {
-            background: var(--kepler-primary-btn);
-            color: #FFFFFF;
-            border: none;
-            border-radius: var(--kepler-radius-md);
-            padding: 8px 16px;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            margin: 0 15px 10px;
-            display: none;
-            transition: all var(--kepler-transition);
-        }
-
-        .filter-add-btn:hover {
-            background: var(--kepler-primary-btn-hover);
         }
 
         .filter-count {
             background: rgba(31, 186, 214, 0.1);
             color: var(--kepler-active);
             padding: 8px 12px;
-            border-radius: var(--kepler-radius-md);
+            border-radius: 3px;
             font-size: 0.8125rem;
             text-align: center;
             border: 1px solid rgba(31, 186, 214, 0.2);
+            box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .filter-apply-btn {
@@ -1507,24 +1364,35 @@
             color: #FFFFFF;
             border: none;
             padding: 10px;
-            border-radius: var(--kepler-radius-md);
+            border-radius: 3px;
             font-size: 0.8125rem;
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             cursor: pointer;
             margin-top: 10px;
-            transition: all var(--kepler-transition);
+            position: relative;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.4);
+            transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.2s ease;
         }
 
         .filter-apply-btn:hover {
             background: var(--kepler-primary-btn-hover);
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .filter-apply-btn:active {
+            transform: translateY(0);
+            box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.4);
         }
 
         .filter-apply-btn:disabled {
             background: var(--kepler-border);
             color: var(--kepler-text-label);
             cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
 
         /* Stats Summary Panel - Kepler.gl Dark Theme */
@@ -1578,77 +1446,6 @@
             padding: 4px 0;
         }
 
-        /* Filter Panel Hint - Animated circle on page load */
-        .panel-hint {
-            position: fixed;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 1500;
-            cursor: pointer;
-            transition: opacity 0.5s ease-out;
-        }
-
-        .panel-hint.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .panel-hint-circle {
-            width: 50px;
-            height: 50px;
-            background: var(--kepler-active);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(31, 186, 214, 0.5);
-            animation: pulse-hint 2s ease-in-out infinite;
-        }
-
-        .panel-hint-circle svg {
-            width: 24px;
-            height: 24px;
-            color: white;
-        }
-
-        .panel-hint-label {
-            position: absolute;
-            right: 60px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: var(--kepler-bg-panel);
-            color: var(--kepler-text-highlight);
-            padding: 8px 12px;
-            border-radius: var(--kepler-radius-md);
-            font-size: 0.8rem;
-            white-space: nowrap;
-            box-shadow: var(--kepler-shadow-dropdown);
-            border: 1px solid var(--kepler-border);
-            opacity: 0;
-            animation: fade-in-label 0.5s ease-out 1s forwards;
-        }
-
-        .panel-hint-label::after {
-            content: '';
-            position: absolute;
-            right: -6px;
-            top: 50%;
-            transform: translateY(-50%);
-            border: 6px solid transparent;
-            border-left-color: var(--kepler-bg-panel);
-        }
-
-        @keyframes pulse-hint {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow: 0 4px 15px rgba(31, 186, 214, 0.5);
-            }
-            50% {
-                transform: scale(1.1);
-                box-shadow: 0 6px 25px rgba(31, 186, 214, 0.6);
-            }
-        }
 
         @keyframes fade-in-label {
             from { opacity: 0; transform: translateY(-50%) translateX(10px); }
@@ -2303,6 +2100,19 @@
         .training-chart-container canvas {
             width: 100% !important;
             height: 120px !important;
+        }
+
+        .training-histogram-row {
+            display: flex;
+            gap: 8px;
+        }
+        .training-histogram-row .training-chart-container {
+            flex: 1;
+            min-width: 0;
+        }
+        .training-histogram-row .training-chart-container canvas {
+            width: 100% !important;
+            height: 100px !important;
         }
 
         /* Results section - Kepler.gl Dark Theme */
@@ -2996,497 +2806,7 @@
             color: var(--kepler-text-label);
         }
 
-        /* ============================================== */
-        /* WALKTHROUGH / TUTORIAL SYSTEM - Kepler.gl     */
-        /* ============================================== */
 
-        /* Help Button in Header */
-        .help-btn {
-            background: var(--kepler-bg-content);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 8px 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            color: var(--kepler-text);
-            transition: all var(--kepler-transition);
-        }
-
-        .help-btn:hover {
-            background: var(--kepler-primary-btn);
-            border-color: var(--kepler-primary-btn);
-            color: #FFFFFF;
-        }
-
-        .help-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        /* Walkthrough Overlay */
-        .walkthrough-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 10000;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .walkthrough-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        /* Dark backdrop with spotlight cutout - Kepler.gl */
-        .walkthrough-backdrop {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(36, 39, 48, 0.85);
-            transition: all 0.4s ease;
-        }
-
-        /* Spotlight effect - CSS clip-path will be set via JS */
-        .walkthrough-spotlight {
-            position: absolute;
-            border-radius: var(--kepler-radius-md);
-            box-shadow:
-                0 0 0 9999px rgba(36, 39, 48, 0.85),
-                0 0 30px rgba(31, 186, 214, 0.6),
-                inset 0 0 20px rgba(255, 255, 255, 0.1);
-            transition: all 0.4s ease;
-            pointer-events: none;
-        }
-
-        .walkthrough-spotlight::before {
-            content: '';
-            position: absolute;
-            top: -4px;
-            left: -4px;
-            right: -4px;
-            bottom: -4px;
-            border: 2px solid var(--kepler-active);
-            border-radius: var(--kepler-radius-md);
-            animation: spotlight-pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes spotlight-pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.01); }
-        }
-
-        /* Walkthrough Card (Tooltip) - Kepler.gl */
-        .walkthrough-card {
-            position: absolute;
-            background: var(--kepler-bg-panel);
-            border-radius: var(--kepler-radius-lg);
-            border: 1px solid var(--kepler-border);
-            box-shadow: var(--kepler-shadow-dropdown);
-            width: 340px;
-            max-width: calc(100vw - 40px);
-            max-height: calc(100vh - 40px);
-            z-index: 10001;
-            animation: card-appear 0.3s ease-out;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        @keyframes card-appear {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .walkthrough-card-header {
-            background: linear-gradient(135deg, var(--kepler-active) 0%, var(--kepler-info) 100%);
-            padding: 12px 16px;
-            color: white;
-            flex-shrink: 0;
-        }
-
-        .walkthrough-card-step {
-            font-size: 0.6875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            opacity: 0.9;
-            margin-bottom: 4px;
-        }
-
-        .walkthrough-card-title {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .walkthrough-card-body {
-            padding: 16px;
-            text-align: center;
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-            background: var(--kepler-bg-content);
-            overflow-y: auto;
-            flex: 1;
-            min-height: 0;
-        }
-
-        .walkthrough-card-content {
-            font-size: 0.8125rem;
-            line-height: 1.5;
-            color: var(--kepler-text);
-            text-align: center;
-            max-width: 100%;
-        }
-
-        .walkthrough-card-content p {
-            margin-bottom: 8px;
-        }
-
-        .walkthrough-card-content p:last-child {
-            margin-bottom: 0;
-        }
-
-        .walkthrough-card-content strong {
-            color: var(--kepler-text-highlight);
-        }
-
-        .walkthrough-card-content ul {
-            margin: 8px auto;
-            padding-left: 18px;
-            text-align: left;
-            display: inline-block;
-        }
-
-        .walkthrough-card-content li {
-            margin-bottom: 4px;
-        }
-
-        .walkthrough-card-content .metric-highlight {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(31, 186, 214, 0.15);
-            padding: 4px 10px;
-            border-radius: var(--kepler-radius-md);
-            font-weight: 500;
-            color: var(--kepler-active);
-        }
-
-        .walkthrough-card-content .color-dot {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            vertical-align: middle;
-            margin-right: 4px;
-        }
-
-        .walkthrough-card-content .color-dot.purple { background: #8b5cf6; }
-        .walkthrough-card-content .color-dot.green { background: #47B275; }
-        .walkthrough-card-content .color-dot.teal { background: #1FBAD6; }
-        .walkthrough-card-content .color-dot.blue { background: #276EF1; }
-
-        /* Walkthrough Footer with Navigation - Kepler.gl */
-        .walkthrough-card-footer {
-            padding: 12px 16px;
-            background: var(--kepler-bg-base);
-            border-top: 1px solid var(--kepler-border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-
-        .walkthrough-progress {
-            display: flex;
-            gap: 6px;
-        }
-
-        .walkthrough-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--kepler-border);
-            transition: all var(--kepler-transition);
-        }
-
-        .walkthrough-dot.active {
-            background: var(--kepler-active);
-            transform: scale(1.2);
-        }
-
-        .walkthrough-dot.completed {
-            background: var(--kepler-success);
-        }
-
-        .walkthrough-nav {
-            display: flex;
-            gap: 8px;
-        }
-
-        .walkthrough-btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: var(--kepler-radius-md);
-            font-size: 0.8125rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all var(--kepler-transition);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .walkthrough-btn-skip {
-            background: transparent;
-            color: var(--kepler-text-label);
-        }
-
-        .walkthrough-btn-skip:hover {
-            color: var(--kepler-text-highlight);
-            background: var(--kepler-bg-hover);
-        }
-
-        .walkthrough-btn-prev {
-            background: var(--kepler-btn-secondary);
-            color: #FFFFFF;
-        }
-
-        .walkthrough-btn-prev:hover {
-            background: var(--kepler-btn-secondary-hover);
-        }
-
-        .walkthrough-btn-next {
-            background: var(--kepler-primary-btn);
-            color: #FFFFFF;
-        }
-
-        .walkthrough-btn-next:hover {
-            background: var(--kepler-primary-btn-hover);
-        }
-
-        .walkthrough-btn-finish {
-            background: var(--kepler-success);
-            color: white;
-        }
-
-        .walkthrough-btn-finish:hover {
-            background: #3DA066;
-        }
-
-        /* Modal-style card (centered, no spotlight) */
-        .walkthrough-card.modal-style {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: min(400px, calc(100vw - 32px));
-            max-height: calc(100vh - 32px);
-        }
-
-        .walkthrough-card.modal-style .walkthrough-card-header {
-            padding: 20px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .walkthrough-card.modal-style .walkthrough-card-title {
-            font-size: 1.25rem;
-        }
-
-        .walkthrough-card.modal-style .walkthrough-card-body {
-            padding: 16px 20px;
-        }
-
-        /* Welcome screen specific */
-        .welcome-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 12px;
-        }
-
-        .welcome-icon svg {
-            width: 30px;
-            height: 30px;
-        }
-
-        /* Completion screen specific */
-        .completion-checkmark {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 12px;
-            animation: checkmark-pop 0.5s ease-out;
-        }
-
-        @keyframes checkmark-pop {
-            0% { transform: scale(0); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-
-        .completion-checkmark svg {
-            width: 30px;
-            height: 30px;
-        }
-
-        /* Arrow pointer from card to target */
-        .walkthrough-arrow {
-            position: absolute;
-            width: 0;
-            height: 0;
-        }
-
-        .walkthrough-arrow.top {
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 10px solid var(--kepler-bg-panel);
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        .walkthrough-arrow.bottom {
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-top: 10px solid var(--kepler-bg-panel);
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        .walkthrough-arrow.left {
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-right: 10px solid var(--kepler-bg-panel);
-            left: -10px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-
-        .walkthrough-arrow.right {
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-left: 10px solid var(--kepler-bg-panel);
-            right: -10px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-
-        /* Example metrics display in walkthrough - Kepler.gl */
-        .walkthrough-metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin: 10px 0;
-        }
-
-        .walkthrough-metric-item {
-            background: var(--kepler-bg-base);
-            border-radius: var(--kepler-radius-md);
-            padding: 8px;
-            text-align: center;
-            border: 1px solid var(--kepler-border);
-        }
-
-        .walkthrough-metric-value {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--kepler-active);
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .walkthrough-metric-label {
-            font-size: 0.625rem;
-            color: var(--kepler-text-label);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 2px;
-        }
-
-        /* Sample sites preview - Kepler.gl */
-        .walkthrough-sites-preview {
-            background: var(--kepler-bg-base);
-            border-radius: var(--kepler-radius-md);
-            padding: 10px;
-            border: 1px solid var(--kepler-border);
-            margin: 10px 0;
-        }
-
-        .walkthrough-site-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            border-bottom: 1px solid var(--border-light);
-            font-size: 0.8rem;
-        }
-
-        .walkthrough-site-row:last-child {
-            border-bottom: none;
-        }
-
-        .walkthrough-site-id {
-            color: var(--primary);
-            font-weight: 500;
-        }
-
-        .walkthrough-site-value {
-            color: var(--text-primary);
-        }
-
-        .walkthrough-site-value.predicted {
-            color: var(--success);
-        }
-
-        /* Action prompt styling */
-        .walkthrough-action-prompt {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: linear-gradient(135deg, rgba(247, 201, 72, 0.15), rgba(245, 166, 35, 0.15));
-            border: 1px solid var(--secondary);
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 12px;
-        }
-
-        .walkthrough-action-prompt svg {
-            width: 20px;
-            height: 20px;
-            color: var(--secondary);
-            flex-shrink: 0;
-        }
-
-        .walkthrough-action-prompt span {
-            color: var(--text-primary);
-            font-size: 0.85rem;
-        }
     </style>
 </head>
 <body>
@@ -3541,23 +2861,6 @@
     <div class="container">
         <header>
             <h1>GSTV Site Visualization</h1>
-            <div class="controls">
-                <button id="filter-header-btn" class="filter-btn" title="Filter Sites">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                    </svg>
-                    Filter
-                    <span class="filter-badge hidden" id="filter-badge">0</span>
-                </button>
-                <button id="help-btn" class="help-btn" title="Start Tutorial">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    Help
-                </button>
-            </div>
             <!-- Hidden select for programmatic site selection -->
             <select id="site-select" multiple="multiple" style="display: none;"></select>
         </header>
@@ -3578,57 +2881,6 @@
                     <line x1="12" y1="16" x2="17" y2="16"/>
                 </svg>
             </div>
-        </div>
-
-        <!-- View Mode Toggle (Points vs Hexbins) -->
-        <div class="view-mode-toggle" id="view-mode-toggle">
-            <button class="view-mode-btn" id="view-mode-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <circle cx="6" cy="6" r="2"/>
-                    <circle cx="18" cy="6" r="2"/>
-                    <circle cx="6" cy="18" r="2"/>
-                    <circle cx="18" cy="18" r="2"/>
-                </svg>
-                <span id="view-mode-label">Points</span>
-            </button>
-            <div class="view-mode-options">
-                <div class="view-mode-option selected" data-mode="points">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <circle cx="6" cy="6" r="2"/>
-                        <circle cx="18" cy="6" r="2"/>
-                        <circle cx="6" cy="18" r="2"/>
-                        <circle cx="18" cy="18" r="2"/>
-                    </svg>
-                    Points
-                </div>
-                <div class="view-mode-option" data-mode="hexbin">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/>
-                        <line x1="12" y1="2" x2="12" y2="22"/>
-                        <line x1="2" y1="8.5" x2="22" y2="8.5"/>
-                        <line x1="2" y1="15.5" x2="22" y2="15.5"/>
-                    </svg>
-                    Hexbins
-                </div>
-                <div class="view-mode-option" data-mode="heatmap">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <circle cx="12" cy="12" r="6" fill="currentColor" opacity="0.3"/>
-                        <circle cx="12" cy="12" r="4" fill="currentColor" opacity="0.5"/>
-                        <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.8"/>
-                    </svg>
-                    Heatmap
-                </div>
-            </div>
-        </div>
-
-        <!-- Hexbin Controls -->
-        <div class="hexbin-controls" id="hexbin-controls">
-            <label>Hexbin Radius</label>
-            <input type="range" id="hexbin-radius" min="5000" max="100000" value="25000" step="5000">
-            <div class="hexbin-value"><span id="hexbin-radius-value">25</span> km</div>
         </div>
 
         <!-- Legend Modal -->
@@ -3668,6 +2920,10 @@
                         <div class="modal-metric" id="modal-rmse-container">
                             <div class="modal-metric-value" id="modal-metric-rmse">-</div>
                             <div class="modal-metric-label">Test RMSE</div>
+                        </div>
+                        <div class="modal-metric" id="modal-mape-real-container">
+                            <div class="modal-metric-value" id="modal-metric-mape-real">-</div>
+                            <div class="modal-metric-label">Test MAPE</div>
                         </div>
                         <div class="modal-metric">
                             <div class="modal-metric-value" id="modal-metric-r2">-</div>
@@ -3718,75 +2974,7 @@
             </div>
         </div>
 
-        <!-- Filter Panel Hint -->
-        <div class="panel-hint" id="panel-hint" title="Open Filters & Details">
-            <div class="panel-hint-label">Filters & Details</div>
-            <div class="panel-hint-circle">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 4h18M3 12h18M3 20h18"/>
-                    <circle cx="17" cy="4" r="2" fill="currentColor"/>
-                    <circle cx="7" cy="12" r="2" fill="currentColor"/>
-                    <circle cx="14" cy="20" r="2" fill="currentColor"/>
-                </svg>
-            </div>
-        </div>
 
-        <div class="stats-panel">
-            <!-- Primary Stats (always visible) -->
-            <div class="stats-primary">
-                <div class="stat stat-with-tooltip">
-                    <span class="stat-tooltip">All sites in the database</span>
-                    <span class="stat-label">Total Sites</span>
-                    <span class="stat-value" id="total-sites">-</span>
-                </div>
-                <div class="stat stat-with-tooltip">
-                    <span class="stat-tooltip">Sites selected via click or lasso</span>
-                    <span class="stat-label">Selected</span>
-                    <span class="stat-value" id="selected-count">0</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat stat-with-tooltip">
-                    <span class="stat-tooltip">Sites matching your filter criteria</span>
-                    <span class="stat-label">Filtered</span>
-                    <span class="stat-value" id="summary-site-count">0</span>
-                </div>
-                <div class="stat stat-with-tooltip">
-                    <span class="stat-tooltip">Average monthly revenue per filtered site</span>
-                    <span class="stat-label">Avg Monthly Rev</span>
-                    <span class="stat-value" id="summary-avg-revenue">$0</span>
-                </div>
-
-                <!-- Connection stats - shown only when multi-select active -->
-                <div class="stats-connections" id="stats-connections">
-                    <div class="stat stat-with-tooltip">
-                        <span class="stat-tooltip">Connections between selected sites</span>
-                        <span class="stat-label">Connections</span>
-                        <span class="stat-value" id="connections-count">0</span>
-                    </div>
-                    <div class="stat stat-with-tooltip">
-                        <span class="stat-tooltip">Average distance between connected sites</span>
-                        <span class="stat-label">Avg Distance</span>
-                        <span class="stat-value" id="avg-distance">-</span>
-                    </div>
-                </div>
-
-                <button class="stats-toggle" id="stats-toggle" title="Show more stats">
-                    <span>More</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Secondary Stats (collapsible) -->
-            <div class="stats-secondary" id="stats-secondary">
-                <div class="stat stat-with-tooltip">
-                    <span class="stat-tooltip">Sum of all historic revenue for filtered sites</span>
-                    <span class="stat-label">Total Historic Rev</span>
-                    <span class="stat-value highlight-green" id="summary-total-revenue">$0</span>
-                </div>
-            </div>
-        </div>
 
         <div id="connection-details" style="margin-top: 15px; display: none;">
             <h3 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--gstv-text-muted);">Connection Details</h3>
@@ -4136,6 +3324,14 @@
                         <div class="progress-metric-value" id="metric-rmse">-</div>
                         <div class="progress-metric-label">RMSE <span class="metric-help-icon">?</span></div>
                     </div>
+                    <div class="progress-metric metric-with-help" id="metric-mape-real-container">
+                        <div class="metric-help-tooltip">
+                            <div class="metric-help-title">Mean Absolute Percentage Error</div>
+                            Average % predictions miss actual values. 15% means predictions are typically 15% off. Excludes zero-revenue sites.
+                        </div>
+                        <div class="progress-metric-value" id="metric-mape-real">-</div>
+                        <div class="progress-metric-label">MAPE <span class="metric-help-icon">?</span></div>
+                    </div>
                     <div class="progress-metric metric-with-help">
                         <div class="metric-help-tooltip">
                             <div class="metric-help-title">R² (Coefficient of Determination)</div>
@@ -4176,7 +3372,7 @@
                 <div class="training-charts" id="training-charts">
                     <!-- Loss Curve Chart -->
                     <div class="training-chart-container">
-                        <div class="training-chart-title">Loss Curve</div>
+                        <div class="training-chart-title" id="loss-chart-title">Loss Curve</div>
                         <canvas id="loss-chart"></canvas>
                     </div>
 
@@ -4184,6 +3380,17 @@
                     <div class="training-chart-container">
                         <div class="training-chart-title" id="performance-chart-title">R² Score</div>
                         <canvas id="performance-chart"></canvas>
+                    </div>
+                    <!-- Weight/Bias Histogram Charts (neural network only) -->
+                    <div class="training-histogram-row" id="histogram-charts-row" style="display: none;">
+                        <div class="training-chart-container">
+                            <div class="training-chart-title">Weight Distribution</div>
+                            <canvas id="weight-histogram-chart"></canvas>
+                        </div>
+                        <div class="training-chart-container">
+                            <div class="training-chart-title">Bias Distribution</div>
+                            <canvas id="bias-histogram-chart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -4238,6 +3445,14 @@
                             </div>
                             <div class="result-value" id="result-rmse">-</div>
                             <div class="result-label">Test RMSE <span class="metric-help-icon">?</span></div>
+                        </div>
+                        <div class="result-item metric-with-help" id="result-mape-real-container">
+                            <div class="metric-help-tooltip">
+                                <div class="metric-help-title">Mean Absolute Percentage Error</div>
+                                Average % predictions miss actual values. Excludes zero-revenue sites.
+                            </div>
+                            <div class="result-value" id="result-mape-real">-</div>
+                            <div class="result-label">Test MAPE <span class="metric-help-icon">?</span></div>
                         </div>
                         <div class="result-item metric-with-help">
                             <div class="metric-help-tooltip">
@@ -4430,17 +3645,8 @@
             <!-- Applied filter pills -->
             <div class="filter-pills" id="filter-pills"></div>
 
-            <!-- Filter dropdown row: [field] then [values multi-select] -->
-            <div class="filter-dropdown-row">
-                <select class="filter-dropdown filter-field-select" id="filter-field-select">
-                    <option value="">Select field...</option>
-                </select>
-            </div>
-            <div class="filter-dropdown-row" id="filter-values-row" style="display: none;">
-                <select class="filter-dropdown filter-values-select" id="filter-values-select" multiple>
-                </select>
-            </div>
-            <button class="filter-add-btn" id="filter-add-btn">Add Filter</button>
+            <!-- Inline filter fields list -->
+            <div id="filter-fields-list"></div>
 
             <div class="filter-count" id="filter-count" style="display: none;">
                 <span id="matching-count">0</span> sites match filters
@@ -4453,35 +3659,6 @@
         </div>
     </div>
 
-    <!-- ================================================ -->
-    <!-- WALKTHROUGH / TUTORIAL OVERLAY                   -->
-    <!-- ================================================ -->
-    <div class="walkthrough-overlay" id="walkthrough-overlay">
-        <div class="walkthrough-backdrop" id="walkthrough-backdrop"></div>
-        <div class="walkthrough-spotlight" id="walkthrough-spotlight"></div>
-        <div class="walkthrough-card" id="walkthrough-card">
-            <div class="walkthrough-arrow" id="walkthrough-arrow"></div>
-            <div class="walkthrough-card-header">
-                <div class="walkthrough-card-step" id="walkthrough-step-label">Step 1 of 11</div>
-                <div class="walkthrough-card-title" id="walkthrough-title">Welcome</div>
-            </div>
-            <div class="walkthrough-card-body">
-                <div class="walkthrough-card-content" id="walkthrough-content">
-                    <!-- Content loaded dynamically -->
-                </div>
-            </div>
-            <div class="walkthrough-card-footer">
-                <div class="walkthrough-progress" id="walkthrough-progress">
-                    <!-- Dots generated dynamically -->
-                </div>
-                <div class="walkthrough-nav">
-                    <button class="walkthrough-btn walkthrough-btn-skip" id="walkthrough-skip">Skip</button>
-                    <button class="walkthrough-btn walkthrough-btn-prev" id="walkthrough-prev">Previous</button>
-                    <button class="walkthrough-btn walkthrough-btn-next" id="walkthrough-next">Next</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script>
         let map;
@@ -4492,11 +3669,6 @@
         let backgroundSitesLayer;
         let glifyPoints = null;  // WebGL points layer (fill)
         let glifyBorderPoints = null;  // WebGL points layer (border/outline)
-
-        // deck.gl layers for advanced visualization
-        let deckOverlay = null;
-        let currentViewMode = 'points';  // 'points', 'hexbin', or 'heatmap'
-        let hexbinRadius = 25000;  // meters
 
         // Lasso-select state
         let selectModeActive = false;
@@ -4617,9 +3789,6 @@
 
             // Setup legend modal
             setupLegend();
-
-            // Setup view mode toggle (Points/Hexbins/Heatmap)
-            setupViewModeToggle();
 
             // Update background marker sizes on zoom
             map.on('zoomend', updateBackgroundMarkerSizes);
@@ -4882,376 +4051,9 @@
             updateMarkerSizes();
         }
 
-        // ============================================
-        // deck.gl Advanced Visualization Layers
-        // ============================================
-
-        // Get data for deck.gl layers (respects filters)
-        function getDeckGLData() {
-            const data = [];
-            for (const site of allSites) {
-                // Skip if filtered out
-                if (filterModeActive && !filteredSiteIds.has(site.GTVID)) continue;
-
-                const metrics = revenueDataMap[site.GTVID] || {};
-                const revenue = metrics.avg_monthly || 0;
-
-                data.push({
-                    position: [site.Longitude, site.Latitude],
-                    revenue: revenue,
-                    score: metrics.score || 0,
-                    gtvid: site.GTVID
-                });
-            }
-            return data;
-        }
-
-        // Create deck.gl overlay on Leaflet map
-        function createDeckOverlay() {
-            try {
-                // Remove existing overlay
-                if (deckOverlay) {
-                    map.removeLayer(deckOverlay);
-                    deckOverlay = null;
-                }
-
-                // Check if deck.gl is available
-                if (typeof deck === 'undefined') {
-                    console.error('deck.gl library not loaded');
-                    return;
-                }
-
-                const data = getDeckGLData();
-                console.log(`getDeckGLData returned ${data.length} points for ${currentViewMode} mode`);
-
-                if (data.length === 0) {
-                    console.warn('No data available for deck.gl visualization');
-                    return;
-                }
-
-                // Calculate revenue statistics for color scale
-                const revenues = data.map(d => d.revenue).filter(r => r > 0);
-                const maxRevenue = revenues.length > 0 ? Math.max(...revenues) : 1;
-                const p90Revenue = revenues.length > 0 ? revenues.sort((a, b) => a - b)[Math.floor(revenues.length * 0.9)] : 1;
-                console.log(`Revenue stats: max=${maxRevenue}, p90=${p90Revenue}`);
-
-                let layers = [];
-
-                if (currentViewMode === 'hexbin') {
-                    console.log('Creating HexagonLayer with radius:', hexbinRadius);
-                    layers.push(new deck.HexagonLayer({
-                        id: 'hexbin-layer',
-                        data: data,
-                        getPosition: d => d.position,
-                        getElevationWeight: d => d.revenue,
-                        getColorWeight: d => d.revenue,
-                        elevationScale: 50,
-                        extruded: true,
-                        radius: hexbinRadius,
-                        coverage: 0.9,
-                        elevationRange: [0, 3000],
-                        colorRange: [
-                            [26, 152, 80],      // Low - Kepler green
-                            [102, 189, 99],
-                            [166, 217, 106],
-                            [253, 174, 97],
-                            [244, 109, 67],
-                            [215, 48, 39]       // High - Red
-                        ],
-                        elevationAggregation: 'SUM',
-                        colorAggregation: 'SUM',
-                        pickable: true,
-                        opacity: 0.8,
-                        material: {
-                            ambient: 0.64,
-                            diffuse: 0.6,
-                            shininess: 32,
-                            specularColor: [51, 51, 51]
-                        }
-                    }));
-                } else if (currentViewMode === 'heatmap') {
-                    console.log('Creating HeatmapLayer');
-                    layers.push(new deck.HeatmapLayer({
-                        id: 'heatmap-layer',
-                        data: data,
-                        getPosition: d => d.position,
-                        getWeight: d => Math.max(1, d.revenue / 1000),
-                        radiusPixels: 50,
-                        intensity: 1,
-                        threshold: 0.05,
-                        colorRange: [
-                            [26, 152, 80, 0],       // Transparent green
-                            [26, 152, 80, 128],     // Semi-transparent green
-                            [166, 217, 106, 180],   // Yellow-green
-                            [253, 174, 97, 200],    // Orange
-                            [244, 109, 67, 220],    // Red-orange
-                            [215, 48, 39, 255]      // Solid red
-                        ],
-                        opacity: 0.8
-                    }));
-                }
-
-                if (layers.length === 0) {
-                    console.warn('No layers created for mode:', currentViewMode);
-                    return;
-                }
-
-                // Create the deck.gl overlay using LeafletLayer (custom canvas overlay)
-                deckOverlay = new DeckGLLeafletLayer(layers);
-                map.addLayer(deckOverlay);
-
-                console.log(`Created deck.gl ${currentViewMode} layer with ${data.length} points`);
-            } catch (error) {
-                console.error('Error creating deck.gl overlay:', error);
-            }
-        }
-
-        // Custom Leaflet layer class for deck.gl
-        class DeckGLLeafletLayer extends L.Layer {
-            constructor(layers) {
-                super();
-                this._layers = layers;
-                this._deck = null;
-                this._container = null;
-                this._initialized = false;
-            }
-
-            onAdd(map) {
-                try {
-                    this._map = map;
-                    this._container = L.DomUtil.create('div', 'deck-gl-layer');
-                    this._container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 400;';
-
-                    const pane = map.getPane('overlayPane');
-                    if (!pane) {
-                        console.error('Could not find overlay pane');
-                        return this;
-                    }
-                    pane.appendChild(this._container);
-
-                    // Create deck.gl instance
-                    this._deck = new deck.Deck({
-                        parent: this._container,
-                        controller: false,
-                        style: { position: 'absolute', width: '100%', height: '100%' },
-                        views: new deck.MapView({ repeat: true }),
-                        layers: this._layers,
-                        onWebGLInitialized: (gl) => {
-                            console.log('deck.gl WebGL initialized');
-                            gl.enable(gl.BLEND);
-                        },
-                        onLoad: () => {
-                            console.log('deck.gl layer loaded');
-                            this._initialized = true;
-                            this._updateViewState();
-                        },
-                        onError: (error) => {
-                            console.error('deck.gl error:', error);
-                        }
-                    });
-
-                    // Initial view state update
-                    this._updateViewState();
-                    map.on('move', this._updateViewState, this);
-                    map.on('zoom', this._updateViewState, this);
-                    map.on('resize', this._onResize, this);
-                    map.on('moveend', this._updateViewState, this);
-
-                    console.log('DeckGLLeafletLayer added to map');
-                } catch (error) {
-                    console.error('Error adding DeckGLLeafletLayer:', error);
-                }
-
-                return this;
-            }
-
-            onRemove(map) {
-                try {
-                    map.off('move', this._updateViewState, this);
-                    map.off('zoom', this._updateViewState, this);
-                    map.off('resize', this._onResize, this);
-                    map.off('moveend', this._updateViewState, this);
-
-                    if (this._deck) {
-                        this._deck.finalize();
-                        this._deck = null;
-                    }
-                    if (this._container && this._container.parentNode) {
-                        this._container.parentNode.removeChild(this._container);
-                    }
-                    this._initialized = false;
-                    console.log('DeckGLLeafletLayer removed from map');
-                } catch (error) {
-                    console.error('Error removing DeckGLLeafletLayer:', error);
-                }
-            }
-
-            _updateViewState() {
-                if (!this._deck || !this._map) return;
-
-                try {
-                    const center = this._map.getCenter();
-                    const zoom = this._map.getZoom();
-                    const size = this._map.getSize();
-
-                    // Leaflet zoom to deck.gl zoom (they should be equivalent for web mercator)
-                    const viewState = {
-                        longitude: center.lng,
-                        latitude: center.lat,
-                        zoom: zoom,
-                        pitch: currentViewMode === 'hexbin' ? 45 : 0,
-                        bearing: 0,
-                        width: size.x,
-                        height: size.y
-                    };
-
-                    this._deck.setProps({ viewState });
-                } catch (error) {
-                    console.error('Error updating view state:', error);
-                }
-            }
-
-            _onResize() {
-                if (this._deck) {
-                    this._deck.setProps({});  // Triggers resize
-                }
-            }
-
-            updateLayers(layers) {
-                this._layers = layers;
-                if (this._deck) {
-                    this._deck.setProps({ layers: layers });
-                }
-            }
-        }
-
-        // Update deck.gl layer (called when filters change or data updates)
-        function updateDeckLayer() {
-            if (currentViewMode === 'points') return;
-            createDeckOverlay();
-        }
-
-        // Switch view mode
-        function setViewMode(mode) {
-            console.log(`setViewMode called with mode: ${mode}, current: ${currentViewMode}`);
-
-            if (mode === currentViewMode) {
-                console.log('Mode unchanged, returning');
-                return;
-            }
-
-            currentViewMode = mode;
-
-            // Update UI
-            document.querySelectorAll('.view-mode-option').forEach(el => {
-                el.classList.toggle('selected', el.dataset.mode === mode);
-            });
-            document.getElementById('view-mode-label').textContent =
-                mode === 'points' ? 'Points' : mode === 'hexbin' ? 'Hexbins' : 'Heatmap';
-
-            // Update button active state
-            const btn = document.getElementById('view-mode-btn');
-            btn.classList.toggle('active', mode !== 'points');
-
-            // Show/hide hexbin controls
-            const hexControls = document.getElementById('hexbin-controls');
-            hexControls.classList.toggle('visible', mode === 'hexbin');
-
-            // Show/hide layers
-            if (mode === 'points') {
-                console.log('Switching to points mode');
-                // Remove deck.gl overlay
-                if (deckOverlay) {
-                    try {
-                        map.removeLayer(deckOverlay);
-                    } catch (e) {
-                        console.warn('Error removing deck overlay:', e);
-                    }
-                    deckOverlay = null;
-                }
-                // Show glify points
-                drawBackgroundSites();
-            } else {
-                console.log(`Switching to ${mode} mode`);
-                // Hide glify points
-                if (glifyPoints) {
-                    try {
-                        glifyPoints.remove();
-                    } catch (e) {
-                        console.warn('Error removing glify points:', e);
-                    }
-                    glifyPoints = null;
-                }
-                if (glifyBorderPoints) {
-                    try {
-                        glifyBorderPoints.remove();
-                    } catch (e) {
-                        console.warn('Error removing glify border points:', e);
-                    }
-                    glifyBorderPoints = null;
-                }
-                // Create deck.gl visualization
-                console.log(`allSites count: ${allSites.length}`);
-                createDeckOverlay();
-            }
-
-            // Close dropdown
-            document.getElementById('view-mode-toggle').classList.remove('open');
-
-            console.log(`View mode changed to: ${mode}`);
-        }
-
-        // Setup view mode toggle
-        function setupViewModeToggle() {
-            const toggle = document.getElementById('view-mode-toggle');
-            const btn = document.getElementById('view-mode-btn');
-            const options = document.querySelectorAll('.view-mode-option');
-            const radiusSlider = document.getElementById('hexbin-radius');
-            const radiusValue = document.getElementById('hexbin-radius-value');
-
-            // Toggle dropdown - stop propagation to prevent document handler from closing it immediately
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggle.classList.toggle('open');
-            });
-
-            // Handle option selection - stop propagation to prevent conflicts
-            options.forEach(option => {
-                option.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const mode = option.dataset.mode;
-                    console.log('View mode option clicked:', mode);
-                    setViewMode(mode);
-                });
-            });
-
-            // Close on click outside
-            document.addEventListener('click', (e) => {
-                if (!toggle.contains(e.target)) {
-                    toggle.classList.remove('open');
-                }
-            });
-
-            // Hexbin radius slider
-            radiusSlider.addEventListener('input', () => {
-                hexbinRadius = parseInt(radiusSlider.value);
-                radiusValue.textContent = Math.round(hexbinRadius / 1000);
-            });
-
-            radiusSlider.addEventListener('change', () => {
-                if (currentViewMode === 'hexbin') {
-                    createDeckOverlay();
-                }
-            });
-        }
-
         // Refresh the current visualization (call this when data/filters change)
         function refreshVisualization() {
-            if (currentViewMode === 'points') {
-                drawBackgroundSites();
-            } else {
-                createDeckOverlay();
-            }
+            drawBackgroundSites();
         }
 
         // Legend modal functions
@@ -5375,46 +4177,8 @@
             container.innerHTML = html;
         }
 
-        // Update stats summary panel
+        // Update stats summary panel (no-op: stats panel removed)
         function updateStatsPanel() {
-            const siteCountEl = document.getElementById('summary-site-count');
-            const totalRevenueEl = document.getElementById('summary-total-revenue');
-            const avgRevenueEl = document.getElementById('summary-avg-revenue');
-
-            if (!siteCountEl) return;
-
-            // Get the sites to summarize
-            let sitesToSummarize = [];
-            if (filterModeActive && filteredSiteIds.size > 0) {
-                sitesToSummarize = allSites.filter(s => filteredSiteIds.has(s.GTVID));
-            }
-
-            if (sitesToSummarize.length === 0) {
-                // No filters or no matching sites
-                siteCountEl.textContent = '0';
-                totalRevenueEl.textContent = '$0.00';
-                avgRevenueEl.textContent = '$0.00';
-                return;
-            }
-
-            // Calculate totals
-            let totalRevenue = 0;
-            let totalAvgMonthly = 0;
-
-            sitesToSummarize.forEach(site => {
-                const metrics = revenueDataMap[site.GTVID];
-                if (metrics) {
-                    totalRevenue += metrics.total || 0;
-                    totalAvgMonthly += metrics.avgMonthly || 0;
-                }
-            });
-
-            const avgRevenue = sitesToSummarize.length > 0 ? totalAvgMonthly / sitesToSummarize.length : 0;
-
-            // Update display with 2 decimal places
-            siteCountEl.textContent = sitesToSummarize.length.toLocaleString();
-            totalRevenueEl.textContent = '$' + totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            avgRevenueEl.textContent = '$' + avgRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
 
         // Calculate marker radius based on zoom level
@@ -5475,7 +4239,7 @@
                 const response = await fetch('/api/filter-options');
                 filterOptions = await response.json();
                 console.log('Loaded filter options for', Object.keys(filterOptions).length, 'fields');
-                populateFieldDropdown();
+                renderFilterFieldsList();
             } catch (error) {
                 console.error('Error loading filter options:', error);
             }
@@ -5490,12 +4254,6 @@
 
             panel.classList.add('open');
             overlay.classList.add('show');
-
-            // Hide the panel hint when panel opens
-            const panelHint = document.getElementById('panel-hint');
-            if (panelHint) {
-                panelHint.classList.add('hidden');
-            }
 
             if (siteId) {
                 // Show loading state for specific site
@@ -5563,23 +4321,178 @@
             }
         }
 
-        // Populate field dropdown with available filter fields
-        function populateFieldDropdown() {
-            const select = document.getElementById('filter-field-select');
-            if (!select) return;
-            select.innerHTML = '<option value="">Select field...</option>';
-            for (const fieldName of FILTERABLE_FIELDS) {
-                if (filterOptions[fieldName] && filterOptions[fieldName].length > 0) {
-                    const option = document.createElement('option');
-                    option.value = fieldName;
-                    option.textContent = fieldName;
-                    if (activeFilters.hasOwnProperty(fieldName)) {
-                        option.disabled = true;
-                        option.textContent += ' \u2713';
+        // Category grouping for inline filter fields (matches backend SITE_DETAIL_CATEGORIES)
+        const FILTER_FIELD_CATEGORIES = {
+            'Location': ['State', 'County', 'DMA'],
+            'Site Info': ['Retailer', 'Network', 'Hardware', 'Experience', 'Program', 'Status'],
+            'Brands': ['Fuel Brand', 'Restaurant', 'C-Store'],
+            'Capabilities': ['EMV Enabled', 'NFC Enabled', 'Open 24 Hours', 'Sells Beer', 'Sells Wine',
+                'Sells Diesel', 'Sells Lottery', 'Programmatic Enabled', 'Walk-up Enabled'],
+            'Restrictions': ['R: Lottery', 'R: Government', 'R: Travel & Tourism', 'R: Car Wash',
+                'R: Beer (OOF)', 'R: Beer (Video)', 'R: Wine (OOF)', 'R: Wine (Video)',
+                'R: Spirits (OOH)', 'R: Spirits (Video)', 'R: Credit Cards', 'R: CBD/Hemp',
+                'R: Cannabis Medical', 'R: Cannabis Recreational', 'R: CBD Non-THC',
+                'R: Drink Responsibly', 'R: Alt Transportation', 'R: Anti-Smoking',
+                'R: Oil/Aftermarket', 'R: E-Cigarette', 'R: Casinos/Gambling', 'R: Political',
+                'R: Electric Vehicles', 'R: Recruitment', 'R: Restaurants CDR', 'R: Restaurants QSR',
+                'R: Auto Service', 'R: Grocery', 'R: Grocery w/ Fuel'],
+            'Sales': ['Sellable Site', 'Schedule Site']
+        };
+
+        // Track which field row is currently expanded
+        let expandedFilterField = null;
+
+        // Render all filterable fields as inline rows grouped by category
+        function renderFilterFieldsList() {
+            const container = document.getElementById('filter-fields-list');
+            if (!container) return;
+
+            let html = '';
+            const categoryOrder = ['Location', 'Site Info', 'Brands', 'Capabilities', 'Restrictions', 'Sales'];
+
+            for (const category of categoryOrder) {
+                const fields = FILTER_FIELD_CATEGORIES[category] || [];
+                // Only show fields that have options loaded
+                const availableFields = fields.filter(f => filterOptions[f] && filterOptions[f].length > 0);
+                if (availableFields.length === 0) continue;
+
+                html += `<div class="filter-category">`;
+                html += `<div class="category-header">${category}</div>`;
+
+                for (const fieldName of availableFields) {
+                    const isActive = activeFilters.hasOwnProperty(fieldName);
+                    const isExpanded = expandedFilterField === fieldName;
+                    const rowClasses = ['filter-field-row'];
+                    if (isActive) rowClasses.push('has-filter');
+                    if (isExpanded) rowClasses.push('expanded');
+
+                    // Display current filter values or dash
+                    let displayValue = '\u2014';
+                    if (isActive) {
+                        const vals = Array.isArray(activeFilters[fieldName]) ? activeFilters[fieldName] : [activeFilters[fieldName]];
+                        displayValue = vals.length > 2
+                            ? `${vals.slice(0, 2).join(', ')} +${vals.length - 2}`
+                            : vals.join(', ');
                     }
-                    select.appendChild(option);
+                    const valueClass = isActive ? 'filter-field-value' : 'filter-field-value empty';
+
+                    html += `<div class="${rowClasses.join(' ')}" data-field="${fieldName}" onclick="toggleFilterFieldRow('${fieldName.replace(/'/g, "\\'")}')">`;
+                    html += `  <span class="filter-field-label">${fieldName}</span>`;
+                    html += `  <span class="${valueClass}">${displayValue}</span>`;
+                    html += `</div>`;
+                    html += `<div class="filter-field-select-container" data-field-container="${fieldName}"></div>`;
                 }
+
+                html += `</div>`;
             }
+
+            container.innerHTML = html;
+
+            // If a field is expanded, re-initialize its Select2
+            if (expandedFilterField) {
+                initInlineSelect2(expandedFilterField);
+            }
+        }
+
+        // Toggle expansion of a filter field row
+        function toggleFilterFieldRow(fieldName) {
+            if (expandedFilterField === fieldName) {
+                // Collapse current
+                destroyInlineSelect2(fieldName);
+                expandedFilterField = null;
+            } else {
+                // Collapse previous if any
+                if (expandedFilterField) {
+                    destroyInlineSelect2(expandedFilterField);
+                }
+                // Expand new
+                expandedFilterField = fieldName;
+            }
+            renderFilterFieldsList();
+        }
+
+        // Initialize Select2 inside the inline container for a field
+        function initInlineSelect2(fieldName) {
+            const container = document.querySelector(`[data-field-container="${fieldName}"]`);
+            if (!container) return;
+
+            // Create the select element
+            const select = document.createElement('select');
+            select.multiple = true;
+            select.className = 'inline-filter-select';
+
+            const options = filterOptions[fieldName] || [];
+            const currentValues = activeFilters[fieldName] || [];
+            const currentSet = new Set(Array.isArray(currentValues) ? currentValues : [currentValues]);
+
+            options.forEach(val => {
+                const opt = new Option(val, val, false, currentSet.has(val));
+                select.appendChild(opt);
+            });
+
+            container.appendChild(select);
+
+            // Initialize Select2
+            const $select = $(select);
+            $select.select2({
+                placeholder: 'Search values...',
+                allowClear: true,
+                closeOnSelect: false,
+                width: '100%',
+                dropdownParent: $('#filter-section')
+            });
+
+            // Open the dropdown immediately
+            $select.select2('open');
+
+            // Real-time filter on change (no Add button needed)
+            $select.on('change', function() {
+                const selectedValues = $(this).val() || [];
+                if (selectedValues.length === 0) {
+                    delete activeFilters[fieldName];
+                } else {
+                    activeFilters[fieldName] = selectedValues;
+                }
+                renderFilterPills();
+                updateFilterCount();
+                updateFilterBadge();
+                // Update the row's display value without full re-render (avoid destroying Select2)
+                const row = document.querySelector(`.filter-field-row[data-field="${fieldName}"]`);
+                if (row) {
+                    const valueSpan = row.querySelector('.filter-field-value');
+                    if (selectedValues.length === 0) {
+                        row.classList.remove('has-filter');
+                        valueSpan.className = 'filter-field-value empty';
+                        valueSpan.textContent = '\u2014';
+                    } else {
+                        row.classList.add('has-filter');
+                        valueSpan.className = 'filter-field-value';
+                        valueSpan.textContent = selectedValues.length > 2
+                            ? `${selectedValues.slice(0, 2).join(', ')} +${selectedValues.length - 2}`
+                            : selectedValues.join(', ');
+                    }
+                    // Update label checkmark
+                    const label = row.querySelector('.filter-field-label');
+                    if (selectedValues.length > 0 && !label.textContent.startsWith('\u2713')) {
+                        // has-filter class handles the ::before pseudo-element
+                    }
+                }
+                // Re-render site details if viewing one
+                if (currentSiteData) {
+                    renderSiteDetails(currentSiteData);
+                }
+            });
+        }
+
+        // Destroy Select2 inside a field's container
+        function destroyInlineSelect2(fieldName) {
+            const container = document.querySelector(`[data-field-container="${fieldName}"]`);
+            if (!container) return;
+            const $select = $(container).find('select');
+            if ($select.hasClass('select2-hidden-accessible')) {
+                $select.select2('destroy');
+            }
+            container.innerHTML = '';
         }
 
         // Render applied filter pills
@@ -5620,11 +4533,6 @@
             panel.classList.remove('open');
             overlay.classList.remove('show');
 
-            // Show the panel hint again when panel closes
-            const panelHint = document.getElementById('panel-hint');
-            if (panelHint) {
-                panelHint.classList.remove('hidden');
-            }
         }
 
         function renderSiteDetails(data) {
@@ -5854,7 +4762,7 @@
                 // Add filter with default value (as array for consistency with multi-select)
                 activeFilters[fieldName] = [defaultValue];
             }
-            populateFieldDropdown();
+            renderFilterFieldsList();
             renderFilterPills();
             updateFilterCount();
             updateFilterBadge();
@@ -5866,7 +4774,11 @@
 
         function removeFilter(fieldName) {
             delete activeFilters[fieldName];
-            populateFieldDropdown();
+            // Collapse the row if it was expanded for this field
+            if (expandedFilterField === fieldName) {
+                expandedFilterField = null;
+            }
+            renderFilterFieldsList();
             renderFilterPills();
             updateFilterCount();
             updateFilterBadge();
@@ -5877,16 +4789,13 @@
             filteredSiteIds = new Set();
             filterModeActive = false;
 
-            // Clean up filter values Select2 if open
-            const $valuesSelect = $('#filter-values-select');
-            if ($valuesSelect.hasClass('select2-hidden-accessible')) {
-                $valuesSelect.select2('destroy');
+            // Collapse any expanded filter row
+            if (expandedFilterField) {
+                destroyInlineSelect2(expandedFilterField);
+                expandedFilterField = null;
             }
-            document.getElementById('filter-values-row').style.display = 'none';
-            document.getElementById('filter-add-btn').style.display = 'none';
-            document.getElementById('filter-field-select').value = '';
 
-            populateFieldDropdown();
+            renderFilterFieldsList();
             renderFilterPills();
             refreshVisualization();
             updateLegendContent();
@@ -6599,8 +5508,6 @@
                 const response = await fetch('/api/sites');
                 allSites = await response.json();
 
-                // Update stats immediately
-                document.getElementById('total-sites').textContent = allSites.length.toLocaleString();
 
                 // Step 2: Build dropdown
                 updatePortalStatus('Building site index...', 45);
@@ -6679,8 +5586,6 @@
             markersLayer.clearLayers();
             linesLayer.clearLayers();
             map.setView([39.5, -98.35], 4);
-            document.getElementById('selected-count').textContent = '0';
-            updateConnectionStatsVisibility();
 
             // Turn off select mode if active
             if (selectModeActive) {
@@ -6883,9 +5788,7 @@
             // Add selection count display element
             function updateSelectionDisplay() {
                 const count = $('#site-select').val()?.length || 0;
-                document.getElementById('selected-count').textContent = count;
                 document.getElementById('draw-btn').disabled = count === 0;
-                updateConnectionStatsVisibility();
 
                 // Update the placeholder text to show count
                 const $container = $('.select2-selection--multiple');
@@ -6919,14 +5822,6 @@
             // DEBUG: Log score verification on page load
             logScoreVerification('PAGE LOAD');
 
-            // Panel hint - animated indicator (stays visible until panel opens)
-            const panelHint = document.getElementById('panel-hint');
-            if (panelHint) {
-                // Click to open panel
-                panelHint.addEventListener('click', function() {
-                    openSidePanel(null);
-                });
-            }
 
             // Hover trigger to open side panel
             const hoverTrigger = document.getElementById('hover-trigger');
@@ -6945,74 +5840,6 @@
                     clearTimeout(hoverTimeout);
                     hoverTimeout = null;
                 }
-            });
-
-            // Filter dropdown handlers - Select2 multi-select support
-            document.getElementById('filter-field-select').addEventListener('change', function() {
-                const valuesRow = document.getElementById('filter-values-row');
-                const $valuesSelect = $('#filter-values-select');
-                const addBtn = document.getElementById('filter-add-btn');
-                const fieldName = this.value;
-
-                if (!fieldName) {
-                    valuesRow.style.display = 'none';
-                    addBtn.style.display = 'none';
-                    return;
-                }
-
-                // Destroy previous Select2 instance if exists
-                if ($valuesSelect.hasClass('select2-hidden-accessible')) {
-                    $valuesSelect.select2('destroy');
-                }
-
-                // Populate values dropdown with options
-                const options = filterOptions[fieldName] || [];
-                $valuesSelect.empty();
-                options.forEach(val => {
-                    $valuesSelect.append(new Option(val, val, false, false));
-                });
-
-                valuesRow.style.display = 'flex';
-                addBtn.style.display = 'block';
-
-                // Initialize Select2 for easy multi-select (click to toggle, searchable)
-                $valuesSelect.select2({
-                    placeholder: 'Search and select values...',
-                    allowClear: true,
-                    closeOnSelect: false,
-                    width: '100%',
-                    dropdownParent: $('#filter-section')
-                });
-            });
-
-            // Add Filter button - collects multi-selected values via Select2
-            document.getElementById('filter-add-btn').addEventListener('click', function() {
-                const fieldSelect = document.getElementById('filter-field-select');
-                const $valuesSelect = $('#filter-values-select');
-                const valuesRow = document.getElementById('filter-values-row');
-                const fieldName = fieldSelect.value;
-
-                // Get all selected values from Select2
-                const selectedValues = $valuesSelect.val() || [];
-
-                if (!fieldName || selectedValues.length === 0) return;
-
-                // Apply filter with array of values
-                activeFilters[fieldName] = selectedValues;
-
-                // Destroy Select2 and reset dropdowns
-                if ($valuesSelect.hasClass('select2-hidden-accessible')) {
-                    $valuesSelect.select2('destroy');
-                }
-                fieldSelect.value = '';
-                valuesRow.style.display = 'none';
-                this.style.display = 'none';
-
-                // Update UI
-                populateFieldDropdown();
-                renderFilterPills();
-                updateFilterCount();
-                updateFilterBadge();
             });
 
             // Filter apply button
@@ -7057,6 +5884,8 @@
         // Training charts
         let lossChart = null;
         let performanceChart = null;
+        let weightHistogramChart = null;
+        let biasHistogramChart = null;
         let trainingChartData = {
             epochs: [],
             trainLoss: [],
@@ -7215,31 +6044,7 @@
 
             // === NEW UI IMPROVEMENTS ===
 
-            // Stats panel toggle handler
-            const statsToggle = document.getElementById('stats-toggle');
-            if (statsToggle) {
-                statsToggle.addEventListener('click', function() {
-                    const secondary = document.getElementById('stats-secondary');
-                    const isExpanded = secondary.classList.toggle('show');
-                    this.classList.toggle('expanded', isExpanded);
-                    this.querySelector('span').textContent = isExpanded ? 'Less' : 'More';
-                });
-            }
 
-            // Filter button in header - opens filter panel
-            const filterHeaderBtn = document.getElementById('filter-header-btn');
-            if (filterHeaderBtn) {
-                filterHeaderBtn.addEventListener('click', function() {
-                    const sidePanel = document.getElementById('side-panel');
-                    const overlay = document.getElementById('side-panel-overlay');
-                    const panelHint = document.getElementById('panel-hint');
-                    if (sidePanel && overlay) {
-                        sidePanel.classList.add('open');
-                        overlay.classList.add('show');
-                        if (panelHint) panelHint.classList.add('hidden');
-                    }
-                });
-            }
 
             // Split task/model dropdowns - sync to hidden combined selector
             const predictionTaskSelect = document.getElementById('prediction-task');
@@ -7380,25 +6185,12 @@
             syncTrainingDropdowns();
         }
 
-        // Update filter badge count
+        // Update filter badge count (no-op: header filter button removed)
         function updateFilterBadge() {
-            const badge = document.getElementById('filter-badge');
-            const btn = document.getElementById('filter-header-btn');
-            if (!badge || !btn) return;
-
-            const filterCount = Object.keys(activeFilters).length;
-            badge.textContent = filterCount;
-            badge.classList.toggle('hidden', filterCount === 0);
-            btn.classList.toggle('has-filters', filterCount > 0);
         }
 
-        // Show/hide connection stats based on selection
+        // Show/hide connection stats (no-op: stats panel removed)
         function updateConnectionStatsVisibility() {
-            const connectionsEl = document.getElementById('stats-connections');
-            const selectedCount = parseInt(document.getElementById('selected-count').textContent) || 0;
-            if (connectionsEl) {
-                connectionsEl.classList.toggle('show', selectedCount > 1);
-            }
         }
 
         // Update plain English metric explanations
@@ -7775,18 +6567,15 @@
         // Human-readable display names for feature columns
         const featureDisplayNames = {
             // Numeric
-            'rs_Impressions': 'Impression Momentum',
             'rs_NVIs': 'NVI Momentum',
             'rs_Revenue': 'Revenue Momentum',
-            'rs_RevenuePerScreen': 'Rev/Screen Momentum',
             'avg_monthly_revenue': 'Avg Monthly Revenue',
             'log_total_revenue': 'Log Total Revenue',
             'log_nearest_site_distance_mi': 'Nearest Site Distance',
-            'log_min_distance_to_interstate_mi': 'Interstate Distance',
-            'avg_household_income': 'Household Income',
+            'log_min_distance_to_interstate_mi': 'Log Min Distance to Interstate (miles)',
+            'log_avg_household_income': 'Log Avg Household Income',
             'median_age': 'Median Age',
             'pct_female': '% Female',
-            'pct_male': '% Male',
             // Model A additional numeric
             'avg_monthly_monthly_impressions': 'Avg Monthly Impressions',
             'avg_monthly_monthly_nvis': 'Avg Monthly NVIs',
@@ -7811,9 +6600,7 @@
             'hardware_type': 'Hardware Type',
             'retailer': 'Retailer',
             'brand_fuel': 'Fuel Brand',
-            'brand_restaurant': 'Restaurant Brand',
             'brand_c_store': 'C-Store Brand',
-            'nearest_interstate': 'Nearest Interstate',
         };
 
         function getFeatureDisplayName(raw) {
@@ -8186,6 +6973,7 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    window.currentJobId = result.job_id;
                     trainingStartTime = Date.now();
                     showTrainingProgress();
                     initializeTrainingCharts();
@@ -8268,20 +7056,25 @@
             trainingEventSource = new EventSource('/api/training/stream');
 
             trainingEventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                updateProgressUI(data);
+                try {
+                    const data = JSON.parse(event.data);
+                    if (window.currentJobId && data.job_id && data.job_id !== window.currentJobId) return;
+                    updateProgressUI(data);
 
-                if (data.status === 'completed' || data.status === 'error' || data.status === 'stopped' || data.status === 'stream_end') {
-                    trainingEventSource.close();
-                    trainingEventSource = null;
+                    if (data.status === 'completed' || data.status === 'error' || data.status === 'stopped' || data.status === 'stream_end') {
+                        trainingEventSource.close();
+                        trainingEventSource = null;
 
-                    if (data.status === 'completed') {
-                        showTrainingResults(data);
-                    } else if (data.status === 'error') {
-                        addLogEntry('Error: ' + data.message, 'error');
-                    } else if (data.status === 'stopped') {
-                        addLogEntry('Training stopped by user', 'normal');
+                        if (data.status === 'completed') {
+                            showTrainingResults(data);
+                        } else if (data.status === 'error') {
+                            addLogEntry('Error: ' + data.message, 'error');
+                        } else if (data.status === 'stopped') {
+                            addLogEntry('Training stopped by user', 'normal');
+                        }
                     }
+                } catch (err) {
+                    console.error('SSE message processing error:', err);
                 }
             };
 
@@ -8321,16 +7114,19 @@
                 document.getElementById('metric-val-loss').textContent = data.val_loss.toFixed(4);
             }
             const currentTaskType = document.getElementById('task-type').value;
+            const mapeRealEl = document.getElementById('metric-mape-real-container');
             if (currentTaskType === 'lookalike') {
                 // Classification: Hide MAE/AUC metrics (shown in chart), hide regression-specific metrics
                 document.getElementById('metric-mae-container').style.display = 'none';
                 document.getElementById('metric-mape-container').style.display = 'none';
                 document.getElementById('metric-rmse-container').style.display = 'none';
+                if (mapeRealEl) mapeRealEl.style.display = 'none';
             } else {
                 // Regression: Show all metrics
                 document.getElementById('metric-mae-container').style.display = '';
                 document.getElementById('metric-mape-container').style.display = '';
                 document.getElementById('metric-rmse-container').style.display = '';
+                if (mapeRealEl) mapeRealEl.style.display = '';
                 if (data.val_mae > 0) {
                     document.getElementById('metric-mae').textContent = '$' + data.val_mae.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
@@ -8339,6 +7135,9 @@
                 }
                 if (data.val_rmse > 0) {
                     document.getElementById('metric-rmse').textContent = '$' + data.val_rmse.toLocaleString(undefined, {maximumFractionDigits: 0});
+                }
+                if (data.val_mape > 0 && document.getElementById('metric-mape-real')) {
+                    document.getElementById('metric-mape-real').textContent = data.val_mape.toFixed(2) + '%';
                 }
             }
             if (data.val_r2 !== undefined && data.val_r2 !== 0) {
@@ -8403,6 +7202,14 @@
             // Update performance chart title based on task type
             const perfTitle = document.getElementById('performance-chart-title');
             perfTitle.textContent = isLookalike ? 'ROC-AUC' : 'R² Score';
+
+            // Dynamic loss chart title: show "Huber Loss" for NN regression
+            const lossTitleEl = document.getElementById('loss-chart-title');
+            const currentModelType = document.getElementById('model-type').value;
+            if (lossTitleEl) {
+                lossTitleEl.textContent = (currentModelType === 'neural_network' && !isLookalike)
+                    ? 'Huber Loss' : 'Loss Curve';
+            }
 
             // Chart.js default settings for dark theme
             const chartDefaults = {
@@ -8507,6 +7314,51 @@
                     }
                 }
             });
+
+            // Histogram charts: destroy existing, create for neural_network only
+            if (weightHistogramChart) { weightHistogramChart.destroy(); weightHistogramChart = null; }
+            if (biasHistogramChart) { biasHistogramChart.destroy(); biasHistogramChart = null; }
+
+            const histRow = document.getElementById('histogram-charts-row');
+            if (histRow) {
+                if (currentModelType === 'neural_network') {
+                    histRow.style.display = 'flex';
+                    const histDefaults = {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { color: 'rgba(58, 65, 76, 0.5)' },
+                                ticks: { color: '#6A7485', font: { size: 8 }, maxTicksLimit: 5 }
+                            },
+                            y: {
+                                display: true,
+                                grid: { color: 'rgba(58, 65, 76, 0.5)' },
+                                ticks: { color: '#6A7485', font: { size: 8 } }
+                            }
+                        }
+                    };
+
+                    const wCtx = document.getElementById('weight-histogram-chart').getContext('2d');
+                    weightHistogramChart = new Chart(wCtx, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(99, 102, 241, 0.6)', borderColor: 'rgba(99, 102, 241, 1)', borderWidth: 1 }] },
+                        options: histDefaults
+                    });
+
+                    const bCtx = document.getElementById('bias-histogram-chart').getContext('2d');
+                    biasHistogramChart = new Chart(bCtx, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(245, 158, 11, 0.6)', borderColor: 'rgba(245, 158, 11, 1)', borderWidth: 1 }] },
+                        options: histDefaults
+                    });
+                } else {
+                    histRow.style.display = 'none';
+                }
+            }
         }
 
         function updateTrainingCharts(data) {
@@ -8529,6 +7381,25 @@
             performanceChart.data.labels = trainingChartData.epochs;
             performanceChart.data.datasets[0].data = trainingChartData.performance;
             performanceChart.update('none');
+
+            // Update Weight/Bias Histograms
+            if (data.weight_histograms && weightHistogramChart && biasHistogramChart) {
+                const wh = data.weight_histograms;
+                if (wh.weights) {
+                    const labels = wh.weights.counts.map((_, i) =>
+                        ((wh.weights.bin_edges[i] + wh.weights.bin_edges[i+1]) / 2).toFixed(3));
+                    weightHistogramChart.data.labels = labels;
+                    weightHistogramChart.data.datasets[0].data = wh.weights.counts;
+                    weightHistogramChart.update('none');
+                }
+                if (wh.biases) {
+                    const labels = wh.biases.counts.map((_, i) =>
+                        ((wh.biases.bin_edges[i] + wh.biases.bin_edges[i+1]) / 2).toFixed(3));
+                    biasHistogramChart.data.labels = labels;
+                    biasHistogramChart.data.datasets[0].data = wh.biases.counts;
+                    biasHistogramChart.update('none');
+                }
+            }
         }
 
         function addLogEntry(message, type) {
@@ -8607,6 +7478,8 @@
                 document.getElementById('result-r2-label').textContent = 'Test R²';
                 document.getElementById('result-mape-container').style.display = 'none';
                 document.getElementById('result-rmse-container').style.display = 'none';
+                const resultMapeRealEl = document.getElementById('result-mape-real-container');
+                if (resultMapeRealEl) resultMapeRealEl.style.display = 'none';
             } else {
                 // Regression: Show all metrics
                 if (metrics.test_mae !== undefined && metrics.test_mae > 0) {
@@ -8618,6 +7491,11 @@
                 if (metrics.test_rmse !== undefined && metrics.test_rmse > 0) {
                     document.getElementById('result-rmse').textContent = '$' + metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
+                if (metrics.test_mape !== undefined && metrics.test_mape > 0 && document.getElementById('result-mape-real')) {
+                    document.getElementById('result-mape-real').textContent = metrics.test_mape.toFixed(2) + '%';
+                }
+                const resultMapeRealEl2 = document.getElementById('result-mape-real-container');
+                if (resultMapeRealEl2) resultMapeRealEl2.style.display = '';
             }
             if (metrics.test_r2 !== undefined) {
                 document.getElementById('result-r2').textContent = metrics.test_r2.toFixed(4);
@@ -8683,6 +7561,10 @@
             refreshVisualization();
             updateLegendContent();
 
+            // Show legend hint now that model outputs are on the map
+            const legendHintEl = document.getElementById('legend-hint');
+            if (legendHintEl) legendHintEl.classList.add('visible');
+
             // Show/hide SHAP button based on availability
             // Read from data.final_metrics directly (not the fallback `metrics` which may lack this field)
             const shapAvailable = (data.final_metrics && data.final_metrics.shap_available === true);
@@ -8723,6 +7605,8 @@
                 document.getElementById('modal-metric-r2-label').textContent = 'Test R²';
                 document.getElementById('modal-mape-container').style.display = 'none';
                 document.getElementById('modal-rmse-container').style.display = 'none';
+                const modalMapeRealEl = document.getElementById('modal-mape-real-container');
+                if (modalMapeRealEl) modalMapeRealEl.style.display = 'none';
             } else {
                 // Regression: Show all metrics
                 document.getElementById('modal-metric-mae').textContent = metrics.test_mae !== undefined && metrics.test_mae > 0
@@ -8731,7 +7615,14 @@
                     ? metrics.test_smape.toFixed(2) + '%' : '-';
                 document.getElementById('modal-metric-rmse').textContent = metrics.test_rmse !== undefined && metrics.test_rmse > 0
                     ? '$' + metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0}) : '-';
+                const modalMapeRealValEl = document.getElementById('modal-metric-mape-real');
+                if (modalMapeRealValEl) {
+                    modalMapeRealValEl.textContent = metrics.test_mape !== undefined && metrics.test_mape > 0
+                        ? metrics.test_mape.toFixed(2) + '%' : '-';
+                }
                 document.getElementById('modal-metric-r2-label').textContent = 'Test R²';
+                const modalMapeRealEl2 = document.getElementById('modal-mape-real-container');
+                if (modalMapeRealEl2) modalMapeRealEl2.style.display = '';
             }
 
             if (metrics.test_r2 !== undefined) {
@@ -9567,596 +8458,12 @@ END OF FILE
             // Redraw sites with default color scheme
             refreshVisualization();
             updateLegendContent();
+
+            // Hide legend hint since model outputs are cleared
+            const legendHintEl = document.getElementById('legend-hint');
+            if (legendHintEl) legendHintEl.classList.remove('visible');
         }
 
-        // ================================================
-        // WALKTHROUGH / TUTORIAL SYSTEM
-        // ================================================
-
-        const walkthroughSteps = [
-            {
-                id: 'welcome',
-                type: 'modal',
-                title: 'Welcome to GSTV Site Visualization',
-                content: `
-                    <div class="welcome-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
-                        </svg>
-                    </div>
-                    <p>This interactive tool helps you explore <strong>57,000+ GSTV sites</strong> across the United States, analyze revenue patterns, and train machine learning models.</p>
-                    <p>This quick tutorial will guide you through the main features. It takes about <strong>2 minutes</strong>.</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'map-overview',
-                type: 'spotlight',
-                title: 'Interactive Site Map',
-                content: `
-                    <p>The map displays all GSTV sites as colored dots. Each dot represents a gas station with digital displays.</p>
-                    <ul>
-                        <li><strong>Dot color</strong> indicates revenue performance (green = high, blue = medium, dark = low)</li>
-                        <li><strong>Click</strong> any dot to see detailed site information</li>
-                        <li><strong>Zoom</strong> with scroll wheel or pinch gestures</li>
-                        <li><strong>Pan</strong> by clicking and dragging</li>
-                    </ul>
-                `,
-                target: '#map',
-                position: 'inside',
-                padding: 10
-            },
-            {
-                id: 'summary-bar',
-                type: 'spotlight',
-                title: 'Summary Statistics Bar',
-                content: `
-                    <p>This bar shows key metrics at a glance:</p>
-                    <div class="walkthrough-metrics-grid">
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">57,234</div>
-                            <div class="walkthrough-metric-label">Total Sites</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">0</div>
-                            <div class="walkthrough-metric-label">Selected</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">$2,845</div>
-                            <div class="walkthrough-metric-label">Avg Monthly</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">$850M</div>
-                            <div class="walkthrough-metric-label">Total Revenue</div>
-                        </div>
-                    </div>
-                    <p>Statistics update dynamically as you filter or select sites.</p>
-                `,
-                target: '.stats-panel',
-                position: 'top',
-                padding: 8
-            },
-            {
-                id: 'filter-hint',
-                type: 'spotlight',
-                title: 'Filters & Details Panel',
-                content: `
-                    <p>Click this button to open the <strong>Filters & Details</strong> panel on the right side.</p>
-                    <p>The panel lets you:</p>
-                    <ul>
-                        <li>Filter sites by State, Retailer, Network, and more</li>
-                        <li>Set revenue range filters</li>
-                        <li>Use lasso selection to draw regions on the map</li>
-                        <li>View detailed information about selected sites</li>
-                    </ul>
-                    <div class="walkthrough-action-prompt">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 9l6 6-6 6"/>
-                            <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
-                        </svg>
-                        <span>Try clicking the panel button after this tutorial!</span>
-                    </div>
-                `,
-                target: '#panel-hint',
-                position: 'left',
-                padding: 15
-            },
-            {
-                id: 'filters-explanation',
-                type: 'modal',
-                title: 'Using Filters',
-                content: `
-                    <p>The Filters panel offers two types of filtering:</p>
-                    <p><strong>Categorical Filters:</strong></p>
-                    <ul>
-                        <li>State (TX, CA, FL, etc.)</li>
-                        <li>Retailer (Shell, Chevron, etc.)</li>
-                        <li>Network type, Hardware status</li>
-                    </ul>
-                    <p><strong>Range Filters:</strong></p>
-                    <ul>
-                        <li>Revenue per Month ($0 - $50,000)</li>
-                        <li>Total Historic Revenue</li>
-                        <li>Active Months (0 - 60)</li>
-                    </ul>
-                    <p>Filters work together - sites must match <strong>all</strong> active filters to appear.</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'training-hint',
-                type: 'spotlight',
-                title: 'Machine Learning Training',
-                content: `
-                    <p>Click this button to open the <strong>Model Training</strong> panel on the left side.</p>
-                    <p>Train neural network models to:</p>
-                    <ul>
-                        <li><strong>Predict Revenue</strong> - Estimate monthly revenue for any site</li>
-                        <li><strong>Find Lookalikes</strong> - Identify sites similar to top performers</li>
-                    </ul>
-                    <p>Training runs on your Apple Silicon GPU for fast results!</p>
-                `,
-                target: '#training-hint',
-                position: 'right',
-                padding: 15
-            },
-            {
-                id: 'model-types',
-                type: 'modal',
-                title: 'Model Types: Regression vs Classification',
-                content: `
-                    <p><strong>Revenue Prediction (Regression):</strong></p>
-                    <p>Predicts the exact dollar amount a site will generate per month. Useful for revenue forecasting and site valuation.</p>
-                    <div class="walkthrough-sites-preview">
-                        <div class="walkthrough-site-row">
-                            <span class="walkthrough-site-id">SFR001</span>
-                            <span class="walkthrough-site-value predicted">$3,245/mo predicted</span>
-                        </div>
-                        <div class="walkthrough-site-row">
-                            <span class="walkthrough-site-id">GHR042</span>
-                            <span class="walkthrough-site-value predicted">$1,892/mo predicted</span>
-                        </div>
-                    </div>
-                    <p><strong>Top Performer Lookalike (Classification):</strong></p>
-                    <p>Identifies sites with characteristics similar to the top 10% revenue performers. Great for finding hidden gems.</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'hyperparameters',
-                type: 'modal',
-                title: 'Understanding Hyperparameters',
-                content: `
-                    <p>Fine-tune your model with these settings:</p>
-                    <ul>
-                        <li><strong>Epochs</strong> - Training iterations (more = potentially better, but slower)</li>
-                        <li><strong>Batch Size</strong> - Samples per update (larger = faster but uses more memory)</li>
-                        <li><strong>Learning Rate</strong> - How fast the model learns (1e-4 is usually safe)</li>
-                        <li><strong>Dropout</strong> - Prevents overfitting (0.2 recommended)</li>
-                        <li><strong>Hidden Layers</strong> - Network depth and width</li>
-                    </ul>
-                    <p>The defaults work well for most cases. Hover over any parameter label for more details!</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'metrics-explanation',
-                type: 'modal',
-                title: 'Understanding Model Metrics',
-                content: `
-                    <p><strong>For Regression Models:</strong></p>
-                    <div class="walkthrough-metrics-grid">
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">$485</div>
-                            <div class="walkthrough-metric-label">MAE</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">12.3%</div>
-                            <div class="walkthrough-metric-label">SMAPE</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">$612</div>
-                            <div class="walkthrough-metric-label">RMSE</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">0.72</div>
-                            <div class="walkthrough-metric-label">R²</div>
-                        </div>
-                    </div>
-                    <p><span class="metric-highlight">MAE</span> = Average prediction error in dollars (lower is better)</p>
-                    <p><span class="metric-highlight">SMAPE</span> = Symmetric error percentage, bounded 0-200% (lower is better)</p>
-                    <p><span class="metric-highlight">RMSE</span> = Root mean squared error — penalizes large errors (lower is better)</p>
-                    <p><span class="metric-highlight">R²</span> = How well the model explains variance (closer to 1.0 is better)</p>
-                    <p><strong>For Classification Models:</strong></p>
-                    <div class="walkthrough-metrics-grid">
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">89%</div>
-                            <div class="walkthrough-metric-label">Accuracy</div>
-                        </div>
-                        <div class="walkthrough-metric-item">
-                            <div class="walkthrough-metric-value">0.91</div>
-                            <div class="walkthrough-metric-label">AUC</div>
-                        </div>
-                    </div>
-                    <p><span class="metric-highlight">Accuracy</span> = Percentage of correct predictions</p>
-                    <p><span class="metric-highlight">AUC</span> = Area under ROC curve (1.0 = perfect)</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'model-output',
-                type: 'modal',
-                title: 'Model Output Visualization',
-                content: `
-                    <p>After training, the map updates to show model results:</p>
-                    <p><strong>Regression Output:</strong></p>
-                    <p>Sites are colored by predicted revenue. Hover over any site to see its predicted value.</p>
-                    <p><strong>Classification Output:</strong></p>
-                    <ul>
-                        <li><span class="color-dot purple"></span> <strong>Purple dots</strong> = Lookalike sites (predicted top performers)</li>
-                        <li><span class="color-dot green"></span> <strong>Green dots</strong> = Regular sites</li>
-                    </ul>
-                    <p>You can export results as a detailed summary file with site-by-site predictions.</p>
-                `,
-                target: null,
-                position: 'center'
-            },
-            {
-                id: 'legend',
-                type: 'spotlight',
-                title: 'Map Legend',
-                content: `
-                    <p>Click the <strong>Legend</strong> button to see what the map colors mean.</p>
-                    <p>The legend updates based on the current view mode:</p>
-                    <ul>
-                        <li><strong>Default view</strong> - Revenue score gradient</li>
-                        <li><strong>After regression</strong> - Predicted revenue colors</li>
-                        <li><strong>After classification</strong> - Lookalike vs regular distinction</li>
-                    </ul>
-                `,
-                target: '#legend-hint',
-                position: 'right',
-                padding: 15
-            },
-            {
-                id: 'completion',
-                type: 'modal',
-                title: 'You\'re Ready to Explore!',
-                content: `
-                    <div class="completion-checkmark">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                            <polyline points="22 4 12 14.01 9 11.01"/>
-                        </svg>
-                    </div>
-                    <p>You've completed the tutorial! Here's a quick summary:</p>
-                    <ul>
-                        <li><strong>Map</strong> - Click sites, zoom, pan to explore</li>
-                        <li><strong>Right Panel</strong> - Filter and view site details</li>
-                        <li><strong>Left Panel</strong> - Train ML models</li>
-                        <li><strong>Legend</strong> - Understand color meanings</li>
-                    </ul>
-                    <p>Click <strong>Help</strong> in the header anytime to replay this tutorial.</p>
-                `,
-                target: null,
-                position: 'center'
-            }
-        ];
-
-        // Walkthrough state
-        const walkthroughState = {
-            isActive: false,
-            currentStep: 0,
-            hasCompleted: false
-        };
-
-        // LocalStorage key
-        const WALKTHROUGH_STORAGE_KEY = 'gstv_walkthrough_completed';
-
-        // Check if walkthrough has been completed
-        function hasCompletedWalkthrough() {
-            return localStorage.getItem(WALKTHROUGH_STORAGE_KEY) === 'true';
-        }
-
-        // Mark walkthrough as completed
-        function markWalkthroughCompleted() {
-            localStorage.setItem(WALKTHROUGH_STORAGE_KEY, 'true');
-            walkthroughState.hasCompleted = true;
-        }
-
-        // Start the walkthrough
-        function startWalkthrough() {
-            walkthroughState.isActive = true;
-            walkthroughState.currentStep = 0;
-
-            const overlay = document.getElementById('walkthrough-overlay');
-            overlay.classList.add('active');
-
-            // Generate progress dots
-            generateProgressDots();
-
-            // Show first step
-            showWalkthroughStep(0);
-        }
-
-        // Stop the walkthrough
-        function stopWalkthrough() {
-            walkthroughState.isActive = false;
-
-            const overlay = document.getElementById('walkthrough-overlay');
-            overlay.classList.remove('active');
-
-            // Reset spotlight
-            const spotlight = document.getElementById('walkthrough-spotlight');
-            spotlight.style.display = 'none';
-        }
-
-        // Generate progress dots
-        function generateProgressDots() {
-            const container = document.getElementById('walkthrough-progress');
-            container.innerHTML = '';
-
-            walkthroughSteps.forEach((step, index) => {
-                const dot = document.createElement('div');
-                dot.className = 'walkthrough-dot';
-                dot.setAttribute('data-step', index);
-                container.appendChild(dot);
-            });
-        }
-
-        // Update progress dots
-        function updateProgressDots() {
-            const dots = document.querySelectorAll('.walkthrough-dot');
-            dots.forEach((dot, index) => {
-                dot.classList.remove('active', 'completed');
-                if (index < walkthroughState.currentStep) {
-                    dot.classList.add('completed');
-                } else if (index === walkthroughState.currentStep) {
-                    dot.classList.add('active');
-                }
-            });
-        }
-
-        // Show a specific step
-        function showWalkthroughStep(stepIndex) {
-            if (stepIndex < 0 || stepIndex >= walkthroughSteps.length) return;
-
-            walkthroughState.currentStep = stepIndex;
-            const step = walkthroughSteps[stepIndex];
-
-            // Update step label
-            document.getElementById('walkthrough-step-label').textContent =
-                `Step ${stepIndex + 1} of ${walkthroughSteps.length}`;
-
-            // Update title
-            document.getElementById('walkthrough-title').textContent = step.title;
-
-            // Update content
-            document.getElementById('walkthrough-content').innerHTML = step.content;
-
-            // Update progress dots
-            updateProgressDots();
-
-            // Update navigation buttons
-            updateNavigationButtons(stepIndex);
-
-            // Position card based on step type
-            const card = document.getElementById('walkthrough-card');
-            const spotlight = document.getElementById('walkthrough-spotlight');
-            const arrow = document.getElementById('walkthrough-arrow');
-
-            if (step.type === 'modal' || !step.target) {
-                // Modal style - centered
-                card.classList.add('modal-style');
-                spotlight.style.display = 'none';
-                arrow.style.display = 'none';
-                arrow.className = 'walkthrough-arrow';
-            } else {
-                // Spotlight style - positioned near target
-                card.classList.remove('modal-style');
-                positionSpotlight(step);
-                positionCard(step);
-            }
-        }
-
-        // Position the spotlight around target element
-        function positionSpotlight(step) {
-            const target = document.querySelector(step.target);
-            if (!target) {
-                document.getElementById('walkthrough-spotlight').style.display = 'none';
-                return;
-            }
-
-            const rect = target.getBoundingClientRect();
-            const padding = step.padding || 10;
-
-            const spotlight = document.getElementById('walkthrough-spotlight');
-            spotlight.style.display = 'block';
-            spotlight.style.top = (rect.top - padding) + 'px';
-            spotlight.style.left = (rect.left - padding) + 'px';
-            spotlight.style.width = (rect.width + padding * 2) + 'px';
-            spotlight.style.height = (rect.height + padding * 2) + 'px';
-        }
-
-        // Position the card relative to spotlight
-        function positionCard(step) {
-            const target = document.querySelector(step.target);
-            if (!target) return;
-
-            const rect = target.getBoundingClientRect();
-            const card = document.getElementById('walkthrough-card');
-            const arrow = document.getElementById('walkthrough-arrow');
-            const padding = step.padding || 10;
-
-            // Reset card positioning
-            card.style.top = '';
-            card.style.left = '';
-            card.style.right = '';
-            card.style.bottom = '';
-            card.style.transform = '';
-
-            // Reset arrow
-            arrow.className = 'walkthrough-arrow';
-            arrow.style.display = 'block';
-
-            const gap = 16; // Gap between spotlight and card
-            const margin = 16; // Minimum margin from viewport edges
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            const cardWidth = Math.min(340, viewportWidth - margin * 2);
-            const cardHeight = Math.min(card.scrollHeight, viewportHeight - margin * 2);
-
-            // Helper to clamp position within viewport
-            const clampX = (x) => Math.max(margin, Math.min(x, viewportWidth - cardWidth - margin));
-            const clampY = (y) => Math.max(margin, Math.min(y, viewportHeight - cardHeight - margin));
-
-            switch (step.position) {
-                case 'top':
-                    card.style.left = clampX(rect.left + rect.width / 2 - cardWidth / 2) + 'px';
-                    card.style.bottom = Math.max(margin, viewportHeight - rect.top + padding + gap) + 'px';
-                    arrow.classList.add('bottom');
-                    break;
-
-                case 'bottom':
-                    card.style.left = clampX(rect.left + rect.width / 2 - cardWidth / 2) + 'px';
-                    card.style.top = clampY(rect.bottom + padding + gap) + 'px';
-                    arrow.classList.add('top');
-                    break;
-
-                case 'left':
-                    card.style.right = Math.max(margin, viewportWidth - rect.left + padding + gap) + 'px';
-                    card.style.top = clampY(rect.top + rect.height / 2 - 120) + 'px';
-                    arrow.classList.add('right');
-                    break;
-
-                case 'right':
-                    card.style.left = clampX(rect.right + padding + gap) + 'px';
-                    card.style.top = clampY(rect.top + rect.height / 2 - 120) + 'px';
-                    arrow.classList.add('left');
-                    break;
-
-                case 'inside':
-                    // Position card centered within the target element (overlay)
-                    card.style.left = clampX(rect.left + (rect.width - cardWidth) / 2) + 'px';
-                    card.style.top = clampY(rect.top + (rect.height - 280) / 2) + 'px';
-                    arrow.style.display = 'none';
-                    break;
-
-                default:
-                    // Center fallback
-                    card.style.top = '50%';
-                    card.style.left = '50%';
-                    card.style.transform = 'translate(-50%, -50%)';
-                    arrow.style.display = 'none';
-            }
-        }
-
-        // Update navigation buttons
-        function updateNavigationButtons(stepIndex) {
-            const prevBtn = document.getElementById('walkthrough-prev');
-            const nextBtn = document.getElementById('walkthrough-next');
-            const skipBtn = document.getElementById('walkthrough-skip');
-
-            // Previous button
-            prevBtn.style.display = stepIndex > 0 ? 'flex' : 'none';
-
-            // Next/Finish button
-            if (stepIndex === walkthroughSteps.length - 1) {
-                nextBtn.textContent = 'Start Exploring';
-                nextBtn.classList.remove('walkthrough-btn-next');
-                nextBtn.classList.add('walkthrough-btn-finish');
-            } else {
-                nextBtn.textContent = 'Next';
-                nextBtn.classList.add('walkthrough-btn-next');
-                nextBtn.classList.remove('walkthrough-btn-finish');
-            }
-
-            // Skip button - hide on last step
-            skipBtn.style.display = stepIndex === walkthroughSteps.length - 1 ? 'none' : 'flex';
-        }
-
-        // Navigate to next step
-        function nextWalkthroughStep() {
-            if (walkthroughState.currentStep < walkthroughSteps.length - 1) {
-                showWalkthroughStep(walkthroughState.currentStep + 1);
-            } else {
-                // Completed
-                markWalkthroughCompleted();
-                stopWalkthrough();
-            }
-        }
-
-        // Navigate to previous step
-        function prevWalkthroughStep() {
-            if (walkthroughState.currentStep > 0) {
-                showWalkthroughStep(walkthroughState.currentStep - 1);
-            }
-        }
-
-        // Skip walkthrough
-        function skipWalkthrough() {
-            markWalkthroughCompleted();
-            stopWalkthrough();
-        }
-
-        // Initialize walkthrough system
-        function initWalkthrough() {
-            // Event listeners for navigation
-            document.getElementById('walkthrough-next').addEventListener('click', nextWalkthroughStep);
-            document.getElementById('walkthrough-prev').addEventListener('click', prevWalkthroughStep);
-            document.getElementById('walkthrough-skip').addEventListener('click', skipWalkthrough);
-
-            // Help button to restart walkthrough
-            document.getElementById('help-btn').addEventListener('click', function() {
-                startWalkthrough();
-            });
-
-            // Click on backdrop to close (optional - commented out for stricter UX)
-            // document.getElementById('walkthrough-backdrop').addEventListener('click', skipWalkthrough);
-
-            // Handle window resize
-            window.addEventListener('resize', function() {
-                if (walkthroughState.isActive) {
-                    const step = walkthroughSteps[walkthroughState.currentStep];
-                    if (step.type === 'spotlight' && step.target) {
-                        positionSpotlight(step);
-                        positionCard(step);
-                    }
-                }
-            });
-
-            // Auto-start for first-time visitors (after portal animation completes)
-            if (!hasCompletedWalkthrough()) {
-                // Wait for portal to finish and initial data load
-                setTimeout(function() {
-                    // Check if portal is still visible
-                    const portal = document.getElementById('portal-loader');
-                    if (portal && !portal.classList.contains('hidden')) {
-                        // Portal still showing, wait more
-                        setTimeout(function() {
-                            if (!hasCompletedWalkthrough() && !walkthroughState.isActive) {
-                                startWalkthrough();
-                            }
-                        }, 2000);
-                    } else {
-                        // Portal done, start walkthrough
-                        startWalkthrough();
-                    }
-                }, 3000);
-            }
-        }
-
-        // Add to document ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize walkthrough after a short delay to ensure everything is loaded
-            setTimeout(initWalkthrough, 500);
-        });
     </script>
 </body>
 </html>

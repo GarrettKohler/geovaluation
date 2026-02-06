@@ -39,7 +39,7 @@ def _clean_nan_values(obj: Any) -> Any:
 
 # Data file paths (go up: services -> src -> project root)
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "input"
-REVENUE_CSV = DATA_DIR / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv"
+REVENUE_CSV = DATA_DIR / "site_scores_revenue_and_diagnostics.csv"
 
 # Cached data (module-level singletons)
 _sites_df: Optional[pd.DataFrame] = None
@@ -199,7 +199,7 @@ def load_revenue_metrics(force_reload: bool = False) -> Dict[str, Dict[str, Any]
     - Total revenue
     - Average monthly revenue
     - Revenue per day
-    - Normalized revenue score (0-1, using p10-p90 percentiles)
+    - Normalized revenue score (0-1, using p20-p95 percentiles)
 
     Args:
         force_reload: If True, recalculate even if cached.
@@ -220,7 +220,7 @@ def load_revenue_metrics(force_reload: bool = False) -> Dict[str, Dict[str, Any]
     # Load revenue data (only needed columns for speed)
     rev_df = pd.read_csv(
         REVENUE_CSV,
-        usecols=['gtvid', 'revenue', 'date', 'site_activated_date'],
+        usecols=['gtvid', 'revenue', 'date', 'site_activated_date', 'statuis'],
         dtype={'gtvid': str, 'revenue': float},
         parse_dates=['date', 'site_activated_date']
     )
@@ -232,11 +232,12 @@ def load_revenue_metrics(force_reload: bool = False) -> Dict[str, Dict[str, Any]
     site_metrics = rev_df.groupby('gtvid').agg({
         'revenue': 'sum',
         'date': ['min', 'max', 'count'],
-        'site_activated_date': 'first'
+        'site_activated_date': 'first',
+        'statuis': 'first'  # Get site status (most recent/first value per site)
     }).reset_index()
 
     # Flatten column names
-    site_metrics.columns = ['gtvid', 'total_revenue', 'first_month', 'last_month', 'active_months', 'activated_date']
+    site_metrics.columns = ['gtvid', 'total_revenue', 'first_month', 'last_month', 'active_months', 'activated_date', 'status']
 
     # Calculate average monthly revenue
     site_metrics['avg_monthly_revenue'] = site_metrics['total_revenue'] / site_metrics['active_months'].clip(lower=1)
@@ -245,24 +246,34 @@ def load_revenue_metrics(force_reload: bool = False) -> Dict[str, Dict[str, Any]
     site_metrics['active_days'] = site_metrics['active_months'] * 30
     site_metrics['revenue_per_day'] = site_metrics['total_revenue'] / site_metrics['active_days'].clip(lower=1)
 
-    # Calculate percentiles for normalization and logging
-    rev_per_day_p10 = np.percentile(site_metrics['revenue_per_day'].values, 10)
-    rev_per_day_p90 = np.percentile(site_metrics['revenue_per_day'].values, 90)
+    # Filter to ACTIVE sites only for percentile calculation
+    # This ensures normalization is based on the true revenue distribution of active sites,
+    # not skewed by deactivated sites which may have artificially low/zero revenue
+    active_sites = site_metrics[site_metrics['status'] == 'Active']
+    total_sites = len(site_metrics)
+    active_count = len(active_sites)
 
-    avg_monthly_p10 = np.percentile(site_metrics['avg_monthly_revenue'].values, 10)
-    avg_monthly_p90 = np.percentile(site_metrics['avg_monthly_revenue'].values, 90)
+    print(f"  Using {active_count:,} active sites (of {total_sites:,} total) for percentile calculation")
 
-    total_rev_p10 = np.percentile(site_metrics['total_revenue'].values, 10)
-    total_rev_p90 = np.percentile(site_metrics['total_revenue'].values, 90)
+    # Calculate percentiles for normalization and logging (p20-p95 for better spread)
+    # Using active sites only for more accurate revenue distribution
+    rev_per_day_p20 = np.percentile(active_sites['revenue_per_day'].values, 20)
+    rev_per_day_p95 = np.percentile(active_sites['revenue_per_day'].values, 95)
 
-    months_p10 = np.percentile(site_metrics['active_months'].values, 10)
-    months_p90 = np.percentile(site_metrics['active_months'].values, 90)
+    avg_monthly_p20 = np.percentile(active_sites['avg_monthly_revenue'].values, 20)
+    avg_monthly_p95 = np.percentile(active_sites['avg_monthly_revenue'].values, 95)
+
+    total_rev_p20 = np.percentile(active_sites['total_revenue'].values, 20)
+    total_rev_p95 = np.percentile(active_sites['total_revenue'].values, 95)
+
+    months_p20 = np.percentile(active_sites['active_months'].values, 20)
+    months_p95 = np.percentile(active_sites['active_months'].values, 95)
 
     # Create lookup dict
     _revenue_metrics = {}
     for _, row in site_metrics.iterrows():
         raw = row['revenue_per_day']
-        normalized = (raw - rev_per_day_p10) / (rev_per_day_p90 - rev_per_day_p10) if rev_per_day_p90 > rev_per_day_p10 else 0
+        normalized = (raw - rev_per_day_p20) / (rev_per_day_p95 - rev_per_day_p20) if rev_per_day_p95 > rev_per_day_p20 else 0
         _revenue_metrics[row['gtvid']] = {
             'score': max(0, min(1, normalized)),
             'avg_monthly': row['avg_monthly_revenue'],
@@ -271,10 +282,10 @@ def load_revenue_metrics(force_reload: bool = False) -> Dict[str, Dict[str, Any]
         }
 
     print(f"Calculated revenue metrics for {len(_revenue_metrics):,} sites")
-    print(f"  Revenue/day:    ${rev_per_day_p10:.2f} (p10) to ${rev_per_day_p90:.2f} (p90)")
-    print(f"  Avg Monthly:    ${avg_monthly_p10:,.0f} (p10) to ${avg_monthly_p90:,.0f} (p90)")
-    print(f"  Total Revenue:  ${total_rev_p10:,.0f} (p10) to ${total_rev_p90:,.0f} (p90)")
-    print(f"  Active Months:  {months_p10:.0f} (p10) to {months_p90:.0f} (p90)")
+    print(f"  Revenue/day:    ${rev_per_day_p20:.2f} (p20) to ${rev_per_day_p95:.2f} (p95)")
+    print(f"  Avg Monthly:    ${avg_monthly_p20:,.0f} (p20) to ${avg_monthly_p95:,.0f} (p95)")
+    print(f"  Total Revenue:  ${total_rev_p20:,.0f} (p20) to ${total_rev_p95:,.0f} (p95)")
+    print(f"  Active Months:  {months_p20:.0f} (p20) to {months_p95:.0f} (p95)")
 
     return _revenue_metrics
 
@@ -355,8 +366,8 @@ def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
     Get site IDs matching the specified filters.
 
     Supports both single values and multi-select (arrays of values).
-    When multiple values are provided for a field, sites matching ANY value are included (OR logic).
-    When multiple fields have filters, ALL must match (AND logic between fields).
+    When multiple values are provided for a field, sites matching ANY value are included (OR within field).
+    When multiple fields have filters, sites matching ANY field are included (OR between fields).
 
     Args:
         filters: Dict mapping field display name to filter value (string) or values (list).
@@ -369,21 +380,18 @@ def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
 
     details_df = load_site_details()
 
-    # Start with all sites
-    mask = pd.Series([True] * len(details_df), index=details_df.index)
+    # OR logic: include sites matching ANY filter field
+    mask = pd.Series([False] * len(details_df), index=details_df.index)
 
-    # Apply each filter
     for display_name, value in filters.items():
         if display_name in CATEGORICAL_FIELDS and value:
             col_name = CATEGORICAL_FIELDS[display_name]
             if col_name in details_df.columns:
-                # Handle multi-select (list of values) with OR logic
                 if isinstance(value, list):
                     if len(value) > 0:
-                        mask = mask & (details_df[col_name].isin(value))
+                        mask = mask | (details_df[col_name].isin(value))
                 else:
-                    # Single value
-                    mask = mask & (details_df[col_name] == value)
+                    mask = mask | (details_df[col_name] == value)
 
     return details_df.loc[mask, 'gtvid'].tolist()
 

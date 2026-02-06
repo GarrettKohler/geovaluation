@@ -118,7 +118,7 @@ class TestPredictions:
     @pytest.fixture
     def sample_data(self):
         """Load sample data for prediction testing."""
-        data_path = Path(__file__).parent.parent / "data" / "input" / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv"
+        data_path = Path(__file__).parent.parent / "data" / "input" / "site_scores_revenue_and_diagnostics.csv"
 
         if not data_path.exists():
             pytest.skip(f"Data file not found: {data_path}")
@@ -279,7 +279,7 @@ class TestDataLoader:
         assert processor.config == config
 
     @pytest.mark.skipif(
-        not (Path(__file__).parent.parent / "data" / "input" / "Site Scores - Site Revenue, Impressions, and Diagnostics.csv").exists(),
+        not (Path(__file__).parent.parent / "data" / "input" / "site_scores_revenue_and_diagnostics.csv").exists(),
         reason="Data file not available"
     )
     def test_data_can_be_loaded(self):

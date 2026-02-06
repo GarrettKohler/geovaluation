@@ -631,6 +631,7 @@ class CatBoostModel:
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
         progress_callback: Optional[callable] = None,
+        callbacks: Optional[List] = None,
     ) -> 'CatBoostModel':
         """
         Train the CatBoost model.
@@ -641,6 +642,7 @@ class CatBoostModel:
             X_val: Validation features (optional, for early stopping)
             y_val: Validation targets
             progress_callback: Optional callback for progress updates
+            callbacks: Optional list of CatBoost callback instances
 
         Returns:
             self (fitted model)
@@ -649,11 +651,14 @@ class CatBoostModel:
         if X_val is not None and y_val is not None:
             eval_set = (X_val, y_val)
 
-        self.model.fit(
-            X_train, y_train,
-            eval_set=eval_set,
-            use_best_model=True if eval_set else False,
-        )
+        fit_kwargs = {
+            'eval_set': eval_set,
+            'use_best_model': True if eval_set else False,
+        }
+        if callbacks:
+            fit_kwargs['callbacks'] = callbacks
+
+        self.model.fit(X_train, y_train, **fit_kwargs)
         self.is_fitted = True
         return self
 
@@ -765,6 +770,7 @@ class XGBoostModel:
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
         progress_callback: Optional[callable] = None,
+        callbacks: Optional[List] = None,
     ) -> 'XGBoostModel':
         """
         Train the XGBoost model.
@@ -775,6 +781,7 @@ class XGBoostModel:
             X_val: Validation features (optional, for early stopping)
             y_val: Validation targets
             progress_callback: Optional callback for progress updates
+            callbacks: Optional list of xgboost.callback.TrainingCallback instances
 
         Returns:
             self (fitted model)
@@ -784,6 +791,10 @@ class XGBoostModel:
         if X_val is not None and y_val is not None:
             fit_params['eval_set'] = [(X_val, y_val)]
             fit_params['verbose'] = 100  # Print every 100 iterations
+
+        # XGBoost 2.0+ removed callbacks from fit(); set via set_params instead
+        if callbacks:
+            self.model.set_params(callbacks=callbacks)
 
         self.model.fit(X_train, y_train, **fit_params)
         self.is_fitted = True

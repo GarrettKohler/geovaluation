@@ -208,12 +208,33 @@ class DataProcessor:
         target_data = np.clip(target_data, p1, p99)
 
         if self.config.task_type == "lookalike":
-            # Classification: binarize to top 10% performers
-            threshold = float(np.percentile(target_data, 90))
-            self.top_performer_threshold = threshold
-            binary_labels = (target_data >= threshold).astype(np.float32)
+            # Classification: binarize sites within percentile bounds as "top performers"
+            lower_pct = getattr(self.config, 'lookalike_lower_percentile', 90)
+            upper_pct = getattr(self.config, 'lookalike_upper_percentile', 100)
+
+            # Calculate thresholds
+            lower_threshold = float(np.percentile(target_data, lower_pct))
+            upper_threshold = float(np.percentile(target_data, upper_pct)) if upper_pct < 100 else float('inf')
+
+            self.top_performer_threshold = lower_threshold
+            self.top_performer_upper_threshold = upper_threshold
+
+            # Sites between lower and upper thresholds are labeled as top performers (1)
+            # Sites below lower threshold are labeled as non-performers (0)
+            if upper_pct >= 100:
+                # Include all sites at or above the lower threshold
+                binary_labels = (target_data >= lower_threshold).astype(np.float32)
+            else:
+                # Include only sites within the percentile range
+                binary_labels = ((target_data >= lower_threshold) & (target_data <= upper_threshold)).astype(np.float32)
+
             n_positive = int(binary_labels.sum())
-            print(f"Classification: threshold=${threshold:,.0f}, {n_positive}/{len(binary_labels)} positive ({n_positive/len(binary_labels)*100:.1f}%)")
+            pct_positive = n_positive / len(binary_labels) * 100
+            print(f"Classification: revenue range p{lower_pct}-p{upper_pct}")
+            print(f"  Lower threshold: ${lower_threshold:,.0f} (p{lower_pct})")
+            if upper_pct < 100:
+                print(f"  Upper threshold: ${upper_threshold:,.0f} (p{upper_pct})")
+            print(f"  Top performers: {n_positive}/{len(binary_labels)} sites ({pct_positive:.1f}%)")
             self.target_scaler = None  # No inverse transform for binary labels
             return torch.from_numpy(np.ascontiguousarray(binary_labels, dtype=np.float32))
         else:

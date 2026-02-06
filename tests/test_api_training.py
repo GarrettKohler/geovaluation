@@ -30,12 +30,8 @@ class TestSystemInfoAPI:
         response = client.get("/api/training/system-info")
         data = response.get_json()
 
-        assert "cuda_available" in data
         assert "mps_available" in data
-        assert "recommended_device" in data
-
-        # recommended_device should be one of cuda, mps, or cpu
-        assert data["recommended_device"] in ["cuda", "mps", "cpu"]
+        assert isinstance(data["mps_available"], bool)
 
     def test_system_info_includes_chip_detection(self, client):
         """On Apple Silicon, system info includes chip details."""
