@@ -746,6 +746,14 @@
                             </svg>
                             Home
                         </a>
+                        <a href="/datasets">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>
+                            Datasets
+                        </a>
                         <a href="/glossary">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
@@ -804,9 +812,17 @@
                 <div class="summary-card-label">Test RMSE</div>
                 <div class="summary-card-value" id="summary-rmse">-</div>
             </div>
-            <div class="summary-card highlight">
+            <div class="summary-card highlight" id="summary-r2-card">
                 <div class="summary-card-label" id="summary-r2-label">Test R²</div>
                 <div class="summary-card-value" id="summary-r2">-</div>
+            </div>
+            <div class="summary-card highlight" id="summary-f1-card" style="display: none;">
+                <div class="summary-card-label">Test F1</div>
+                <div class="summary-card-value" id="summary-f1">-</div>
+            </div>
+            <div class="summary-card" id="summary-logloss-card" style="display: none;">
+                <div class="summary-card-label">Log Loss</div>
+                <div class="summary-card-value" id="summary-logloss">-</div>
             </div>
             <div class="summary-card">
                 <div class="summary-card-label">Test Loss</div>
@@ -977,14 +993,19 @@
 
             // Update summary cards
             if (taskType === 'lookalike') {
-                // Classification: Show ROC-AUC, hide regression-specific metrics
+                // Classification: Show ROC-AUC, F1, Log Loss; hide regression metrics
                 document.getElementById('summary-mae-label').textContent = 'ROC-AUC';
                 document.getElementById('summary-mae').textContent = metrics.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : '-';
-                document.getElementById('summary-r2-label').textContent = 'Test R²';
                 document.getElementById('summary-mape-card').style.display = 'none';
                 document.getElementById('summary-rmse-card').style.display = 'none';
+                document.getElementById('summary-r2-card').style.display = 'none';
+                // Show F1 and Log Loss
+                document.getElementById('summary-f1-card').style.display = '';
+                document.getElementById('summary-logloss-card').style.display = '';
+                document.getElementById('summary-f1').textContent = metrics.test_f1 !== undefined ? metrics.test_f1.toFixed(4) : '-';
+                document.getElementById('summary-logloss').textContent = metrics.test_logloss !== undefined ? metrics.test_logloss.toFixed(4) : '-';
             } else {
-                // Regression: Show all 5 metrics
+                // Regression: Show all 5 metrics, hide F1/LogLoss
                 if (metrics.test_mae !== undefined && metrics.test_mae > 0) {
                     document.getElementById('summary-mae').textContent = '$' + metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
@@ -995,9 +1016,12 @@
                     document.getElementById('summary-rmse').textContent = '$' + metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
                 document.getElementById('summary-r2-label').textContent = 'Test R²';
-            }
-            if (metrics.test_r2 !== undefined) {
-                document.getElementById('summary-r2').textContent = metrics.test_r2.toFixed(4);
+                document.getElementById('summary-r2-card').style.display = '';
+                document.getElementById('summary-f1-card').style.display = 'none';
+                document.getElementById('summary-logloss-card').style.display = 'none';
+                if (metrics.test_r2 !== undefined) {
+                    document.getElementById('summary-r2').textContent = metrics.test_r2.toFixed(4);
+                }
             }
             if (metrics.test_loss !== undefined && metrics.test_loss > 0) {
                 document.getElementById('summary-loss').textContent = metrics.test_loss.toFixed(4);
@@ -1156,7 +1180,7 @@
         }
 
         function downloadFile(filename, content) {
-            const blob = new Blob([content], { type: 'text/plain' });
+            const blob = new Blob([content], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1181,6 +1205,37 @@
                 ? 'Top Performer Lookalike (Classification)'
                 : 'Revenue Prediction (Regression)';
 
+            const modelTypeLabels = {
+                'neural_network': 'Neural Network (PyTorch)',
+                'xgboost': 'XGBoost (Gradient Boosting)',
+                'catboost': 'CatBoost (Gradient Boosting)',
+            };
+            const modelTypeDisplay = modelTypeLabels[config?.modelType] || config?.modelType || 'Neural Network (PyTorch)';
+
+            // Build feature list section
+            const features = config?.features || {};
+            const numericFeatures = features.numeric || [];
+            const categoricalFeatures = features.categorical || [];
+            const booleanFeatures = features.boolean || [];
+            const totalFeatures = numericFeatures.length + categoricalFeatures.length + booleanFeatures.length;
+
+            let featureSection = '';
+            if (totalFeatures > 0) {
+                featureSection = `
+================================================================================
+TRAINING FEATURES (${totalFeatures} total)
+================================================================================
+Numeric (${numericFeatures.length}):
+${numericFeatures.length > 0 ? numericFeatures.map(f => '  - ' + f).join('\n') : '  (none)'}
+
+Categorical (${categoricalFeatures.length}):
+${categoricalFeatures.length > 0 ? categoricalFeatures.map(f => '  - ' + f).join('\n') : '  (none)'}
+
+Boolean (${booleanFeatures.length}):
+${booleanFeatures.length > 0 ? booleanFeatures.map(f => '  - ' + f).join('\n') : '  (none)'}
+`;
+            }
+
             let content = `
 ================================================================================
 ${modelTitle}
@@ -1192,7 +1247,7 @@ Timestamp: ${timestamp}
 MODEL CONFIGURATION
 ================================================================================
 Task Type:          ${taskDescription}
-Model Type:         Neural Network (PyTorch)
+Model Type:         ${modelTypeDisplay}
 Target Variable:    ${taskType === 'lookalike' ? 'Top Performer Classification' : 'Average Monthly Revenue'}
 
 Hyperparameters:
@@ -1202,15 +1257,18 @@ Hyperparameters:
   - Dropout:        ${config?.dropout || 'N/A'}
   - Hidden Layers:  ${config?.hiddenLayers || 'N/A'}
   - Embedding Dim:  ${config?.embeddingDim || 'N/A'}
-
+${featureSection}
 ================================================================================
 TRAINING METRICS
 ================================================================================
 ${taskType === 'lookalike'
-    ? `ROC-AUC:            ${metrics?.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : 'N/A'}`
+    ? `ROC-AUC:            ${metrics?.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : 'N/A'}
+Test F1 Score:      ${metrics?.test_f1 !== undefined ? metrics.test_f1.toFixed(4) : 'N/A'}
+Log Loss:           ${metrics?.test_logloss !== undefined ? metrics.test_logloss.toFixed(4) : 'N/A'}`
     : `Test MAE:           $${metrics?.test_mae !== undefined ? metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
 Test SMAPE:         ${metrics?.test_smape !== undefined ? metrics.test_smape.toFixed(2) + '%' : 'N/A'}
 Test RMSE:          $${metrics?.test_rmse !== undefined ? metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
+Test MAPE:          ${metrics?.test_mape !== undefined && metrics.test_mape > 0 ? metrics.test_mape.toFixed(2) + '%' : 'N/A'}
 Test R²:            ${metrics?.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : 'N/A'}`}
 Final Test Loss:    ${metrics?.test_loss !== undefined ? metrics.test_loss.toFixed(4) : 'N/A'}
 Training Time:      ${metrics?.elapsed_time !== undefined ? Math.floor(metrics.elapsed_time / 60) + 'm ' + Math.floor(metrics.elapsed_time % 60) + 's' : 'N/A'}
@@ -1316,13 +1374,13 @@ Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenu
         function exportSummary() {
             const timestamp = getTimestamp();
             const prefix = trainingData?.taskType === 'lookalike' ? 'classification' : 'regression';
-            downloadFile(`${prefix}_summary_${timestamp}.txt`, generateSummaryContent());
+            downloadFile(`${prefix}_summary_${timestamp}.csv`, generateSummaryContent());
         }
 
         function exportDetails() {
             const timestamp = getTimestamp();
             const prefix = trainingData?.taskType === 'lookalike' ? 'classification' : 'regression';
-            downloadFile(`${prefix}_details_${timestamp}.txt`, generateDetailsContent());
+            downloadFile(`${prefix}_details_${timestamp}.csv`, generateDetailsContent());
         }
 
         function exportBoth() {

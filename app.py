@@ -74,6 +74,29 @@ def shap_values():
     return render_template('shap_values.html')
 
 
+@app.route('/datasets')
+def datasets_index():
+    """Render the dataset index page showing pipeline-active source datasets."""
+    from src.services.lineage_service import load_ontology, get_pipeline_datasets
+    ontology = load_ontology(Path(__file__).parent / "docs" / "data_ontology.yaml")
+    datasets = get_pipeline_datasets(ontology)
+    return render_template('datasets_index.html', datasets=datasets)
+
+
+@app.route('/datasets/<dataset_id>')
+def dataset_lineage(dataset_id):
+    """Render the column lineage detail page for a specific dataset."""
+    from src.services.lineage_service import load_ontology, get_dataset_info, get_lineage_for_dataset
+    ontology = load_ontology(Path(__file__).parent / "docs" / "data_ontology.yaml")
+    dataset = get_dataset_info(ontology, dataset_id)
+    if not dataset:
+        return "Dataset not found", 404
+    lineages = get_lineage_for_dataset(dataset_id)
+    kept = [l for l in lineages if not l.dropped]
+    dropped = [l for l in lineages if l.dropped]
+    return render_template('dataset_lineage.html', dataset=dataset, kept=kept, dropped=dropped)
+
+
 # =============================================================================
 # API Routes - Sites Data
 # =============================================================================

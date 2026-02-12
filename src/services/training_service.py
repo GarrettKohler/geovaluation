@@ -126,6 +126,9 @@ class TrainingConfig:
     pretrain_epochs: int = 20  # Epochs for autoencoder pretraining
     clustering_epochs: int = 30  # Epochs for clustering refinement
     
+    # Network filter: None = all networks, or "Gilbarco", "Speedway", "Wayne/Dover"
+    network_filter: Optional[str] = None
+
     # Custom output directory for this experiment
     output_dir: Optional[Path] = None
 
@@ -620,18 +623,27 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
     ))
 
     test_preds = model.predict(X_test)
-    test_mae, test_smape, test_rmse, test_r2, test_loss, test_mape = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    test_mae, test_smape, test_rmse, test_r2, test_loss, test_mape, test_f1, test_logloss = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     if config.task_type == "lookalike":
-        from sklearn.metrics import roc_auc_score
+        from sklearn.metrics import roc_auc_score, f1_score, log_loss
+        if hasattr(model, 'predict_proba'):
+            probs = model.predict_proba(X_test)[:, 1]
+        else:
+            probs = test_preds
         try:
-            if hasattr(model, 'predict_proba'):
-                probs = model.predict_proba(X_test)[:, 1]
-            else:
-                probs = test_preds
             test_r2 = float(roc_auc_score(y_test, probs))
         except Exception:
             test_r2 = 0.0
+        try:
+            binary_preds = (probs >= 0.5).astype(int)
+            test_f1 = float(f1_score(y_test.astype(int), binary_preds, zero_division=0))
+        except Exception:
+            test_f1 = 0.0
+        try:
+            test_logloss = float(log_loss(y_test, probs))
+        except Exception:
+            test_logloss = 0.0
     else:
         errors = test_preds - y_test
         test_mae = float(np.mean(np.abs(errors)))
@@ -712,6 +724,8 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
                 "test_rmse": test_rmse,
                 "test_smape": test_smape,
                 "test_mape": test_mape,
+                "test_f1": test_f1,
+                "test_logloss": test_logloss,
             },
         }, f, indent=2)
 
@@ -723,6 +737,8 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         "test_rmse": float(test_rmse),
         "test_smape": float(test_smape),
         "test_mape": float(test_mape),
+        "test_f1": float(test_f1),
+        "test_logloss": float(test_logloss),
         "val_loss": 0.0,
         "val_r2": 0.0,
         "val_mae": 0.0,
@@ -732,11 +748,16 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
 
     print(f"\n{'='*60}")
     print(f"[{config.model_type.upper()}] FINAL TEST METRICS")
-    print(f"  Test R²:    {test_r2:.6f}")
-    print(f"  Test MAE:   ${test_mae:,.2f}")
-    print(f"  Test RMSE:  ${test_rmse:,.2f}")
-    print(f"  Test SMAPE: {test_smape:.2f}%")
-    print(f"  Test MAPE:  {test_mape:.2f}%")
+    if config.task_type == "lookalike":
+        print(f"  ROC-AUC:    {test_r2:.6f}")
+        print(f"  Test F1:    {test_f1:.6f}")
+        print(f"  Log Loss:   {test_logloss:.6f}")
+    else:
+        print(f"  Test R²:    {test_r2:.6f}")
+        print(f"  Test MAE:   ${test_mae:,.2f}")
+        print(f"  Test RMSE:  ${test_rmse:,.2f}")
+        print(f"  Test SMAPE: {test_smape:.2f}%")
+        print(f"  Test MAPE:  {test_mape:.2f}%")
     print(f"  Best iteration: {model.best_iteration}")
     print(f"{'='*60}\n")
 
@@ -749,6 +770,7 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         status="completed", message="Training completed successfully",
         best_val_loss=float(test_rmse),
         val_mape=float(test_mape),
+        val_f1=float(test_f1), val_logloss=float(test_logloss),
         final_metrics=job.final_metrics,
     ))
 
@@ -783,6 +805,362 @@ def _compute_weight_histograms(model, n_bins=30):
             'counts': [int(x) for x in counts],
         }
     return result if result else None
+
+
+def _run_clustering_training(job, config, pytorch_config, train_loader, val_loader, test_loader, processor, report_callback, start_time):
+    """
+    Deep Embedded Clustering (DEC) training path.
+
+    Two-phase training:
+      Phase 1 (Pretrain): Train autoencoder on reconstruction loss (MSE)
+      Phase 2 (Clustering): Initialize centroids via k-means, then refine
+                             with KL-divergence + reconstruction loss
+
+    After training, computes per-cluster SHAP feature importance.
+    """
+    device = torch.device(config.device)
+    n_clusters = config.n_clusters
+    pretrain_epochs = config.pretrain_epochs if hasattr(config, 'pretrain_epochs') else 20
+    clustering_epochs = config.clustering_epochs if hasattr(config, 'clustering_epochs') else 30
+    total_epochs = pretrain_epochs + clustering_epochs
+
+    report_callback(TrainingProgress(
+        job_id=job.job_id, epoch=0, total_epochs=total_epochs,
+        train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+        learning_rate=config.learning_rate, elapsed_time=time.time() - start_time,
+        status="running", message=f"Creating DEC model ({n_clusters} clusters, latent_dim={pytorch_config.latent_dim})..."
+    ))
+
+    # Create clustering model
+    model = ClusteringModel(
+        n_numeric=processor.n_numeric_features,
+        n_boolean=processor.n_boolean_features,
+        categorical_vocab_sizes=processor.categorical_vocab_sizes,
+        embedding_dim=pytorch_config.embedding_dim,
+        latent_dim=pytorch_config.latent_dim,
+        n_clusters=n_clusters,
+        dropout=pytorch_config.dropout,
+    ).to(device)
+
+    criterion_recon = nn.MSELoss()
+    optimizer = AdamW(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
+
+    best_loss = float('inf')
+    best_model_state = None
+
+    # =========================================================================
+    # Phase 1: Autoencoder Pretraining
+    # =========================================================================
+    for epoch in range(1, pretrain_epochs + 1):
+        if job.should_stop:
+            report_callback(TrainingProgress(
+                job_id=job.job_id, epoch=epoch, total_epochs=total_epochs,
+                train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+                learning_rate=optimizer.param_groups[0]["lr"], elapsed_time=time.time() - start_time,
+                status="stopped", message="Training stopped by user"
+            ))
+            return
+
+        model.train()
+        total_train_loss = 0.0
+        n_batches = 0
+
+        for numeric, categorical, boolean, _target in train_loader:
+            numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+            optimizer.zero_grad(set_to_none=True)
+
+            result = model(numeric, categorical, boolean)
+            # Reconstruction target: the combined input features
+            x_input = model._prepare_input(numeric, categorical, boolean)
+            loss = criterion_recon(result['x_reconstructed'], x_input.detach())
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+            total_train_loss += loss.item()
+            n_batches += 1
+
+        train_loss = total_train_loss / n_batches if n_batches > 0 else 0
+
+        # Validation
+        model.eval()
+        total_val_loss = 0.0
+        with torch.no_grad():
+            for numeric, categorical, boolean, _target in val_loader:
+                numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+                result = model(numeric, categorical, boolean)
+                x_input = model._prepare_input(numeric, categorical, boolean)
+                loss = criterion_recon(result['x_reconstructed'], x_input.detach())
+                total_val_loss += loss.item()
+
+        val_loss = total_val_loss / len(val_loader) if len(val_loader) > 0 else 0
+        scheduler.step(val_loss)
+
+        if val_loss < best_loss:
+            best_loss = val_loss
+            best_model_state = model.state_dict().copy()
+
+        report_callback(TrainingProgress(
+            job_id=job.job_id, epoch=epoch, total_epochs=total_epochs,
+            train_loss=float(train_loss), val_loss=float(val_loss),
+            val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=float(optimizer.param_groups[0]["lr"]),
+            elapsed_time=float(time.time() - start_time),
+            status="running",
+            message=f"Phase 1 (Pretrain): Epoch {epoch}/{pretrain_epochs} — Recon loss: {val_loss:.4f}",
+            best_val_loss=float(best_loss),
+            weight_histograms=_compute_weight_histograms(model),
+        ))
+
+    # Restore best pretrained model
+    if best_model_state:
+        model.load_state_dict(best_model_state)
+
+    # =========================================================================
+    # Initialize centroids via k-means on latent representations
+    # =========================================================================
+    report_callback(TrainingProgress(
+        job_id=job.job_id, epoch=pretrain_epochs, total_epochs=total_epochs,
+        train_loss=0, val_loss=float(best_loss), val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+        learning_rate=float(optimizer.param_groups[0]["lr"]),
+        elapsed_time=float(time.time() - start_time),
+        status="running", message=f"Initializing {n_clusters} cluster centroids (k-means)..."
+    ))
+
+    model.eval()
+    all_z = []
+    with torch.no_grad():
+        for numeric, categorical, boolean, _target in train_loader:
+            numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+            z = model.encode(numeric, categorical, boolean)
+            all_z.append(z.cpu())
+        for numeric, categorical, boolean, _target in val_loader:
+            numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+            z = model.encode(numeric, categorical, boolean)
+            all_z.append(z.cpu())
+
+    z_all = torch.cat(all_z)
+    initial_labels = model.initialize_centroids(z_all)
+    print(f"[{job.job_id}] K-means init: {np.bincount(initial_labels)} samples per cluster")
+
+    # =========================================================================
+    # Phase 2: Clustering Refinement (KL-divergence + reconstruction)
+    # =========================================================================
+    optimizer_phase2 = AdamW(model.parameters(), lr=config.learning_rate * 0.1, weight_decay=config.weight_decay)
+    scheduler_phase2 = ReduceLROnPlateau(optimizer_phase2, mode="min", factor=0.5, patience=5)
+    recon_weight = 0.1  # Balance reconstruction vs clustering loss
+
+    best_cluster_loss = float('inf')
+    best_cluster_state = None
+
+    for epoch in range(1, clustering_epochs + 1):
+        if job.should_stop:
+            report_callback(TrainingProgress(
+                job_id=job.job_id, epoch=pretrain_epochs + epoch, total_epochs=total_epochs,
+                train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+                learning_rate=optimizer_phase2.param_groups[0]["lr"], elapsed_time=time.time() - start_time,
+                status="stopped", message="Training stopped by user"
+            ))
+            return
+
+        model.train()
+        total_train_loss = 0.0
+        total_kl_loss = 0.0
+        n_batches = 0
+
+        for numeric, categorical, boolean, _target in train_loader:
+            numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+            optimizer_phase2.zero_grad(set_to_none=True)
+
+            result = model(numeric, categorical, boolean)
+            x_input = model._prepare_input(numeric, categorical, boolean)
+
+            # Reconstruction loss
+            loss_recon = criterion_recon(result['x_reconstructed'], x_input.detach())
+
+            # Clustering loss (KL-divergence)
+            q = result['q']
+            p = model.target_distribution(q).detach()
+            loss_kl = model.clustering_loss(q, p)
+
+            loss = loss_kl + recon_weight * loss_recon
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer_phase2.step()
+            total_train_loss += loss.item()
+            total_kl_loss += loss_kl.item()
+            n_batches += 1
+
+        train_loss = total_train_loss / n_batches if n_batches > 0 else 0
+        kl_loss = total_kl_loss / n_batches if n_batches > 0 else 0
+
+        # Validation
+        model.eval()
+        total_val_loss = 0.0
+        with torch.no_grad():
+            for numeric, categorical, boolean, _target in val_loader:
+                numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+                result = model(numeric, categorical, boolean)
+                x_input = model._prepare_input(numeric, categorical, boolean)
+                loss_recon = criterion_recon(result['x_reconstructed'], x_input.detach())
+                q = result['q']
+                p = model.target_distribution(q).detach()
+                loss_kl = model.clustering_loss(q, p)
+                total_val_loss += (loss_kl + recon_weight * loss_recon).item()
+
+        val_loss = total_val_loss / len(val_loader) if len(val_loader) > 0 else 0
+        scheduler_phase2.step(val_loss)
+
+        if val_loss < best_cluster_loss:
+            best_cluster_loss = val_loss
+            best_cluster_state = model.state_dict().copy()
+
+        report_callback(TrainingProgress(
+            job_id=job.job_id, epoch=pretrain_epochs + epoch, total_epochs=total_epochs,
+            train_loss=float(train_loss), val_loss=float(val_loss),
+            val_mae=float(kl_loss), val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=float(optimizer_phase2.param_groups[0]["lr"]),
+            elapsed_time=float(time.time() - start_time),
+            status="running",
+            message=f"Phase 2 (Clustering): Epoch {epoch}/{clustering_epochs} — KL: {kl_loss:.4f}",
+            best_val_loss=float(best_cluster_loss),
+            weight_histograms=_compute_weight_histograms(model),
+        ))
+
+    # Restore best model
+    if best_cluster_state:
+        model.load_state_dict(best_cluster_state)
+
+    # =========================================================================
+    # Final: Get cluster assignments and compute metrics
+    # =========================================================================
+    report_callback(TrainingProgress(
+        job_id=job.job_id, epoch=total_epochs, total_epochs=total_epochs,
+        train_loss=0, val_loss=float(best_cluster_loss), val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+        learning_rate=0, elapsed_time=float(time.time() - start_time),
+        status="running", message="Computing final cluster assignments..."
+    ))
+
+    model.eval()
+    # Collect ALL data (train + val + test) for final cluster assignments
+    all_z = []
+    all_numeric, all_cat, all_bool = [], [], []
+    with torch.no_grad():
+        for loader in [train_loader, val_loader, test_loader]:
+            for numeric, categorical, boolean, _target in loader:
+                numeric, categorical, boolean = numeric.to(device), categorical.to(device), boolean.to(device)
+                z = model.encode(numeric, categorical, boolean)
+                all_z.append(z.cpu())
+                all_numeric.append(numeric.cpu())
+                all_cat.append(categorical.cpu())
+                all_bool.append(boolean.cpu())
+
+    z_all = torch.cat(all_z)
+    cluster_assignments = model.get_cluster_assignments(z_all).numpy()
+
+    # Build concatenated feature matrix for SHAP
+    numeric_all = torch.cat(all_numeric).numpy()
+    cat_all = torch.cat(all_cat).numpy().astype(np.float64)
+    bool_all = torch.cat(all_bool).numpy()
+    X_all = np.concatenate([numeric_all, cat_all, bool_all], axis=1)
+
+    feature_names = (
+        list(pytorch_config.numeric_features) +
+        list(pytorch_config.categorical_features) +
+        list(pytorch_config.boolean_features)
+    )
+
+    # Cluster distribution
+    cluster_sizes = np.bincount(cluster_assignments, minlength=n_clusters)
+    print(f"\n{'='*60}")
+    print(f"[DEC] FINAL CLUSTER ASSIGNMENTS ({n_clusters} clusters)")
+    for i in range(n_clusters):
+        print(f"  Cluster {i}: {cluster_sizes[i]:,} sites ({cluster_sizes[i]/len(cluster_assignments)*100:.1f}%)")
+    print(f"{'='*60}\n")
+
+    # Silhouette score
+    from sklearn.metrics import silhouette_score
+    try:
+        sil_score = float(silhouette_score(z_all.numpy(), cluster_assignments))
+    except Exception:
+        sil_score = 0.0
+
+    # Compute per-cluster SHAP feature importance
+    def shap_progress(msg: str):
+        report_callback(TrainingProgress(
+            job_id=job.job_id, epoch=total_epochs, total_epochs=total_epochs,
+            train_loss=0, val_loss=float(best_cluster_loss), val_mae=0, val_smape=0, val_rmse=0, val_r2=float(sil_score),
+            learning_rate=0, elapsed_time=float(time.time() - start_time),
+            status="running", message=msg
+        ))
+
+    cluster_shap_results = compute_cluster_shap_values(
+        model=model,
+        cluster_assignments=cluster_assignments,
+        X_data=X_all,
+        feature_names=feature_names,
+        n_numeric=processor.n_numeric_features,
+        n_categorical=len(pytorch_config.categorical_features),
+        output_dir=job.output_dir,
+        n_explain=100,
+        progress_callback=shap_progress,
+    )
+
+    # Save model and metadata
+    torch.save({
+        "model_state_dict": model.state_dict(),
+        "config": pytorch_config,
+        "cluster_assignments": cluster_assignments,
+        "cluster_sizes": cluster_sizes.tolist(),
+        "silhouette_score": sil_score,
+    }, job.output_dir / "best_model.pt")
+    processor.save(job.output_dir / "preprocessor.pkl")
+
+    with open(job.output_dir / "model_metadata.json", "w") as f:
+        json.dump({
+            "model_type": "clustering",
+            "task_type": "clustering",
+            "n_clusters": n_clusters,
+            "latent_dim": pytorch_config.latent_dim,
+            "pretrain_epochs": pretrain_epochs,
+            "clustering_epochs": clustering_epochs,
+            "silhouette_score": sil_score,
+            "cluster_sizes": cluster_sizes.tolist(),
+            "total_samples": len(cluster_assignments),
+            "feature_names": feature_names,
+            "shap_available": cluster_shap_results is not None,
+        }, f, indent=2)
+
+    # Report completion
+    job.final_metrics = {
+        "test_loss": float(best_cluster_loss),
+        "test_r2": float(sil_score),  # Repurpose R² field for silhouette score
+        "test_mae": 0.0,
+        "test_rmse": 0.0,
+        "test_smape": 0.0,
+        "test_mape": 0.0,
+        "val_loss": float(best_cluster_loss),
+        "val_r2": float(sil_score),
+        "val_mae": 0.0,
+        "shap_available": cluster_shap_results is not None,
+        "experiment_dir": str(job.output_dir.name),
+        "n_clusters": n_clusters,
+        "cluster_sizes": cluster_sizes.tolist(),
+        "silhouette_score": sil_score,
+    }
+
+    report_callback(TrainingProgress(
+        job_id=job.job_id, epoch=total_epochs, total_epochs=total_epochs,
+        train_loss=0.0, val_loss=float(best_cluster_loss),
+        val_mae=0.0, val_smape=0.0, val_rmse=0.0, val_r2=float(sil_score),
+        learning_rate=0.0, elapsed_time=float(time.time() - start_time),
+        status="completed",
+        message=f"Clustering complete: {n_clusters} clusters, silhouette={sil_score:.3f}",
+        best_val_loss=float(best_cluster_loss),
+        final_metrics=job.final_metrics,
+    ))
 
 
 def run_training_logic(job: TrainingJob, report_callback):
@@ -827,6 +1205,13 @@ def run_training_logic(job: TrainingJob, report_callback):
     pytorch_config.lookalike_lower_percentile = config.lookalike_lower_percentile
     pytorch_config.lookalike_upper_percentile = config.lookalike_upper_percentile
 
+    # Network subset filter
+    pytorch_config.network_filter = config.network_filter
+
+    # Clustering parameters
+    pytorch_config.n_clusters = config.n_clusters
+    pytorch_config.latent_dim = config.latent_dim
+
     # Apply model preset
     if config.model_preset:
         pytorch_config.apply_model_preset(config.model_preset)
@@ -848,6 +1233,12 @@ def run_training_logic(job: TrainingJob, report_callback):
         # Convert dataclass to dict, handle Path objects
         cfg_dict = asdict(config)
         cfg_dict['output_dir'] = str(cfg_dict['output_dir'])
+        # Include resolved feature lists so the config is self-documenting
+        cfg_dict['training_features'] = {
+            'numeric': pytorch_config.numeric_features,
+            'categorical': pytorch_config.categorical_features,
+            'boolean': pytorch_config.boolean_features,
+        }
         json.dump(cfg_dict, f, indent=2)
 
     # Load data
@@ -856,6 +1247,14 @@ def run_training_logic(job: TrainingJob, report_callback):
     # Dispatch: tree-based models (XGBoost, CatBoost) use a separate training path
     if config.model_type in ("xgboost", "catboost"):
         _run_tree_training(
+            job, config, pytorch_config, train_loader, val_loader,
+            test_loader, processor, report_callback, start_time
+        )
+        return
+
+    # Dispatch: clustering uses Deep Embedded Clustering (DEC) path
+    if config.task_type == "clustering":
+        _run_clustering_training(
             job, config, pytorch_config, train_loader, val_loader,
             test_loader, processor, report_callback, start_time
         )
@@ -997,9 +1396,17 @@ def run_training_logic(job: TrainingJob, report_callback):
         mae, smape, rmse, r2, f1, logloss, mape = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         
         if config.task_type == "lookalike":
-             from sklearn.metrics import roc_auc_score
+             from sklearn.metrics import roc_auc_score, f1_score, log_loss
+             probs = 1 / (1 + np.exp(-predictions_np.flatten()))
              try:
-                 r2 = float(roc_auc_score(targets_np.flatten(), 1/(1+np.exp(-predictions_np.flatten())))) # AUC
+                 r2 = float(roc_auc_score(targets_np.flatten(), probs))  # AUC
+             except: pass
+             try:
+                 binary_preds = (probs >= 0.5).astype(int)
+                 f1 = float(f1_score(targets_np.flatten().astype(int), binary_preds, zero_division=0))
+             except: pass
+             try:
+                 logloss = float(log_loss(targets_np.flatten(), probs))
              except: pass
         else:
             # Regression metrics
@@ -1086,16 +1493,24 @@ def run_training_logic(job: TrainingJob, report_callback):
     test_targets_np = torch.cat(test_targs).numpy()
 
     # Calculate test metrics
-    test_mae, test_smape, test_rmse, test_r2, test_mape = 0.0, 0.0, 0.0, 0.0, 0.0
+    test_mae, test_smape, test_rmse, test_r2, test_mape, test_f1, test_logloss = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
     if config.task_type == "lookalike":
-        from sklearn.metrics import roc_auc_score
+        from sklearn.metrics import roc_auc_score, f1_score, log_loss
+        probs = 1 / (1 + np.exp(-test_predictions_np.flatten()))
         try:
-            # For classification, R² field holds AUC (displayed appropriately in UI)
-            probs = 1 / (1 + np.exp(-test_predictions_np.flatten()))
             test_r2 = float(roc_auc_score(test_targets_np.flatten(), probs))
         except Exception:
             test_r2 = 0.0
+        try:
+            binary_preds = (probs >= 0.5).astype(int)
+            test_f1 = float(f1_score(test_targets_np.flatten().astype(int), binary_preds, zero_division=0))
+        except Exception:
+            test_f1 = 0.0
+        try:
+            test_logloss = float(log_loss(test_targets_np.flatten(), probs))
+        except Exception:
+            test_logloss = 0.0
     else:
         # Regression: inverse transform to original scale for interpretable metrics
         test_preds_orig = processor.target_scaler.inverse_transform(
@@ -1143,6 +1558,8 @@ def run_training_logic(job: TrainingJob, report_callback):
             "test_rmse": test_rmse,
             "test_smape": test_smape,
             "test_mape": test_mape,
+            "test_f1": test_f1,
+            "test_logloss": test_logloss,
             "val_loss": best_val_loss,
         }
     }, job.output_dir / "best_model.pt")
@@ -1205,6 +1622,8 @@ def run_training_logic(job: TrainingJob, report_callback):
         "test_rmse": float(test_rmse),
         "test_smape": float(test_smape),
         "test_mape": float(test_mape),
+        "test_f1": float(test_f1),
+        "test_logloss": float(test_logloss),
         # Validation metrics (for reference/comparison)
         "val_loss": float(best_val_loss),
         "val_r2": float(val_r2_final),  # Last epoch validation R² for comparison
@@ -1233,6 +1652,7 @@ def run_training_logic(job: TrainingJob, report_callback):
         status="completed", message="Training completed successfully",
         best_val_loss=float(best_val_loss),
         val_mape=float(test_mape),
+        val_f1=float(test_f1), val_logloss=float(test_logloss),
         final_metrics=job.final_metrics,  # Include test set metrics for frontend
     ))
 
@@ -1272,6 +1692,10 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
             device=config_dict.get("device", "mps"),
             model_preset=config_dict.get("model_preset", "model_b"),
             selected_features=config_dict.get("selected_features"),
+            network_filter=config_dict.get("network_filter"),
+            # Clustering parameters
+            n_clusters=int(config_dict.get("n_clusters", 5)),
+            cluster_probability_threshold=float(config_dict.get("cluster_probability_threshold", 0.5)),
         )
         
         job_id = job_manager.submit_job(config)

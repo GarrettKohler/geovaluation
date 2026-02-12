@@ -83,6 +83,15 @@ class DataProcessor:
 
         print(f"Loaded {len(df):,} rows, {len(df.columns)} columns")
 
+        # Filter by network if specified
+        if self.config.network_filter:
+            original_count = len(df)
+            if self.config.network_filter == "Wayne/Dover":
+                df = df.filter(pl.col('network').is_in(['Wayne', 'Dover']))
+            else:
+                df = df.filter(pl.col('network') == self.config.network_filter)
+            print(f"Network filter '{self.config.network_filter}': {len(df):,} sites ({original_count - len(df):,} excluded)")
+
         # Filter to sites with sufficient history (more than 11 active months)
         # This ensures we train on sites with stable, representative performance data
         if 'active_months' in df.columns:
@@ -324,15 +333,22 @@ def create_data_loaders(
     use_multiprocessing = config.num_workers > 0
     prefetch = config.prefetch_factor if use_multiprocessing else None
 
+    # Cap batch_size to training set size to prevent zero-batch issue with drop_last=True
+    # (happens when network subset filtering produces fewer samples than batch_size)
+    effective_batch_size = min(config.batch_size, len(train_dataset))
+    use_drop_last = len(train_dataset) > effective_batch_size
+    if effective_batch_size < config.batch_size:
+        print(f"Batch size capped: {config.batch_size} → {effective_batch_size} (training set too small)")
+
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.batch_size,
+        batch_size=effective_batch_size,
         shuffle=True,
         num_workers=config.num_workers,
         pin_memory=pin_memory,
         prefetch_factor=prefetch,
         persistent_workers=use_multiprocessing,
-        drop_last=True,  # For stable batch norm
+        drop_last=use_drop_last,  # For stable batch norm (disabled for small datasets)
     )
 
     val_loader = DataLoader(

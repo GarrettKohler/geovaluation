@@ -1,0 +1,37 @@
+@app.route('/')
+@app.route('/training-details')
+@app.route('/glossary')
+@app.route('/shap-values')
+
+@app.route('/api/sites')
+
+@app.route('/api/site-details/<site_id>')
+
+@app.route('/api/bulk-site-details', methods=['POST'])
+
+@app.route('/api/filter-options')
+
+@app.route('/api/filtered-sites', methods=['POST'])
+
+@app.route('/api/training/system-info')
+@app.route('/api/training/presets')
+@app.route('/api/training/features')
+@app.route('/api/training/all-features')
+@app.route('/api/training/start', methods=['POST'])
+@app.route('/api/training/stop', methods=['POST'])
+@app.route('/api/training/status')
+@app.route('/api/training/stream')
+
+@app.route('/api/experiments')
+
+@app.route('/api/shap/available')
+@app.route('/api/shap/summary')
+@app.route('/api/shap/plots')
+
+@app.route('/api/explainability/available')
+@app.route('/api/explainability/explain', methods=['POST'])
+@app.route('/api/explainability/explain-batch', methods=['POST'])
+@app.route('/api/explainability/tier-summary', methods=['POST'])
+@app.route('/api/explainability/fleet-analysis', methods=['POST'])
+@app.route('/api/explainability/fleet-analysis/status/<job_id>')
+@app.route('/api/explainability/export-report/<job_id>')

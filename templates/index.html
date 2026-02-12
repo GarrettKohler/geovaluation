@@ -390,6 +390,78 @@
             letter-spacing: -0.01em;
         }
 
+        /* Navigation Menu */
+        .nav-menu-wrapper { position: relative; }
+
+        .nav-menu-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--kepler-bg-base);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--kepler-text);
+            transition: all 200ms ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-menu-btn:hover {
+            border-color: var(--kepler-active);
+            color: var(--kepler-active);
+            background: var(--kepler-bg-hover);
+        }
+
+        .nav-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            background: var(--kepler-bg-panel);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+            min-width: 180px;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .nav-dropdown.open {
+            display: block;
+            animation: menuFadeIn 150ms ease;
+        }
+
+        @keyframes menuFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-dropdown a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: var(--kepler-text);
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: 400;
+            transition: all 200ms ease;
+            border-bottom: 1px solid var(--kepler-border);
+        }
+
+        .nav-dropdown a:last-child { border-bottom: none; }
+
+        .nav-dropdown a:hover {
+            background: rgba(31, 186, 214, 0.1);
+            color: var(--kepler-active);
+        }
+
+        .nav-dropdown a svg { width: 16px; height: 16px; opacity: 0.7; }
+        .nav-dropdown a:hover svg { opacity: 1; }
 
         .select-wrapper {
             min-width: 400px;
@@ -2860,7 +2932,50 @@
 
     <div class="container">
         <header>
-            <h1>GSTV Site Visualization</h1>
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <div class="nav-menu-wrapper">
+                    <button class="nav-menu-btn" onclick="toggleNavMenu()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                        Menu
+                    </button>
+                    <div class="nav-dropdown" id="nav-dropdown">
+                        <a href="/datasets">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>
+                            Datasets
+                        </a>
+                        <a href="/training-details">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            </svg>
+                            Training Details
+                        </a>
+                        <a href="/glossary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                            </svg>
+                            Glossary
+                        </a>
+                        <a href="/shap-values">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="20" x2="18" y2="10"/>
+                                <line x1="12" y1="20" x2="12" y2="4"/>
+                                <line x1="6" y1="20" x2="6" y2="14"/>
+                            </svg>
+                            SHAP Values
+                        </a>
+                    </div>
+                </div>
+                <h1>GSTV Site Visualization</h1>
+            </div>
             <!-- Hidden select for programmatic site selection -->
             <select id="site-select" multiple="multiple" style="display: none;"></select>
         </header>
@@ -2925,9 +3040,17 @@
                             <div class="modal-metric-value" id="modal-metric-mape-real">-</div>
                             <div class="modal-metric-label">Test MAPE</div>
                         </div>
-                        <div class="modal-metric">
+                        <div class="modal-metric" id="modal-r2-container">
                             <div class="modal-metric-value" id="modal-metric-r2">-</div>
                             <div class="modal-metric-label" id="modal-metric-r2-label">Test R²</div>
+                        </div>
+                        <div class="modal-metric" id="modal-f1-container" style="display: none;">
+                            <div class="modal-metric-value" id="modal-metric-f1">-</div>
+                            <div class="modal-metric-label">Test F1</div>
+                        </div>
+                        <div class="modal-metric" id="modal-logloss-container" style="display: none;">
+                            <div class="modal-metric-value" id="modal-metric-logloss">-</div>
+                            <div class="modal-metric-label">Log Loss</div>
                         </div>
                         <div class="modal-metric">
                             <div class="modal-metric-value" id="modal-metric-loss">-</div>
@@ -3067,6 +3190,17 @@
                         <option value="neural_network">Neural Network (Flexible)</option>
                     </select>
                     <div class="training-form-hint" id="model-algorithm-hint">Gradient boosting - fast training, great accuracy</div>
+                </div>
+
+                <div class="training-form-group" style="margin-top: 12px;">
+                    <label class="training-form-label" data-tooltip="Train on all sites or a specific network subset. Useful for building network-specific models.">Network Subset</label>
+                    <select class="training-form-select" id="network-filter">
+                        <option value="" selected>All Networks (26,099 sites)</option>
+                        <option value="Gilbarco">Gilbarco (18,210 sites)</option>
+                        <option value="Speedway">Speedway (2,760 sites)</option>
+                        <option value="Wayne/Dover">Wayne/Dover (5,129 sites)</option>
+                    </select>
+                    <div class="training-form-hint">Choose which network's sites to train on</div>
                 </div>
 
                 <!-- Hidden combined selector for backward compatibility -->
@@ -3661,6 +3795,17 @@
 
 
     <script>
+        // Navigation menu toggle
+        function toggleNavMenu() {
+            document.getElementById('nav-dropdown').classList.toggle('open');
+        }
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.nav-menu-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('nav-dropdown').classList.remove('open');
+            }
+        });
+
         let map;
         let allSites = [];
         let sitesByCoord = new Map();  // Spatial lookup map for fast site finding
@@ -6195,10 +6340,23 @@
 
         // Update plain English metric explanations
         function updateMetricExplanations(metrics) {
-            // MAE explanation
+            const isLookalike = document.getElementById('task-type')?.value === 'lookalike';
+
+            // MAE / ROC-AUC explanation
             const maeExplain = document.getElementById('metric-mae-explain');
             const resultMaeExplain = document.getElementById('result-mae-explain');
-            if (metrics.mae !== undefined && metrics.mae !== '-') {
+            if (isLookalike) {
+                // For lookalike, the MAE slot shows ROC-AUC (metrics.r2 holds AUC)
+                if (metrics.r2 !== undefined && metrics.r2 !== '-') {
+                    const aucVal = parseFloat(metrics.r2);
+                    if (!isNaN(aucVal)) {
+                        const aucPct = (aucVal * 100).toFixed(0);
+                        const aucText = `${aucPct}% classification accuracy`;
+                        if (maeExplain) maeExplain.textContent = aucText;
+                        if (resultMaeExplain) resultMaeExplain.textContent = aucText;
+                    }
+                }
+            } else if (metrics.mae !== undefined && metrics.mae !== '-') {
                 const maeVal = parseFloat(metrics.mae);
                 if (!isNaN(maeVal)) {
                     const maeText = `±$${maeVal.toFixed(0)} typical error`;
@@ -6207,7 +6365,7 @@
                 }
             }
 
-            // SMAPE explanation
+            // SMAPE explanation (hidden for lookalike, no change needed)
             const mapeExplain = document.getElementById('metric-mape-explain');
             const resultMapeExplain = document.getElementById('result-mape-explain');
             if (metrics.smape !== undefined && metrics.smape !== '-') {
@@ -6219,14 +6377,16 @@
                 }
             }
 
-            // R² explanation
+            // R² / AUC explanation
             const r2Explain = document.getElementById('metric-r2-explain');
             const resultR2Explain = document.getElementById('result-r2-explain');
             if (metrics.r2 !== undefined && metrics.r2 !== '-') {
                 const r2Val = parseFloat(metrics.r2);
                 if (!isNaN(r2Val)) {
                     const r2Pct = (r2Val * 100).toFixed(0);
-                    const r2Text = `Explains ${r2Pct}% of variation`;
+                    const r2Text = isLookalike
+                        ? `${r2Pct}% classification accuracy`
+                        : `Explains ${r2Pct}% of variation`;
                     if (r2Explain) r2Explain.textContent = r2Text;
                     if (resultR2Explain) resultR2Explain.textContent = r2Text;
                 }
@@ -6573,6 +6733,10 @@
             'log_total_revenue': 'Log Total Revenue',
             'log_nearest_site_distance_mi': 'Nearest Site Distance',
             'log_min_distance_to_interstate_mi': 'Log Min Distance to Interstate (miles)',
+            'log_min_distance_to_kroger_mi': 'Log Distance to Kroger (miles)',
+            'log_min_distance_to_mcdonalds_mi': 'Log Distance to McDonalds (miles)',
+            'log_min_distance_to_walmart_mi': 'Log Distance to Walmart (miles)',
+            'log_min_distance_to_target_mi': 'Log Distance to Target (miles)',
             'log_avg_household_income': 'Log Avg Household Income',
             'median_age': 'Median Age',
             'pct_female': '% Female',
@@ -6920,6 +7084,8 @@
                 // Clustering parameters
                 n_clusters: nClusters,
                 cluster_probability_threshold: clusterThreshold,
+                // Network subset filter
+                network_filter: document.getElementById('network-filter').value || null,
             };
         }
 
@@ -7032,16 +7198,39 @@
             const currentTask = document.getElementById('task-type').value;
             const isLookalike = currentTask === 'lookalike';
             document.getElementById('metric-mae-label').textContent = isLookalike ? 'ROC-AUC' : 'MAE';
+            document.getElementById('metric-r2-label').innerHTML = isLookalike
+                ? 'ROC-AUC <span class="metric-help-icon">?</span>'
+                : 'R² Score <span class="metric-help-icon">?</span>';
             // Hide regression metrics for lookalike, show classification metrics
             document.getElementById('metric-mae-container').style.display = isLookalike ? 'none' : '';
             document.getElementById('metric-mape-container').style.display = isLookalike ? 'none' : '';
             document.getElementById('metric-rmse-container').style.display = isLookalike ? 'none' : '';
+            // Hide MAPE for lookalike
+            const metricMapeRealContainer = document.getElementById('metric-mape-real-container');
+            if (metricMapeRealContainer) metricMapeRealContainer.style.display = isLookalike ? 'none' : '';
             // Show F1 and Log Loss for classification (lookalike) tasks
             document.getElementById('metric-f1-container').style.display = isLookalike ? '' : 'none';
             document.getElementById('metric-logloss-container').style.display = isLookalike ? '' : 'none';
+            // Update progress metric tooltips to match task type
+            const progressR2Container = document.getElementById('metric-r2')?.closest('.metric-with-help');
+            const progressR2Tooltip = progressR2Container?.querySelector('.metric-help-tooltip');
+            if (progressR2Tooltip) {
+                progressR2Tooltip.innerHTML = isLookalike
+                    ? '<div class="metric-help-title">ROC-AUC (Area Under the Curve)</div>'
+                        + 'How well the model distinguishes top performers from others. 1.0 is perfect, 0.5 is random chance.'
+                        + ' <a href="/glossary#r2" class="metric-help-link">Learn more \u2192</a>'
+                    : '<div class="metric-help-title">R\u00B2 (Coefficient of Determination)</div>'
+                        + 'How much of the revenue variation the model explains. 0.85 means 85% of variation is explained. Higher is better.'
+                        + ' <a href="/glossary#r2" class="metric-help-link">Learn more \u2192</a>';
+            }
             // Reset F1 and Log Loss values
             document.getElementById('metric-f1').textContent = '-';
             document.getElementById('metric-logloss').textContent = '-';
+            // Pre-configure result panel containers for task type
+            document.getElementById('result-f1-container').style.display = isLookalike ? '' : 'none';
+            document.getElementById('result-logloss-container').style.display = isLookalike ? '' : 'none';
+            const resultR2Item = document.getElementById('result-r2')?.closest('.result-item');
+            if (resultR2Item) resultR2Item.style.display = isLookalike ? 'none' : '';
 
             // Clear log
             document.getElementById('progress-log').innerHTML = '';
@@ -7449,6 +7638,8 @@
                     test_rmse: data.val_rmse || 0,
                     test_r2: data.val_r2 || 0,
                     test_loss: data.val_loss || 0,
+                    test_f1: data.val_f1 || 0,
+                    test_logloss: data.val_logloss || 0,
                     elapsed_time: data.elapsed_time
                 };
             }
@@ -7472,16 +7663,32 @@
 
             // Update result values in training panel
             if (taskType === 'lookalike') {
-                // Classification: Show ROC-AUC, hide regression-specific metrics
-                document.getElementById('result-mae-label').textContent = 'ROC-AUC';
+                // Classification: Show ROC-AUC in MAE slot, show F1 and Log Loss, hide regression metrics
+                document.getElementById('result-mae-label').innerHTML = 'ROC-AUC <span class="metric-help-icon">?</span>';
                 document.getElementById('result-mae').textContent = metrics.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : '-';
-                document.getElementById('result-r2-label').textContent = 'Test R²';
                 document.getElementById('result-mape-container').style.display = 'none';
                 document.getElementById('result-rmse-container').style.display = 'none';
                 const resultMapeRealEl = document.getElementById('result-mape-real-container');
                 if (resultMapeRealEl) resultMapeRealEl.style.display = 'none';
+                // Hide R² container (not meaningful for classification)
+                const r2Container = document.getElementById('result-r2')?.closest('.result-item');
+                if (r2Container) r2Container.style.display = 'none';
+                // Show F1 and Log Loss containers
+                document.getElementById('result-f1-container').style.display = '';
+                document.getElementById('result-logloss-container').style.display = '';
+                // Populate F1 and Log Loss
+                document.getElementById('result-f1').textContent = metrics.test_f1 !== undefined ? metrics.test_f1.toFixed(4) : '-';
+                document.getElementById('result-logloss').textContent = metrics.test_logloss !== undefined ? metrics.test_logloss.toFixed(4) : '-';
+                // Update tooltip for classification context
+                const maeTooltip = document.querySelector('#result-mae-container .metric-help-tooltip');
+                if (maeTooltip) {
+                    maeTooltip.innerHTML = '<div class="metric-help-title">ROC-AUC (Area Under the Curve)</div>'
+                        + 'How well the model distinguishes top performers from others. 1.0 is perfect, 0.5 is random chance.';
+                }
             } else {
-                // Regression: Show all metrics
+                // Regression: Show all metrics and restore regression tooltips
+                document.getElementById('result-mae-label').innerHTML = 'Test MAE <span class="metric-help-icon">?</span>';
+                document.getElementById('result-r2-label').innerHTML = 'Test R² <span class="metric-help-icon">?</span>';
                 if (metrics.test_mae !== undefined && metrics.test_mae > 0) {
                     document.getElementById('result-mae').textContent = '$' + metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0});
                 }
@@ -7496,9 +7703,25 @@
                 }
                 const resultMapeRealEl2 = document.getElementById('result-mape-real-container');
                 if (resultMapeRealEl2) resultMapeRealEl2.style.display = '';
-            }
-            if (metrics.test_r2 !== undefined) {
-                document.getElementById('result-r2').textContent = metrics.test_r2.toFixed(4);
+                // Show R² container for regression, hide F1/logloss
+                const r2Container2 = document.getElementById('result-r2')?.closest('.result-item');
+                if (r2Container2) r2Container2.style.display = '';
+                document.getElementById('result-f1-container').style.display = 'none';
+                document.getElementById('result-logloss-container').style.display = 'none';
+                // Restore regression tooltips
+                const maeTooltip2 = document.querySelector('#result-mae-container .metric-help-tooltip');
+                if (maeTooltip2) {
+                    maeTooltip2.innerHTML = '<div class="metric-help-title">Mean Absolute Error</div>'
+                        + 'Predictions are typically off by this dollar amount.';
+                }
+                const r2TooltipEl2 = r2Container2?.querySelector('.metric-help-tooltip');
+                if (r2TooltipEl2) {
+                    r2TooltipEl2.innerHTML = '<div class="metric-help-title">R² Score</div>'
+                        + 'Percentage of revenue variation the model explains. Higher is better.';
+                }
+                if (metrics.test_r2 !== undefined) {
+                    document.getElementById('result-r2').textContent = metrics.test_r2.toFixed(4);
+                }
             }
             if (metrics.test_loss !== undefined && metrics.test_loss > 0) {
                 document.getElementById('result-loss').textContent = metrics.test_loss.toFixed(4);
@@ -7599,16 +7822,21 @@
 
             // Update metrics in modal
             if (taskType === 'lookalike') {
-                // Classification: Show ROC-AUC, hide regression-specific metrics
+                // Classification: Show ROC-AUC in MAE slot, show F1/LogLoss, hide regression metrics
                 document.getElementById('modal-metric-mae-label').textContent = 'ROC-AUC';
                 document.getElementById('modal-metric-mae').textContent = metrics.test_r2 !== undefined ? metrics.test_r2.toFixed(4) : '-';
-                document.getElementById('modal-metric-r2-label').textContent = 'Test R²';
                 document.getElementById('modal-mape-container').style.display = 'none';
                 document.getElementById('modal-rmse-container').style.display = 'none';
                 const modalMapeRealEl = document.getElementById('modal-mape-real-container');
                 if (modalMapeRealEl) modalMapeRealEl.style.display = 'none';
+                // Hide R², show F1 and Log Loss
+                document.getElementById('modal-r2-container').style.display = 'none';
+                document.getElementById('modal-f1-container').style.display = '';
+                document.getElementById('modal-logloss-container').style.display = '';
+                document.getElementById('modal-metric-f1').textContent = metrics.test_f1 !== undefined ? metrics.test_f1.toFixed(4) : '-';
+                document.getElementById('modal-metric-logloss').textContent = metrics.test_logloss !== undefined ? metrics.test_logloss.toFixed(4) : '-';
             } else {
-                // Regression: Show all metrics
+                // Regression: Show all metrics, hide F1/LogLoss
                 document.getElementById('modal-metric-mae').textContent = metrics.test_mae !== undefined && metrics.test_mae > 0
                     ? '$' + metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0}) : '-';
                 document.getElementById('modal-metric-mape').textContent = metrics.test_smape !== undefined && metrics.test_smape > 0
@@ -7623,12 +7851,15 @@
                 document.getElementById('modal-metric-r2-label').textContent = 'Test R²';
                 const modalMapeRealEl2 = document.getElementById('modal-mape-real-container');
                 if (modalMapeRealEl2) modalMapeRealEl2.style.display = '';
-            }
-
-            if (metrics.test_r2 !== undefined) {
-                document.getElementById('modal-metric-r2').textContent = metrics.test_r2.toFixed(4);
-            } else {
-                document.getElementById('modal-metric-r2').textContent = '-';
+                // Show R², hide F1/LogLoss
+                document.getElementById('modal-r2-container').style.display = '';
+                document.getElementById('modal-f1-container').style.display = 'none';
+                document.getElementById('modal-logloss-container').style.display = 'none';
+                if (metrics.test_r2 !== undefined) {
+                    document.getElementById('modal-metric-r2').textContent = metrics.test_r2.toFixed(4);
+                } else {
+                    document.getElementById('modal-metric-r2').textContent = '-';
+                }
             }
 
             if (metrics.test_loss !== undefined && metrics.test_loss > 0) {
@@ -7727,7 +7958,13 @@
                     dropout: document.getElementById('dropout')?.value,
                     hiddenLayers: document.getElementById('hidden-layers')?.value,
                     embeddingDim: document.getElementById('embedding-dim')?.value,
-                    modelPreset: document.getElementById('model-preset')?.value
+                    modelPreset: document.getElementById('model-preset')?.value,
+                    modelType: document.getElementById('model-type')?.value,
+                    features: {
+                        numeric: [...featureSelectionState.numeric],
+                        categorical: [...featureSelectionState.categorical],
+                        boolean: [...featureSelectionState.boolean],
+                    }
                 }
             };
             // Store on window for child to read via window.opener (avoids sessionStorage 5MB limit)
@@ -7912,13 +8149,13 @@
 
             // File 1: Statistical Summary
             const summaryContent = generateStatisticalSummary(trainingMetrics, timestamp);
-            downloadFile(`${filePrefix}_summary_${timestamp}.txt`, summaryContent);
+            downloadFile(`${filePrefix}_summary_${timestamp}.csv`, summaryContent);
 
             // File 2: Detailed Sites List
             const sitesListContent = generateSitesListFile(siteDetails, trainingSiteIds, lookalikeSiteIds);
-            downloadFile(`${filePrefix}_sites_${timestamp}.txt`, sitesListContent);
+            downloadFile(`${filePrefix}_sites_${timestamp}.csv`, sitesListContent);
 
-            console.log(`Exported: ${filePrefix}_summary_${timestamp}.txt and ${filePrefix}_sites_${timestamp}.txt`);
+            console.log(`Exported: ${filePrefix}_summary_${timestamp}.csv and ${filePrefix}_sites_${timestamp}.csv`);
         }
 
         // Fetch bulk site details from API
@@ -8093,10 +8330,13 @@ ${generateFeaturesUsedSection(metrics)}
 TRAINING METRICS
 ================================================================================
 ${taskType === 'lookalike'
-    ? `Final ROC-AUC:      ${metrics?.test_r2 !== undefined && metrics.test_r2 !== null ? metrics.test_r2.toFixed(4) : 'N/A'}`
+    ? `Final ROC-AUC:      ${metrics?.test_r2 !== undefined && metrics.test_r2 !== null ? metrics.test_r2.toFixed(4) : 'N/A'}
+Test F1 Score:      ${metrics?.test_f1 !== undefined && metrics.test_f1 !== null ? metrics.test_f1.toFixed(4) : 'N/A'}
+Log Loss:           ${metrics?.test_logloss !== undefined && metrics.test_logloss !== null ? metrics.test_logloss.toFixed(4) : 'N/A'}`
     : `Test MAE:           $${metrics?.test_mae !== undefined ? metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
 Test SMAPE:          ${metrics?.test_smape !== undefined ? metrics.test_smape.toFixed(2) + '%' : 'N/A'}
 Test RMSE:          $${metrics?.test_rmse !== undefined ? metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
+Test MAPE:          ${metrics?.test_mape !== undefined && metrics.test_mape > 0 ? metrics.test_mape.toFixed(2) + '%' : 'N/A'}
 Test R²:            ${metrics?.test_r2 !== undefined && metrics.test_r2 !== null ? metrics.test_r2.toFixed(4) : 'N/A'}`}
 Final Test Loss:    ${metrics?.test_loss !== undefined && metrics.test_loss !== null ? metrics.test_loss.toFixed(4) : 'N/A'}
 Training Time:      ${metrics?.elapsed_time !== undefined && metrics.elapsed_time !== null ? Math.floor(metrics.elapsed_time / 60) + 'm ' + Math.floor(metrics.elapsed_time % 60) + 's' : 'N/A'}
@@ -8150,6 +8390,8 @@ Potential Revenue:      $${(lookalikeCount * avgTrainingRevenue * 0.7).toLocaleS
 MODEL INTERPRETATION
 ================================================================================
 AUC Score:              ${metrics?.test_r2 ? (metrics.test_r2 * 100).toFixed(1) + '% classification accuracy' : 'N/A'}
+F1 Score:               ${metrics?.test_f1 ? metrics.test_f1.toFixed(4) : 'N/A'}
+Log Loss:               ${metrics?.test_logloss ? metrics.test_logloss.toFixed(4) : 'N/A'}
 
 ${metrics?.test_r2 >= 0.9 ? 'EXCELLENT: AUC >90% indicates highly accurate lookalike identification.' :
   metrics?.test_r2 >= 0.8 ? 'GOOD: AUC >80% shows reliable classification of potential high performers.' :
@@ -8181,6 +8423,7 @@ MODEL INTERPRETATION
 MAE:                    Average prediction error of $${metrics?.test_mae ? metrics.test_mae.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'}
 SMAPE:                  Average prediction error of ${metrics?.test_smape ? metrics.test_smape.toFixed(2) + '%' : 'N/A'} (bounded 0-200%)
 RMSE:                   Root mean squared error of $${metrics?.test_rmse ? metrics.test_rmse.toLocaleString(undefined, {maximumFractionDigits: 0}) : 'N/A'} (penalizes large errors)
+MAPE:                   ${metrics?.test_mape && metrics.test_mape > 0 ? metrics.test_mape.toFixed(2) + '% mean absolute percentage error' : 'N/A'}
 R² Score:               ${metrics?.test_r2 ? (metrics.test_r2 * 100).toFixed(1) + '% of revenue variance explained' : 'N/A'}
 
 ${metrics?.test_r2 >= 0.7 ? 'EXCELLENT: Model explains >70% of revenue variance. Highly reliable predictions.' :
@@ -8400,7 +8643,7 @@ END OF FILE
 
         // Download a file with given content
         function downloadFile(filename, content) {
-            const blob = new Blob([content], { type: 'text/plain' });
+            const blob = new Blob([content], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

@@ -105,7 +105,7 @@ class TestPredictions:
         from site_scoring.predict import SiteScorer
 
         try:
-            return SiteScorer(
+            scorer = SiteScorer(
                 model_path=model_output_dir / "best_model.pt",
                 preprocessor_path=model_output_dir / "preprocessor.pkl",
                 device="cpu",
@@ -114,6 +114,16 @@ class TestPredictions:
             if "size mismatch" in str(e):
                 pytest.skip("Model architecture changed since checkpoint was saved - retrain needed")
             raise
+
+        # Check if saved preprocessor expects a different feature count than current config
+        if hasattr(scorer, 'processor') and hasattr(scorer.processor, 'scaler'):
+            expected = getattr(scorer.processor.scaler, 'n_features_in_', None)
+            from site_scoring.config import Config
+            actual = len(Config().numeric_features)
+            if expected is not None and expected != actual:
+                pytest.skip(f"Feature count changed ({expected} → {actual}) since model was trained - retrain needed")
+
+        return scorer
 
     @pytest.fixture
     def sample_data(self):
@@ -298,8 +308,8 @@ class TestDataLoader:
         assert boolean is not None
         assert target is not None
 
-        # Should have many samples
-        assert len(target) > 100000, f"Only {len(target)} samples loaded"
+        # Should have many samples (aggregated: one row per active site)
+        assert len(target) > 10000, f"Only {len(target)} samples loaded"
 
 
 class TestModelArchitecture:

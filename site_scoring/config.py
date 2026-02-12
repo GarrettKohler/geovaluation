@@ -29,6 +29,9 @@ class Config:
     data_path: Path = field(default_factory=lambda: DEFAULT_DATA_PATH)
     output_dir: Path = field(default_factory=lambda: DEFAULT_OUTPUT_DIR)
 
+    # Network filter: None = all networks, or "Gilbarco", "Speedway", "Wayne/Dover"
+    network_filter: Optional[str] = None
+
     # Target variable - aggregated metrics
     # Options: avg_monthly_revenue (recommended), total_revenue, total_monthly_impressions
     target: str = "avg_monthly_revenue"
@@ -76,11 +79,11 @@ class Config:
         # Long-term (12/24 months)
         "rs_NVIs_370_740", "rs_Revenue_370_740",
         # Revenue metrics
-        "avg_monthly_revenue",
         "log_total_revenue",
         # Geospatial distances (log-transformed for better distribution)
         "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
         "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
+        "log_min_distance_to_walmart_mi", "log_min_distance_to_target_mi",
         # Demographics
         "log_avg_household_income", "median_age",
         "pct_female",
@@ -97,7 +100,7 @@ class Config:
     boolean_features: List[str] = field(default_factory=lambda: [
         # Pre-encoded boolean flags from aggregated data (already 0/1 integers)
         # Restriction flags (r_*_encoded)
-        "r_lottery_encoded", "r_government_encoded", "r_travel_and_tourism_encoded",
+        # r_lottery_encoded, r_government_encoded, r_travel_and_tourism_encoded removed — near-zero variance (99%+ same value)
         "r_retail_car_wash_encoded", "r_cpg_beverage_beer_oof_encoded",
         "r_cpg_beverage_beer_vide_encoded", "r_cpg_beverage_wine_oof_encoded",
         "r_cpg_beverage_wine_video_encoded", "r_finance_credit_cards_encoded",
@@ -105,8 +108,9 @@ class Config:
         "r_cpg_non_food_beverage_cannabis_medical_encoded",
         "r_cpg_non_food_beverage_cannabis_recreational_encoded",
         "r_cpg_non_food_beverage_cbd_hemp_non_thc_encoded",
-        "r_alcohol_drink_responsibly_message_encoded", "r_alternative_transportation_encoded",
-        "r_associations_and_npo_anti_smoking_encoded", "r_automotive_after_market_oil_encoded",
+        # r_alcohol_drink_responsibly_message_encoded, r_alternative_transportation_encoded,
+        # r_associations_and_npo_anti_smoking_encoded removed — near-zero variance (99%+ same value)
+        "r_automotive_after_market_oil_encoded",
         "r_cpg_beverage_spirits_ooh_encoded", "r_cpg_beverage_spirits_video_encoded",
         "r_cpg_non_food_beverage_e_cigarette_encoded",
         "r_entertainment_casinos_and_gambling_encoded",
@@ -117,7 +121,8 @@ class Config:
         # Capability flags (c_*_encoded)
         "c_emv_enabled_encoded", "c_nfc_enabled_encoded", "c_open_24_hours_encoded",
         "c_sells_beer_encoded", "c_sells_diesel_fuel_encoded", "c_sells_lottery_encoded",
-        "c_vistar_programmatic_enabled_encoded", "c_walk_up_enabled_encoded",
+        "c_vistar_programmatic_enabled_encoded",
+        # c_walk_up_enabled_encoded removed — 98% Unknown, near-zero variance
         "c_sells_wine_encoded",
         # Other booleans
         "schedule_site_encoded", "sellable_site_encoded",
@@ -199,9 +204,10 @@ _MODEL_B_NUMERIC = [
     "rs_NVIs_95_185", "rs_Revenue_95_185",
     "rs_NVIs_185_370", "rs_Revenue_185_370",
     "rs_NVIs_370_740", "rs_Revenue_370_740",
-    "avg_monthly_revenue", "log_total_revenue",
+    "log_total_revenue",
     "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
     "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
+    "log_min_distance_to_walmart_mi", "log_min_distance_to_target_mi",
     "log_avg_household_income", "median_age",
     "pct_female",
 ]
@@ -219,9 +225,10 @@ _MODEL_A_NUMERIC = [
     "rs_NVIs_95_185", "rs_Revenue_95_185",
     "rs_NVIs_185_370", "rs_Revenue_185_370",
     "rs_NVIs_370_740", "rs_Revenue_370_740",
-    "avg_monthly_revenue", "log_total_revenue",
+    "log_total_revenue",
     "log_min_distance_to_nearest_site_mi", "log_min_distance_to_interstate_mi",
     "log_min_distance_to_kroger_mi", "log_min_distance_to_mcdonalds_mi",
+    "log_min_distance_to_walmart_mi", "log_min_distance_to_target_mi",
     "log_avg_household_income", "median_age",
     "pct_female",
     "pct_african_american", "pct_asian", "pct_hispanic",
@@ -235,7 +242,7 @@ _MODEL_A_CATEGORICAL = [
 
 # Boolean features are the same for both presets (all r_* and c_* flags)
 _ALL_BOOLEAN = [
-    "r_lottery_encoded", "r_government_encoded", "r_travel_and_tourism_encoded",
+    # r_lottery_encoded, r_government_encoded, r_travel_and_tourism_encoded removed — near-zero variance
     "r_retail_car_wash_encoded", "r_cpg_beverage_beer_oof_encoded",
     "r_cpg_beverage_beer_vide_encoded", "r_cpg_beverage_wine_oof_encoded",
     "r_cpg_beverage_wine_video_encoded", "r_finance_credit_cards_encoded",
@@ -243,8 +250,9 @@ _ALL_BOOLEAN = [
     "r_cpg_non_food_beverage_cannabis_medical_encoded",
     "r_cpg_non_food_beverage_cannabis_recreational_encoded",
     "r_cpg_non_food_beverage_cbd_hemp_non_thc_encoded",
-    "r_alcohol_drink_responsibly_message_encoded", "r_alternative_transportation_encoded",
-    "r_associations_and_npo_anti_smoking_encoded", "r_automotive_after_market_oil_encoded",
+    # r_alcohol_drink_responsibly_message_encoded, r_alternative_transportation_encoded,
+    # r_associations_and_npo_anti_smoking_encoded removed — near-zero variance
+    "r_automotive_after_market_oil_encoded",
     "r_cpg_beverage_spirits_ooh_encoded", "r_cpg_beverage_spirits_video_encoded",
     "r_cpg_non_food_beverage_e_cigarette_encoded",
     "r_entertainment_casinos_and_gambling_encoded",
@@ -254,7 +262,8 @@ _ALL_BOOLEAN = [
     "r_retail_grocerty_with_fuel_encoded",
     "c_emv_enabled_encoded", "c_nfc_enabled_encoded", "c_open_24_hours_encoded",
     "c_sells_beer_encoded", "c_sells_diesel_fuel_encoded", "c_sells_lottery_encoded",
-    "c_vistar_programmatic_enabled_encoded", "c_walk_up_enabled_encoded",
+    "c_vistar_programmatic_enabled_encoded",
+    # c_walk_up_enabled_encoded removed — 98% Unknown
     "c_sells_wine_encoded",
     "schedule_site_encoded", "sellable_site_encoded",
 ]

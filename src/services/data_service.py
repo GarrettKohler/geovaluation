@@ -367,7 +367,7 @@ def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
 
     Supports both single values and multi-select (arrays of values).
     When multiple values are provided for a field, sites matching ANY value are included (OR within field).
-    When multiple fields have filters, sites matching ANY field are included (OR between fields).
+    When multiple fields have filters, ALL fields must match (AND between fields) to narrow results.
 
     Args:
         filters: Dict mapping field display name to filter value (string) or values (list).
@@ -380,8 +380,8 @@ def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
 
     details_df = load_site_details()
 
-    # OR logic: include sites matching ANY filter field
-    mask = pd.Series([False] * len(details_df), index=details_df.index)
+    # AND logic: sites must match ALL filter fields (each filter narrows results)
+    mask = pd.Series([True] * len(details_df), index=details_df.index)
 
     for display_name, value in filters.items():
         if display_name in CATEGORICAL_FIELDS and value:
@@ -389,9 +389,9 @@ def get_filtered_site_ids(filters: Dict[str, Any]) -> List[str]:
             if col_name in details_df.columns:
                 if isinstance(value, list):
                     if len(value) > 0:
-                        mask = mask | (details_df[col_name].isin(value))
+                        mask = mask & (details_df[col_name].isin(value))
                 else:
-                    mask = mask | (details_df[col_name] == value)
+                    mask = mask & (details_df[col_name] == value)
 
     return details_df.loc[mask, 'gtvid'].tolist()
 

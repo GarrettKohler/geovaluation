@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Claude / Gemini config
+.claude/
+.gemini/
+CLAUDE.md
+
+# Large input data (mounted via Azure Blob Storage at runtime)
+data/input/
+data/hackathon_cleaned_sites.csv
+
+# Jupyter notebooks
+sagemaker/
+*.ipynb
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Docs (not needed at runtime)
+docs/
+
+# Tests (not needed in production image)
+tests/
+
+# Model outputs (generated at runtime)
+site_scoring/outputs/
