@@ -536,14 +536,8 @@ class EnsembleModel(nn.Module):
 
 
 # =============================================================================
-# Gradient Boosting Models (CatBoost & XGBoost)
+# Gradient Boosting Models (XGBoost)
 # =============================================================================
-
-try:
-    from catboost import CatBoostRegressor, CatBoostClassifier
-    CATBOOST_AVAILABLE = True
-except ImportError:
-    CATBOOST_AVAILABLE = False
 
 try:
     from xgboost import XGBRegressor, XGBClassifier
@@ -552,146 +546,6 @@ except ImportError:
     XGBOOST_AVAILABLE = False
 
 import numpy as np
-
-
-class CatBoostModel:
-    """
-    CatBoost wrapper for tabular regression/classification.
-
-    Advantages over neural networks for tabular data:
-    - Native handling of categorical features (no manual encoding needed)
-    - Typically faster training (5-10x)
-    - Often better accuracy on structured data
-    - Built-in feature importance
-    - Handles missing values automatically
-    """
-
-    def __init__(
-        self,
-        task_type: str = "regression",
-        cat_feature_indices: Optional[List[int]] = None,
-        feature_names: Optional[List[str]] = None,
-        iterations: int = 1000,
-        learning_rate: float = 0.03,
-        depth: int = 6,
-        early_stopping_rounds: int = 50,
-        verbose: int = 100,
-        random_seed: int = 42,
-    ):
-        """
-        Initialize CatBoost model.
-
-        Args:
-            task_type: "regression" or "lookalike" (classification)
-            cat_feature_indices: Indices of categorical features in the input array
-            feature_names: Names of all features (for interpretability)
-            iterations: Number of boosting iterations
-            learning_rate: Learning rate (eta)
-            depth: Tree depth
-            early_stopping_rounds: Stop if no improvement for N rounds
-            verbose: Print progress every N iterations
-            random_seed: Random seed for reproducibility
-        """
-        if not CATBOOST_AVAILABLE:
-            raise ImportError("CatBoost not installed. Run: pip install catboost")
-
-        self.task_type = task_type
-        self.cat_feature_indices = cat_feature_indices or []
-        self.feature_names = feature_names
-        self.is_fitted = False
-
-        common_params = {
-            'iterations': iterations,
-            'learning_rate': learning_rate,
-            'depth': depth,
-            'early_stopping_rounds': early_stopping_rounds,
-            'verbose': verbose,
-            'random_seed': random_seed,
-            'cat_features': self.cat_feature_indices,
-            'thread_count': -1,  # Use all cores
-        }
-
-        if task_type == "regression":
-            self.model = CatBoostRegressor(
-                loss_function='RMSE',
-                eval_metric='RMSE',
-                **common_params
-            )
-        else:  # lookalike / classification
-            self.model = CatBoostClassifier(
-                loss_function='Logloss',
-                eval_metric='AUC',
-                **common_params
-            )
-
-    def fit(
-        self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-        progress_callback: Optional[callable] = None,
-        callbacks: Optional[List] = None,
-    ) -> 'CatBoostModel':
-        """
-        Train the CatBoost model.
-
-        Args:
-            X_train: Training features (n_samples, n_features)
-            y_train: Training targets (n_samples,)
-            X_val: Validation features (optional, for early stopping)
-            y_val: Validation targets
-            progress_callback: Optional callback for progress updates
-            callbacks: Optional list of CatBoost callback instances
-
-        Returns:
-            self (fitted model)
-        """
-        eval_set = None
-        if X_val is not None and y_val is not None:
-            eval_set = (X_val, y_val)
-
-        fit_kwargs = {
-            'eval_set': eval_set,
-            'use_best_model': True if eval_set else False,
-        }
-        if callbacks:
-            fit_kwargs['callbacks'] = callbacks
-
-        self.model.fit(X_train, y_train, **fit_kwargs)
-        self.is_fitted = True
-        return self
-
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """Predict target values."""
-        if not self.is_fitted:
-            raise RuntimeError("Model not fitted. Call fit() first.")
-        return self.model.predict(X)
-
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """Predict class probabilities (classification only)."""
-        if self.task_type == "regression":
-            raise ValueError("predict_proba not available for regression")
-        if not self.is_fitted:
-            raise RuntimeError("Model not fitted. Call fit() first.")
-        return self.model.predict_proba(X)
-
-    def get_feature_importance(self) -> Dict[str, float]:
-        """Get feature importance scores (as native Python floats for JSON serialization)."""
-        if not self.is_fitted:
-            raise RuntimeError("Model not fitted. Call fit() first.")
-
-        importance = self.model.get_feature_importance()
-
-        # Convert to native Python float for JSON serialization
-        if self.feature_names and len(self.feature_names) == len(importance):
-            return {name: float(val) for name, val in zip(self.feature_names, importance)}
-        return {i: float(val) for i, val in enumerate(importance)}
-
-    @property
-    def best_iteration(self) -> int:
-        """Get the best iteration (with early stopping)."""
-        return self.model.best_iteration_ if self.is_fitted else 0
 
 
 class XGBoostModel:
@@ -846,7 +700,7 @@ def create_model(
     Factory function to create a model based on type.
 
     Args:
-        model_type: "neural_network", "catboost", or "xgboost"
+        model_type: "neural_network" or "xgboost"
         task_type: "regression" or "lookalike"
         n_numeric: Number of numeric features
         n_boolean: Number of boolean features
@@ -856,7 +710,7 @@ def create_model(
         **kwargs: Additional arguments passed to the model constructor
 
     Returns:
-        Model instance (SiteScoringModel, CatBoostModel, or XGBoostModel)
+        Model instance (SiteScoringModel or XGBoostModel)
     """
     if model_type == "neural_network":
         if config is not None:
@@ -866,23 +720,6 @@ def create_model(
             n_boolean=n_boolean,
             categorical_vocab_sizes=categorical_vocab_sizes,
             **kwargs
-        )
-
-    elif model_type == "catboost":
-        # CatBoost uses indices for categorical features
-        # Categorical features come after numeric features in our data layout
-        cat_start_idx = n_numeric
-        cat_end_idx = n_numeric + len(categorical_vocab_sizes)
-        cat_feature_indices = list(range(cat_start_idx, cat_end_idx))
-
-        return CatBoostModel(
-            task_type=task_type,
-            cat_feature_indices=cat_feature_indices,
-            feature_names=feature_names,
-            iterations=kwargs.get('epochs', 1000),
-            learning_rate=kwargs.get('learning_rate', 0.03),
-            depth=kwargs.get('depth', 6),
-            early_stopping_rounds=kwargs.get('early_stopping_rounds', 50),
         )
 
     elif model_type == "xgboost":
@@ -906,4 +743,4 @@ def create_model(
         )
 
     else:
-        raise ValueError(f"Unknown model_type: {model_type}. Choose from: neural_network, catboost, xgboost, clustering")
+        raise ValueError(f"Unknown model_type: {model_type}. Choose from: neural_network, xgboost, clustering")

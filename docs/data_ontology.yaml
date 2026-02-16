@@ -1,11 +1,11 @@
 # Auto-generated Data Ontology
-# Generated: 2026-02-12T20:24:16.995079+00:00
+# Generated: 2026-02-15T18:40:25.811992+00:00
 # Do not edit manually - regenerate with: python scripts/generate_data_ontology.py
 # Hook: .claude/hooks/update-data-ontology.sh auto-triggers on data file changes
 
 metadata:
   title: Geospatial Site Analysis - Data Ontology
-  generated_at: '2026-02-12T20:24:16.995079+00:00'
+  generated_at: '2026-02-15T18:40:25.811992+00:00'
   generator: scripts/generate_data_ontology.py
   project_root: /Users/home/gkdev/geospatial
   quick_mode: true
@@ -1119,8 +1119,8 @@ datasets:
       modified: '2026-02-05T18:38:30.482073+00:00'
     contents:
       exists: true
-      file_count: 70
-      total_size_human: 130.1 MB
+      file_count: 56
+      total_size_human: 81.0 MB
       files:
       - path: site_scoring/outputs/.DS_Store
         size_human: 6.0 KB
@@ -1134,144 +1134,144 @@ datasets:
       - path: site_scoring/outputs/experiments/.DS_Store
         size_human: 8.0 KB
         suffix: ''
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/best_model.json
-        size_human: 3.1 MB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/config.json
-        size_human: 1.0 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/model_metadata.json
-        size_human: 2.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/model_wrapper.pkl
-        size_human: 2.2 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/preprocessor.pkl
-        size_human: 3.3 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/shap_cache.npz
-        size_human: 148.4 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770913808_b8ff3313/shap_importance.json
-        size_human: 3.5 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/best_model.json
-        size_human: 3.0 MB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/config.json
-        size_human: 1.0 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/model_metadata.json
-        size_human: 2.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/model_wrapper.pkl
-        size_human: 2.1 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/preprocessor.pkl
-        size_human: 3.3 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/shap_cache.npz
-        size_human: 148.5 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770914434_4c581d4f/shap_importance.json
-        size_human: 3.5 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/best_model.json
-        size_human: 3.0 MB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/config.json
+      - path: site_scoring/outputs/experiments/job_1770927948_d9bea043/config.json
         size_human: 3.1 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/model_metadata.json
-        size_human: 2.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/model_wrapper.pkl
-        size_human: 2.1 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/preprocessor.pkl
-        size_human: 3.3 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/shap_cache.npz
-        size_human: 148.5 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770914671_b926201e/shap_importance.json
-        size_human: 3.5 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914760_4bd6687b/best_model.pt
-        size_human: 4.3 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770914760_4bd6687b/config.json
+      - path: site_scoring/outputs/experiments/job_1770927949_bf7a01f5/config.json
         size_human: 3.1 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770914760_4bd6687b/preprocessor.pkl
-        size_human: 3.3 MB
+      - path: site_scoring/outputs/experiments/job_1770927949_de8a2fd6/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/best_model.pt
+        size_human: 3.2 MB
+        suffix: .pt
+      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/config.json
+        size_human: 3.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/preprocessor.pkl
+        size_human: 11.9 KB
         suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770914760_4bd6687b/shap_cache.npz
-        size_human: 38.3 KB
+      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/shap_cache.npz
+        size_human: 39.9 KB
         suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770914760_4bd6687b/shap_importance.json
+      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/shap_importance.json
         size_human: 3.7 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770920111_ee68f5eb/best_model.pt
-        size_human: 4.3 MB
+      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/best_model.pt
+        size_human: 3.2 MB
         suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770920111_ee68f5eb/config.json
-        size_human: 4.7 KB
+      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/config.json
+        size_human: 3.2 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770920111_ee68f5eb/preprocessor.pkl
-        size_human: 3.3 MB
+      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/preprocessor.pkl
+        size_human: 11.9 KB
         suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770920111_ee68f5eb/shap_cache.npz
-        size_human: 34.8 KB
+      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/shap_cache.npz
+        size_human: 39.9 KB
         suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770920111_ee68f5eb/shap_importance.json
+      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/shap_importance.json
         size_human: 3.7 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770920337_412c1576/best_model.pt
-        size_human: 4.3 MB
+      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/best_model.pt
+        size_human: 3.2 MB
         suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770920337_412c1576/config.json
-        size_human: 4.7 KB
+      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/config.json
+        size_human: 3.2 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770920337_412c1576/preprocessor.pkl
-        size_human: 3.3 MB
+      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/preprocessor.pkl
+        size_human: 11.8 KB
         suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770920525_e163cc87/best_model.pt
-        size_human: 4.4 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770920525_e163cc87/config.json
-        size_human: 4.0 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770920525_e163cc87/preprocessor.pkl
-        size_human: 3.3 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770920525_e163cc87/shap_cache.npz
-        size_human: 60.6 KB
+      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/shap_cache.npz
+        size_human: 39.8 KB
         suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770920525_e163cc87/shap_importance.json
+      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/shap_importance.json
+        size_human: 3.7 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931685_92735211/best_model.pt
+        size_human: 3.2 MB
+        suffix: .pt
+      - path: site_scoring/outputs/experiments/job_1770931685_92735211/config.json
+        size_human: 3.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931685_92735211/preprocessor.pkl
+        size_human: 11.8 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770931685_92735211/shap_cache.npz
+        size_human: 39.8 KB
+        suffix: .npz
+      - path: site_scoring/outputs/experiments/job_1770931685_92735211/shap_importance.json
+        size_human: 3.7 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/best_model.pt
+        size_human: 3.2 MB
+        suffix: .pt
+      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/config.json
+        size_human: 3.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/preprocessor.pkl
+        size_human: 11.8 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/shap_cache.npz
+        size_human: 39.9 KB
+        suffix: .npz
+      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/shap_importance.json
         size_human: 3.6 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770925772_9b468780/best_model.pt
-        size_human: 4.4 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770925772_9b468780/config.json
-        size_human: 4.0 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770925772_9b468780/preprocessor.pkl
-        size_human: 3.3 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770925772_9b468780/shap_cache.npz
-        size_human: 60.4 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770925772_9b468780/shap_importance.json
-        size_human: 3.7 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770926327_318ec9da/best_model.json
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/best_model.json
         size_human: 3.0 MB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770926327_318ec9da/config.json
-        size_human: 4.9 KB
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/config.json
+        size_human: 3.2 KB
         suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/model_metadata.json
+        size_human: 2.3 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/model_wrapper.pkl
+        size_human: 2.1 MB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/preprocessor.pkl
+        size_human: 11.9 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/shap_cache.npz
+        size_human: 157.8 KB
+        suffix: .npz
+      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/shap_importance.json
+        size_human: 3.5 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/best_model.json
+        size_human: 3.0 MB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/config.json
+        size_human: 3.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/model_metadata.json
+        size_human: 2.3 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/model_wrapper.pkl
+        size_human: 2.1 MB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/preprocessor.pkl
+        size_human: 11.9 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/shap_cache.npz
+        size_human: 157.9 KB
+        suffix: .npz
+      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/shap_importance.json
+        size_human: 3.5 KB
+        suffix: .json
+      - path: site_scoring/outputs/explainability/calibrator.pkl
+        size_human: 615.0 B
+        suffix: .pkl
+      - path: site_scoring/outputs/explainability/conformal.pkl
+        size_human: 296.0 B
+        suffix: .pkl
+      - path: site_scoring/outputs/explainability/metadata.pkl
+        size_human: 2.5 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/explainability/tier_classifier.pkl
+        size_human: 156.0 B
+        suffix: .pkl
   precleaned_summary:
     id: precleaned_summary
     path: data/processed/precleaned_summary.txt

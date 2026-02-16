@@ -3186,7 +3186,6 @@
                     <label class="training-form-label" data-tooltip="XGBoost is fast and often best for tabular data. Neural networks can learn complex patterns with embeddings.">Model Type</label>
                     <select class="training-form-select" id="model-algorithm">
                         <option value="xgboost" selected>XGBoost (Fast, Recommended)</option>
-                        <option value="catboost">CatBoost (Best for Categories)</option>
                         <option value="neural_network">Neural Network (Flexible)</option>
                     </select>
                     <div class="training-form-hint" id="model-algorithm-hint">Gradient boosting - fast training, great accuracy</div>
@@ -3206,7 +3205,6 @@
                 <!-- Hidden combined selector for backward compatibility -->
                 <select class="training-form-select" id="training-task" style="display: none;">
                     <option value="regression_xgboost" selected>Revenue Prediction - XGBoost</option>
-                    <option value="regression_catboost">Revenue Prediction - CatBoost</option>
                     <option value="regression_neural_network">Revenue Prediction - PyTorch Neural Network</option>
                     <option value="lookalike_neural_network">Top Site Lookalike Classifier - PyTorch Neural Network</option>
                 </select>
@@ -6202,7 +6200,7 @@
                 // Build the combined value
                 let combinedValue = predTask + '_' + modelAlg;
 
-                // Handle special cases - catboost not available for lookalike
+                // Handle special cases - xgboost not available for lookalike
                 if (predTask === 'lookalike' && modelAlg !== 'neural_network') {
                     combinedValue = 'lookalike_neural_network';
                     if (modelAlgorithmSelect) {
@@ -6237,20 +6235,15 @@
 
                 const modelHints = {
                     'xgboost': 'Gradient boosting - fast training, great accuracy',
-                    'catboost': 'Handles categories natively - often best for mixed data',
                     'neural_network': 'Deep learning - flexible, uses GPU acceleration'
                 };
 
                 if (predHint) predHint.textContent = predHints[predTask] || '';
                 if (modelHint) modelHint.textContent = modelHints[modelAlg] || '';
 
-                // Disable catboost for lookalike and clustering tasks
+                // Disable xgboost for clustering tasks
                 if (modelAlgorithmSelect) {
-                    const catboostOption = modelAlgorithmSelect.querySelector('option[value="catboost"]');
                     const xgboostOption = modelAlgorithmSelect.querySelector('option[value="xgboost"]');
-                    if (catboostOption) {
-                        catboostOption.disabled = (predTask === 'lookalike' || predTask === 'clustering');
-                    }
                     if (xgboostOption) {
                         xgboostOption.disabled = (predTask === 'clustering');
                     }
@@ -6439,8 +6432,7 @@
             let taskType = 'regression';
             if (isLookalikeTask) taskType = 'lookalike';
             if (isClusteringTask) taskType = 'clustering';
-            const modelType = trainingTask.includes('xgboost') ? 'xgboost' :
-                              trainingTask.includes('catboost') ? 'catboost' : 'neural_network';
+            const modelType = trainingTask.includes('xgboost') ? 'xgboost' : 'neural_network';
 
             // Update hidden inputs for backward compatibility
             document.getElementById('task-type').value = taskType;
@@ -6449,7 +6441,6 @@
             // Training task descriptions
             const taskHints = {
                 'regression_xgboost': 'Gradient boosting model for revenue prediction',
-                'regression_catboost': 'CatBoost model for revenue prediction',
                 'regression_neural_network': 'Deep learning model with embeddings for revenue prediction',
                 'lookalike_neural_network': 'Classifier to find inactive sites similar to top performers',
                 'clustering_neural_network': 'Deep Embedded Clustering to segment top performers'
@@ -7958,6 +7949,7 @@
                     dropout: document.getElementById('dropout')?.value,
                     hiddenLayers: document.getElementById('hidden-layers')?.value,
                     embeddingDim: document.getElementById('embedding-dim')?.value,
+                    earlyStoppingPatience: document.getElementById('early-stopping')?.value,
                     modelPreset: document.getElementById('model-preset')?.value,
                     modelType: document.getElementById('model-type')?.value,
                     features: {
@@ -8299,6 +8291,35 @@ ${booleanList.map(f => `  - ${getFeatureDisplayName(f)}`).join('\n')}`;
                 ? 'Top Performer Lookalike (Classification)'
                 : 'Revenue Prediction (Regression)';
 
+            const selectedModelType = document.getElementById('model-type')?.value || 'neural_network';
+            const modelTypeLabels = {
+                'neural_network': 'Neural Network (PyTorch)',
+                'xgboost': 'XGBoost (Gradient Boosting)',
+            };
+            const modelTypeDisplay = modelTypeLabels[selectedModelType] || selectedModelType;
+            const isTreeModel = selectedModelType === 'xgboost';
+
+            let hyperparamsSection;
+            if (isTreeModel) {
+                const epochs = parseInt(document.getElementById('epochs')?.value || '50');
+                const nEstimators = epochs < 100 ? 500 : epochs;
+                const lr = parseFloat(document.getElementById('learning-rate')?.value || '0.0001');
+                const earlyStop = parseInt(document.getElementById('early-stopping')?.value || '10');
+                hyperparamsSection = `Hyperparameters:
+  - Boosting Rounds: ${nEstimators}
+  - Learning Rate:  ${lr > 0.001 ? lr : 0.03}
+  - Max Depth:      6
+  - Early Stopping: ${earlyStop * 5} rounds`;
+            } else {
+                hyperparamsSection = `Hyperparameters:
+  - Epochs:         ${document.getElementById('epochs')?.value || 'N/A'}
+  - Batch Size:     ${document.getElementById('batch-size')?.value || 'N/A'}
+  - Learning Rate:  ${document.getElementById('learning-rate')?.value || 'N/A'}
+  - Dropout:        ${document.getElementById('dropout')?.value || 'N/A'}
+  - Hidden Layers:  ${document.getElementById('hidden-layers')?.value || 'N/A'}
+  - Embedding Dim:  ${document.getElementById('embedding-dim')?.value || 'N/A'}`;
+            }
+
             let content = `
 ================================================================================
 ${modelTitle}
@@ -8310,16 +8331,10 @@ Timestamp: ${timestamp}
 MODEL CONFIGURATION
 ================================================================================
 Task Type:          ${taskDescription}
-Model Type:         Neural Network (PyTorch)
+Model Type:         ${modelTypeDisplay}
 Target Variable:    ${taskType === 'lookalike' ? 'Top Performer Classification' : 'Average Monthly Revenue'}
 
-Hyperparameters:
-  - Epochs:         ${document.getElementById('epochs')?.value || 'N/A'}
-  - Batch Size:     ${document.getElementById('batch-size')?.value || 'N/A'}
-  - Learning Rate:  ${document.getElementById('learning-rate')?.value || 'N/A'}
-  - Dropout:        ${document.getElementById('dropout')?.value || 'N/A'}
-  - Hidden Layers:  ${document.getElementById('hidden-layers')?.value || 'N/A'}
-  - Embedding Dim:  ${document.getElementById('embedding-dim')?.value || 'N/A'}
+${hyperparamsSection}
 
 ================================================================================
 FEATURES USED FOR TRAINING

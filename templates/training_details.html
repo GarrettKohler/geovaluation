@@ -1208,7 +1208,6 @@
             const modelTypeLabels = {
                 'neural_network': 'Neural Network (PyTorch)',
                 'xgboost': 'XGBoost (Gradient Boosting)',
-                'catboost': 'CatBoost (Gradient Boosting)',
             };
             const modelTypeDisplay = modelTypeLabels[config?.modelType] || config?.modelType || 'Neural Network (PyTorch)';
 
@@ -1236,6 +1235,25 @@ ${booleanFeatures.length > 0 ? booleanFeatures.map(f => '  - ' + f).join('\n') :
 `;
             }
 
+            const isTreeModel = config?.modelType === 'xgboost';
+            let hyperparamsSection;
+            if (isTreeModel) {
+                const nEstimators = (config?.epochs && parseInt(config.epochs) < 100) ? 500 : (config?.epochs || 500);
+                hyperparamsSection = `Hyperparameters:
+  - Boosting Rounds: ${nEstimators}
+  - Learning Rate:  ${config?.learningRate && parseFloat(config.learningRate) > 0.001 ? config.learningRate : '0.03'}
+  - Max Depth:      6
+  - Early Stopping: ${(config?.earlyStoppingPatience || 10) * 5} rounds`;
+            } else {
+                hyperparamsSection = `Hyperparameters:
+  - Epochs:         ${config?.epochs || 'N/A'}
+  - Batch Size:     ${config?.batchSize || 'N/A'}
+  - Learning Rate:  ${config?.learningRate || 'N/A'}
+  - Dropout:        ${config?.dropout || 'N/A'}
+  - Hidden Layers:  ${config?.hiddenLayers || 'N/A'}
+  - Embedding Dim:  ${config?.embeddingDim || 'N/A'}`;
+            }
+
             let content = `
 ================================================================================
 ${modelTitle}
@@ -1250,13 +1268,7 @@ Task Type:          ${taskDescription}
 Model Type:         ${modelTypeDisplay}
 Target Variable:    ${taskType === 'lookalike' ? 'Top Performer Classification' : 'Average Monthly Revenue'}
 
-Hyperparameters:
-  - Epochs:         ${config?.epochs || 'N/A'}
-  - Batch Size:     ${config?.batchSize || 'N/A'}
-  - Learning Rate:  ${config?.learningRate || 'N/A'}
-  - Dropout:        ${config?.dropout || 'N/A'}
-  - Hidden Layers:  ${config?.hiddenLayers || 'N/A'}
-  - Embedding Dim:  ${config?.embeddingDim || 'N/A'}
+${hyperparamsSection}
 ${featureSection}
 ================================================================================
 TRAINING METRICS
@@ -1297,11 +1309,8 @@ Generated: ${new Date().toLocaleString()}
 `;
 
             // Training Sites
-            content += `TRAINING SITES (${trainingSiteIds.length} records)
---------------------------------------------------------------------------------------------------------------
-Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenue  | Score
---------------------------------------------------------------------------------------------------------------
-`;
+            content += `TRAINING SITES (${trainingSiteIds.length} records)\n`;
+            content += `Site ID,Status,Avg Monthly Rev,Predicted Rev,Total Revenue,Score\n`;
 
             trainingSiteIds.forEach(siteId => {
                 const site = siteDetails[siteId] || {};
@@ -1311,22 +1320,16 @@ Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenu
                 const status = site.status || 'Unknown';
                 const predicted = site.predictedRevenue;
                 const predictedStr = predicted !== null && predicted !== undefined
-                    ? '$' + predicted.toLocaleString(undefined, {maximumFractionDigits: 0}).padStart(13)
-                    : '-'.padStart(14);
+                    ? predicted.toFixed(2) : '';
 
-                content += `${siteId.padEnd(16)} | ${status.padEnd(10)} | $${avgRevenue.toLocaleString().padStart(14)} | ${predictedStr} | $${totalRevenue.toLocaleString().padStart(13)} | ${(score * 100).toFixed(1)}%\n`;
+                content += `="${siteId}",${status},${avgRevenue.toFixed(2)},${predictedStr},${totalRevenue.toFixed(2)},${(score * 100).toFixed(1)}%\n`;
             });
 
             // Secondary Sites (Lookalike or Test)
             const secondaryLabel = taskType === 'lookalike' ? 'LOOKALIKE' : 'TEST';
             if (lookalikeSiteIds && lookalikeSiteIds.length > 0) {
-                content += `
-================================================================================
-${secondaryLabel} SITES (${lookalikeSiteIds.length} records)
---------------------------------------------------------------------------------------------------------------
-Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenue  | Score
---------------------------------------------------------------------------------------------------------------
-`;
+                content += `\n${secondaryLabel} SITES (${lookalikeSiteIds.length} records)\n`;
+                content += `Site ID,Status,Avg Monthly Rev,Predicted Rev,Total Revenue,Score\n`;
 
                 lookalikeSiteIds.forEach(siteId => {
                     const site = siteDetails[siteId] || {};
@@ -1336,22 +1339,16 @@ Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenu
                     const status = site.status || 'Unknown';
                     const predicted = site.predictedRevenue;
                     const predictedStr = predicted !== null && predicted !== undefined
-                        ? '$' + predicted.toLocaleString(undefined, {maximumFractionDigits: 0}).padStart(13)
-                        : '-'.padStart(14);
+                        ? predicted.toFixed(2) : '';
 
-                    content += `${siteId.padEnd(16)} | ${status.padEnd(10)} | $${avgRevenue.toLocaleString().padStart(14)} | ${predictedStr} | $${totalRevenue.toLocaleString().padStart(13)} | ${(score * 100).toFixed(1)}%\n`;
+                    content += `="${siteId}",${status},${avgRevenue.toFixed(2)},${predictedStr},${totalRevenue.toFixed(2)},${(score * 100).toFixed(1)}%\n`;
                 });
             }
 
             // Predicted-Only Sites (inactive sites with model predictions)
             if (predictedOnlySiteIds && predictedOnlySiteIds.length > 0) {
-                content += `
-================================================================================
-PREDICTED SITES (${predictedOnlySiteIds.length} records)
---------------------------------------------------------------------------------------------------------------
-Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenue  | Score
---------------------------------------------------------------------------------------------------------------
-`;
+                content += `\nPREDICTED SITES (${predictedOnlySiteIds.length} records)\n`;
+                content += `Site ID,Status,Avg Monthly Rev,Predicted Rev,Total Revenue,Score\n`;
 
                 predictedOnlySiteIds.forEach(siteId => {
                     const site = siteDetails[siteId] || {};
@@ -1361,10 +1358,9 @@ Site ID          | Status     | Avg Monthly Rev | Predicted Rev   | Total Revenu
                     const status = site.status || 'Unknown';
                     const predicted = site.predictedRevenue;
                     const predictedStr = predicted !== null && predicted !== undefined
-                        ? '$' + predicted.toLocaleString(undefined, {maximumFractionDigits: 0}).padStart(13)
-                        : '-'.padStart(14);
+                        ? predicted.toFixed(2) : '';
 
-                    content += `${siteId.padEnd(16)} | ${status.padEnd(10)} | $${avgRevenue.toLocaleString().padStart(14)} | ${predictedStr} | $${totalRevenue.toLocaleString().padStart(13)} | ${(score * 100).toFixed(1)}%\n`;
+                    content += `="${siteId}",${status},${avgRevenue.toFixed(2)},${predictedStr},${totalRevenue.toFixed(2)},${(score * 100).toFixed(1)}%\n`;
                 });
             }
 

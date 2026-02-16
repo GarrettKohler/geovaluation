@@ -250,13 +250,13 @@ def compute_shap_values_tree(
     progress_callback=None,
 ) -> bool:
     """
-    Compute SHAP values for tree-based models (CatBoost, XGBoost) using TreeExplainer.
+    Compute SHAP values for tree-based models (XGBoost) using TreeExplainer.
 
     TreeExplainer is much faster than KernelExplainer for tree models because it
     uses the tree structure directly to compute exact Shapley values.
 
     Args:
-        model: Trained CatBoost or XGBoost model (wrapper or native)
+        model: Trained XGBoost model (wrapper or native)
         X_test: Test data as numpy array (n_samples, n_features)
         feature_names: List of all feature names
         output_dir: Directory to save SHAP cache

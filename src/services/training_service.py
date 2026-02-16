@@ -27,10 +27,8 @@ from site_scoring.config import Config, DEFAULT_OUTPUT_DIR
 from site_scoring.model import (
     SiteScoringModel,
     ClusteringModel,
-    CatBoostModel,
     XGBoostModel,
     create_model,
-    CATBOOST_AVAILABLE,
     XGBOOST_AVAILABLE,
 )
 from site_scoring.data_loader import DataProcessor, create_data_loaders
@@ -471,78 +469,9 @@ def _create_xgboost_progress_callback(report_fn, job, config, X_val, y_val, tota
     return XGBoostProgressCallback()
 
 
-class CatBoostProgressCallback:
-    """
-    CatBoost training callback that reports progress to the SSE stream.
-
-    CatBoost callbacks implement after_iteration(info) which receives
-    iteration number and metric values.
-    """
-
-    def __init__(self, report_fn, job, config, X_val, y_val, total_rounds, start_time, report_interval=10):
-        self.report_fn = report_fn
-        self.job = job
-        self.config = config
-        self.X_val = X_val
-        self.y_val = y_val
-        self.total_rounds = total_rounds
-        self.start_time = start_time
-        self.report_interval = report_interval
-        self.best_val_rmse = float('inf')
-
-    def after_iteration(self, info):
-        """Called by CatBoost after each boosting iteration."""
-        iteration = info.iteration
-        if iteration % self.report_interval != 0 and iteration != self.total_rounds - 1:
-            return True  # continue training
-
-        # Extract metrics from CatBoost info
-        val_rmse = 0.0
-        if info.metrics and 'validation' in info.metrics:
-            val_metrics = info.metrics['validation']
-            if 'RMSE' in val_metrics:
-                val_rmse = float(val_metrics['RMSE'][-1])
-
-        # Compute detailed metrics on validation set
-        try:
-            preds = info.model.predict(self.X_val)
-            errors = preds - self.y_val
-            mae = float(np.mean(np.abs(errors)))
-            rmse = float(np.sqrt(np.mean(errors**2)))
-            ss_res = np.sum(errors**2)
-            ss_tot = np.sum((self.y_val - np.mean(self.y_val))**2)
-            r2 = float(1 - (ss_res / ss_tot)) if ss_tot > 0 else 0.0
-            denominator = (np.abs(preds) + np.abs(self.y_val)) / 2
-            denominator = np.where(denominator == 0, 1, denominator)
-            smape = float(np.mean(np.abs(errors) / denominator) * 100)
-        except Exception:
-            mae, rmse, r2, smape = 0.0, val_rmse, 0.0, 0.0
-
-        if rmse < self.best_val_rmse:
-            self.best_val_rmse = rmse
-
-        self.report_fn(TrainingProgress(
-            job_id=self.job.job_id,
-            epoch=iteration + 1,
-            total_epochs=self.total_rounds,
-            train_loss=val_rmse,
-            val_loss=rmse,
-            val_mae=mae,
-            val_smape=smape,
-            val_rmse=rmse,
-            val_r2=r2,
-            learning_rate=self.config.learning_rate,
-            elapsed_time=float(time.time() - self.start_time),
-            status="running",
-            message=f"Round {iteration + 1}/{self.total_rounds}",
-            best_val_loss=self.best_val_rmse,
-        ))
-        return True  # continue training
-
-
 def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, test_loader, processor, report_callback, start_time):
     """
-    Training path for XGBoost and CatBoost models.
+    Training path for XGBoost models.
 
     Converts DataLoaders to numpy, trains with per-round progress callbacks,
     evaluates on held-out test set, computes SHAP TreeExplainer importance,
@@ -600,18 +529,6 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
             start_time=start_time,
             report_interval=10,
         ))
-    elif config.model_type == "catboost":
-        callbacks.append(CatBoostProgressCallback(
-            report_fn=report_callback,
-            job=job,
-            config=config,
-            X_val=X_val,
-            y_val=y_val,
-            total_rounds=n_estimators,
-            start_time=start_time,
-            report_interval=10,
-        ))
-
     model.fit(X_train, y_train, X_val=X_val, y_val=y_val, callbacks=callbacks)
 
     # Step 4: Test set evaluation
@@ -701,8 +618,6 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         # Clear training callbacks before saving (they contain unpicklable local classes)
         model.model.set_params(callbacks=None)
         model.model.save_model(str(job.output_dir / "best_model.json"))
-    elif config.model_type == "catboost":
-        model.model.save_model(str(job.output_dir / "best_model.cbm"))
 
     # Also pickle the wrapper for easy reloading
     with open(job.output_dir / "model_wrapper.pkl", "wb") as f:
@@ -1244,8 +1159,8 @@ def run_training_logic(job: TrainingJob, report_callback):
     # Load data
     train_loader, val_loader, test_loader, processor = create_data_loaders(pytorch_config)
 
-    # Dispatch: tree-based models (XGBoost, CatBoost) use a separate training path
-    if config.model_type in ("xgboost", "catboost"):
+    # Dispatch: tree-based models (XGBoost) use a separate training path
+    if config.model_type == "xgboost":
         _run_tree_training(
             job, config, pytorch_config, train_loader, val_loader,
             test_loader, processor, report_callback, start_time
@@ -1675,7 +1590,10 @@ def detect_apple_chip() -> Dict:
     return chip_info
 
 def get_system_info() -> Dict:
-    return {"pytorch_version": torch.__version__, "mps_available": torch.backends.mps.is_available()}
+    info = {"pytorch_version": torch.__version__, "mps_available": torch.backends.mps.is_available()}
+    if info["mps_available"]:
+        info.update(detect_apple_chip())
+    return info
 
 def start_training(config_dict: Dict) -> Tuple[bool, str]:
     """Start a new training job."""

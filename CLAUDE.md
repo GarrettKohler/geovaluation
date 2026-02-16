@@ -17,11 +17,11 @@ Flask web app with PyTorch ML pipeline. Visualizes site performance on Leaflet m
 │   ├── data_service.py     # Site data loading for web (pandas)
 │   └── training_service.py # ML training orchestration
 ├── site_scoring/           # ML pipeline
-│   ├── data/               # NEW: Standardized data loading
+│   ├── data/               # Standardized data loading
 │   │   ├── registry.py     # DataRegistry singleton
 │   │   └── outputs/tensor.py # FeatureProcessor
 │   ├── config.py           # Model configuration, feature lists
-│   ├── model.py            # PyTorch neural network
+│   ├── model.py            # XGBoost + PyTorch neural network
 │   ├── trainer.py          # Training loop
 │   ├── data_loader.py      # Tensor conversion
 │   └── data_transform.py   # ETL pipeline (polars)
