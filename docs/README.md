@@ -1,5 +1,8 @@
        Comprehensive Geospatial Codebase Exploration                                                                    
-                                                                                                                                                                                                                       
+                                                                                                                                                                               DATA
+       The data for this is too large to keep in repo
+       Link to download zip: https://drive.google.com/file/d/1AVj85ifnmEoBBMfPBZwXZEtYhgiPH7Ej/view?usp=sharing
+                                                                                                                                                                        
        ---                                                                                                              
        PROJECT OVERVIEW                                                                                                 
                                                                                                                         
