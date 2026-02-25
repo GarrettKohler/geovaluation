@@ -788,18 +788,28 @@ def _export_classification_results(job, processor, test_predictions, test_target
             threshold = getattr(processor, 'top_performer_threshold', None)
             target_col = job.config.target if hasattr(job.config, 'target') else 'avg_monthly_revenue'
 
+            # Build rows sorted by predicted_probability descending
+            gtvids_list = non_active_df['gtvid'].to_list()
+            statuses_list = non_active_df['status'].to_list()
+            revenues = non_active_df[target_col].fill_null(0).to_list() if target_col in non_active_df.columns else [0] * len(gtvids_list)
+
+            rows = []
+            for gtvid, status, revenue in zip(gtvids_list, statuses_list, revenues):
+                prob = scores.get(gtvid, 0.0)
+                label = 1 if (threshold is not None and revenue >= threshold) else 0
+                rows.append([gtvid, status, prob, label, test_roc_auc])
+
+            # Sort by predicted_probability descending to assign top-5000 flag
+            rows.sort(key=lambda r: r[2], reverse=True)
+
             non_active_path = experiment_dir / "non_active_classification.csv"
             with open(non_active_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["gtvid", "status", "predicted_probability", "actual_label", "model_roc_auc"])
-                gtvids_list = non_active_df['gtvid'].to_list()
-                statuses_list = non_active_df['status'].to_list()
-                revenues = non_active_df[target_col].fill_null(0).to_list() if target_col in non_active_df.columns else [0] * len(gtvids_list)
-                for gtvid, status, revenue in zip(gtvids_list, statuses_list, revenues):
-                    prob = scores.get(gtvid, 0.0)
-                    label = 1 if (threshold is not None and revenue >= threshold) else 0
-                    writer.writerow([gtvid, status, prob, label, test_roc_auc])
-            print(f"  Exported {len(gtvids_list)} non-active sites → {non_active_path.name}")
+                writer.writerow(["gtvid", "status", "predicted_probability", "actual_label", "model_roc_auc", "top_5000"])
+                for rank, row in enumerate(rows, start=1):
+                    top_5000 = 1 if rank <= 5000 else 0
+                    writer.writerow(row + [top_5000])
+            print(f"  Exported {len(rows)} non-active sites → {non_active_path.name} (top 5000 flagged)")
     except Exception as e:
         print(f"  Warning: Non-active site export failed: {e}")
 

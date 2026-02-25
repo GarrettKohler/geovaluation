@@ -226,14 +226,14 @@ class TestNonActiveCsv:
     """Tests for non_active_classification.csv export."""
 
     def test_non_active_csv_columns(self, run_export):
-        """Verify non-active CSV has required columns."""
+        """Verify non-active CSV has required columns including top_5000."""
         path = run_export / "non_active_classification.csv"
         assert path.exists(), "non_active_classification.csv was not created"
 
         with open(path) as f:
             reader = csv.DictReader(f)
             assert set(reader.fieldnames) == {
-                "gtvid", "status", "predicted_probability", "actual_label", "model_roc_auc"
+                "gtvid", "status", "predicted_probability", "actual_label", "model_roc_auc", "top_5000"
             }
 
     def test_non_active_excludes_active_sites(self, run_export):
@@ -265,3 +265,36 @@ class TestNonActiveCsv:
             labels = {row["actual_label"] for row in reader}
 
         assert labels.issubset({"0", "1"})
+
+    def test_top_5000_column_is_binary(self, run_export):
+        """top_5000 is 0 or 1 in non_active_classification.csv."""
+        path = run_export / "non_active_classification.csv"
+
+        with open(path) as f:
+            reader = csv.DictReader(f)
+            flags = {row["top_5000"] for row in reader}
+
+        assert flags.issubset({"0", "1"})
+
+    def test_top_5000_all_flagged_when_under_5000(self, run_export):
+        """With only 4 non-active sites, all should be flagged as top_5000=1."""
+        path = run_export / "non_active_classification.csv"
+
+        with open(path) as f:
+            reader = csv.DictReader(f)
+            flags = [row["top_5000"] for row in reader]
+
+        assert all(f == "1" for f in flags), f"Expected all top_5000=1, got {flags}"
+
+    def test_non_active_sorted_by_probability_descending(self, run_export):
+        """non_active_classification.csv is sorted by predicted_probability descending."""
+        path = run_export / "non_active_classification.csv"
+
+        with open(path) as f:
+            reader = csv.DictReader(f)
+            probs = [float(row["predicted_probability"]) for row in reader]
+
+        for i in range(len(probs) - 1):
+            assert probs[i] >= probs[i + 1], (
+                f"Row {i} prob {probs[i]} < row {i+1} prob {probs[i+1]}"
+            )
