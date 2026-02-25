@@ -941,6 +941,37 @@ def create_training_dataset(
     return train_df
 
 
+# Module-level cache for prediction data (~25MB)
+_prediction_data_cache: Optional[pl.DataFrame] = None
+
+
+def get_all_sites_for_prediction() -> pl.DataFrame:
+    """
+    Load all sites (all statuses) with derived features for batch prediction.
+
+    Loads site_aggregated_precleaned.parquet (57K sites) and applies the same
+    transforms as training (log transforms, one-hot encoding, binning) but
+    without the active-only filter.
+
+    Results are cached at module level — computed once, reused for all requests.
+    """
+    global _prediction_data_cache
+    if _prediction_data_cache is not None:
+        return _prediction_data_cache
+
+    parquet_path = DEFAULT_OUTPUT_PATH / "site_aggregated_precleaned.parquet"
+    print(f"Loading all sites for prediction from {parquet_path}...")
+    df = pl.read_parquet(parquet_path)
+    print(f"  Loaded {len(df):,} sites (all statuses)")
+
+    # Apply same transforms as training but keep all sites
+    df = prepare_training_dataset(df, active_only=False, drop_geo_ids=True)
+    print(f"  Prepared {len(df):,} sites with derived features")
+
+    _prediction_data_cache = df
+    return df
+
+
 if __name__ == "__main__":
     # Create both pre-cleaned and training datasets
     train_df = create_training_dataset()

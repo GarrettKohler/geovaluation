@@ -1,0 +1,44 @@
+column_name,description,pct_missing,n_unique,data_type
+ID - Gbase,Internal site identifier (matches id_gbase in monthly data),0.01,67647,String
+R - Lottery,Advertising restriction: Lottery,0.0,2,Boolean
+R - Government,Advertising restriction: Government,0.0,2,Boolean
+R - Travel & Tourism,Advertising restriction: Travel & Tourism,0.0,2,Boolean
+R - CPG - Beverage - Beer - OOH,Restriction: Beer out-of-home ads,0.0,2,Boolean
+R - CPG - Beverage - Beer - Video,Restriction: Beer video ads,0.0,2,Boolean
+R - CPG - Beverage - Wine - OOH,Restriction: Wine out-of-home ads,0.0,2,Boolean
+R - CPG - Beverage - Wine - Video,Restriction: Wine video ads,0.0,2,Boolean
+R - Finance - Credit Cards,Restriction: Credit card ads,0.0,2,Boolean
+R - CPG - CBD Hemp Ingestibles (Non-THC),Restriction: CBD/hemp ingestible ads,0.0,2,Boolean
+R - CPG - Non Food/Beverage - Cannabis (Medical Use),Restriction: Medical cannabis ads,0.0,2,Boolean
+Average Daily Impressions,Average daily ad impressions at the site,0.03,833,Int64
+R - CPG - Non Food/Beverage - Cannabis (Recreational Use),Restriction: Recreational cannabis ads,0.0,2,Boolean
+C - Sells Spirits,Capability: Site sells spirits,11.44,3,String
+R - CPG - Non Food/Beverage - CBD Hemp (Non-THC),Restriction: Non-food CBD/hemp ads,0.0,2,Boolean
+C - Sells Wine,Capability: Site sells wine,11.45,3,String
+R - Automotive - Electric,Restriction: Electric vehicle ads,0.0,2,Boolean
+Retailer - # of Contacts with Email,Number of retailer contacts with email on file,1.85,34,Float64
+R - Alcohol - Drink Responsibly Message,Restriction: Alcohol responsibility messaging,0.0,1,Boolean
+R - Alternative Transportation,Restriction: Alternative transportation ads,0.0,2,Boolean
+R - Associations & NPO - Anti-Smoking,Restriction: Anti-smoking association ads,0.0,2,Boolean
+R - Automotive - After Market - Oil,Restriction: Aftermarket oil product ads,0.0,2,Boolean
+R - CPG - Beverage - Spirits - OOH,Restriction: Spirits out-of-home ads,0.0,2,Boolean
+R - CPG - Beverage - Spirits - Video,Restriction: Spirits video ads,0.0,2,Boolean
+R - CPG - Non Food/Beverage - E-Cigarett,Restriction: E-cigarette ads,0.0,2,Boolean
+R - Entertainment - Casinos and Gambling,Restriction: Casino and gambling ads,0.0,2,Boolean
+R - Government - Political,Restriction: Political ads,0.0,2,Boolean
+R - Recruitment,Restriction: Recruitment/job ads,0.0,2,Boolean
+R - Restaurants - CDR,Restriction: Casual dining restaurant ads,0.0,2,Boolean
+R - Restaurants - QSR,Restriction: Quick-service restaurant ads,0.0,2,Boolean
+R - Retail - Automotive Service,Restriction: Automotive service ads,0.0,2,Boolean
+R - Retail - Grocery,Restriction: Grocery retail ads,0.0,2,Boolean
+R - Retail - Grocery with Fuel,Restriction: Grocery-with-fuel retail ads,0.0,2,Boolean
+C - EMV Enabled,Capability: EMV chip payment terminal,83.68,3,String
+C - NFC Enabled,Capability: NFC contactless payment,21.32,3,String
+C - Open 24 Hours,Capability: Site operates 24 hours,0.01,3,String
+C - Sells Beer,Capability: Site sells beer,6.54,3,String
+C - Sells Diesel Fuel,Capability: Site sells diesel fuel,86.11,3,String
+C - Sells Lottery,Capability: Site sells lottery tickets,9.65,3,String
+C - Vistar Programmatic Enabled,Capability: Vistar programmatic ads enabled,0.0,2,Boolean
+C - Walk Up Enabled,Capability: Walk-up customer interaction,98.25,3,String
+Average Household Income,Average household income in the site ZIP code,0.18,15535,Float64
+Median Age,Median population age in the site ZIP code,0.14,452,Float64

@@ -515,26 +515,6 @@ class ClusteringModel(nn.Module):
         return torch.argmax(q, dim=1)
 
 
-class EnsembleModel(nn.Module):
-    """
-    Ensemble of multiple models for improved predictions.
-    Uses model averaging for more robust results.
-    """
-
-    def __init__(self, models: List[SiteScoringModel]):
-        super().__init__()
-        self.models = nn.ModuleList(models)
-
-    def forward(
-        self,
-        numeric: torch.Tensor,
-        categorical: torch.Tensor,
-        boolean: torch.Tensor,
-    ) -> torch.Tensor:
-        predictions = [model(numeric, categorical, boolean) for model in self.models]
-        return torch.stack(predictions).mean(dim=0)
-
-
 # =============================================================================
 # Gradient Boosting Models (XGBoost)
 # =============================================================================

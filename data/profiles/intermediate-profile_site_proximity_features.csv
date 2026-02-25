@@ -1,0 +1,12 @@
+column_name,description,pct_missing,n_unique,data_type
+GTVID,Public-facing site identifier (GSTV ID),0.0,67644,String
+Latitude,Site latitude coordinate,0.0,67473,Float64
+Longitude,Site longitude coordinate,0.0,67333,Float64
+nearest_site,GTVID of the nearest other GSTV site,0.0,48973,String
+min_distance_to_nearest_site_mi,Distance in miles to nearest GSTV site,0.0,46544,Float64
+nearest_interstate,Name of the nearest interstate highway,0.0,244,String
+min_distance_to_interstate_mi,Min distance in miles to nearest interstate,0.0,67511,Float64
+min_distance_to_kroger_mi,Distance in miles to nearest Kroger store,14.77,57636,Float64
+min_distance_to_mcdonalds_mi,Distance in miles to nearest McDonald's,14.77,57636,Float64
+min_distance_to_walmart_mi,Distance in miles to nearest Walmart store,14.77,57636,Float64
+min_distance_to_target_mi,Distance in miles to nearest Target store,14.77,57636,Float64

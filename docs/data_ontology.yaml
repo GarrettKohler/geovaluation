@@ -1,11 +1,11 @@
 # Auto-generated Data Ontology
-# Generated: 2026-02-15T18:40:25.811992+00:00
+# Generated: 2026-02-23T21:17:15.823716+00:00
 # Do not edit manually - regenerate with: python scripts/generate_data_ontology.py
 # Hook: .claude/hooks/update-data-ontology.sh auto-triggers on data file changes
 
 metadata:
   title: Geospatial Site Analysis - Data Ontology
-  generated_at: '2026-02-15T18:40:25.811992+00:00'
+  generated_at: '2026-02-23T21:17:15.823716+00:00'
   generator: scripts/generate_data_ontology.py
   project_root: /Users/home/gkdev/geospatial
   quick_mode: true
@@ -197,7 +197,7 @@ datasets:
       exists: true
       size_bytes: 971664334
       size_human: 926.7 MB
-      modified: '2026-01-16T21:22:06.870989+00:00'
+      modified: '2026-02-23T21:15:48.399065+00:00'
       skipped_introspection: File > 500MB, schema-only via n_rows=0
     introspection:
       columns: 94
@@ -314,56 +314,7 @@ datasets:
     downstream: []
     notes: Reference dataset. Not directly consumed by ML pipeline.
     file_info:
-      exists: true
-      size_bytes: 17704228
-      size_human: 16.9 MB
-      modified: '2026-01-22T15:23:56.130831+00:00'
-    introspection:
-      columns: 43
-      schema:
-        ID - Gbase: String
-        R - Lottery: Boolean
-        R - Government: Boolean
-        R - Travel & Tourism: Boolean
-        R - CPG - Beverage - Beer - OOH: Boolean
-        R - CPG - Beverage - Beer - Video: Boolean
-        R - CPG - Beverage - Wine - OOH: Boolean
-        R - CPG - Beverage - Wine - Video: Boolean
-        R - Finance - Credit Cards: Boolean
-        R - CPG - CBD Hemp Ingestibles (Non-THC): Boolean
-        R - CPG - Non Food/Beverage - Cannabis (Medical Use): Boolean
-        Average Daily Impressions: Int64
-        R - CPG - Non Food/Beverage - Cannabis (Recreational Use): Boolean
-        C - Sells Spirits: String
-        R - CPG - Non Food/Beverage - CBD Hemp (Non-THC): Boolean
-        C - Sells Wine: String
-        R - Automotive - Electric: Boolean
-        'Retailer - # of Contacts with Email': Float64
-        R - Alcohol - Drink Responsibly Message: Boolean
-        R - Alternative Transportation: Boolean
-        R - Associations & NPO - Anti-Smoking: Boolean
-        R - Automotive - After Market - Oil: Boolean
-        R - CPG - Beverage - Spirits - OOH: Boolean
-        R - CPG - Beverage - Spirits - Video: Boolean
-        R - CPG - Non Food/Beverage - E-Cigarett: Boolean
-        R - Entertainment - Casinos and Gambling: Boolean
-        R - Government - Political: Boolean
-        R - Recruitment: Boolean
-        R - Restaurants - CDR: Boolean
-        R - Restaurants - QSR: Boolean
-        R - Retail - Automotive Service: Boolean
-        R - Retail - Grocery: Boolean
-        R - Retail - Grocery with Fuel: Boolean
-        C - EMV Enabled: String
-        C - NFC Enabled: String
-        C - Open 24 Hours: String
-        C - Sells Beer: String
-        C - Sells Diesel Fuel: String
-        C - Sells Lottery: String
-        C - Vistar Programmatic Enabled: Boolean
-        C - Walk Up Enabled: String
-        Average Household Income: Float64
-        Median Age: Float64
+      exists: false
   revenue_salesforce:
     id: revenue_salesforce
     path: data/input/Site Revenue - Salesforce.csv
@@ -375,20 +326,7 @@ datasets:
     downstream: []
     notes: Rarely used. Primary revenue source is site_scores_monthly.
     file_info:
-      exists: true
-      size_bytes: 5321326
-      size_human: 5.1 MB
-      modified: '2026-01-22T15:24:13.199913+00:00'
-    introspection:
-      columns: 7
-      schema:
-        ID - Gbase: String
-        Sellable: Boolean
-        Schedulable: Boolean
-        Program: String
-        Network: String
-        Average Revenue: Float64
-        Average DMA Rank: Float64
+      exists: false
   nearest_site_distances:
     id: nearest_site_distances
     path: data/input/nearest_site_distances.csv
@@ -407,7 +345,7 @@ datasets:
       exists: true
       size_bytes: 6767878
       size_human: 6.5 MB
-      modified: '2026-01-14T00:44:01.489106+00:00'
+      modified: '2026-02-23T21:16:00.613988+00:00'
     introspection:
       columns: 8
       schema:
@@ -463,7 +401,7 @@ datasets:
       exists: true
       size_bytes: 2875939
       size_human: 2.7 MB
-      modified: '2026-01-29T21:04:48.089943+00:00'
+      modified: '2026-02-23T21:16:02.178514+00:00'
     introspection:
       columns: 4
       schema:
@@ -507,42 +445,7 @@ datasets:
     downstream: []
     notes: Superseded by site_kroger_distances.csv.
     file_info:
-      exists: true
-      size_bytes: 2230372
-      size_human: 2.1 MB
-      modified: '2026-01-29T20:38:27.896018+00:00'
-    introspection:
-      columns: 29
-      schema:
-        dba: String
-        store_number: Int64
-        store_name: String
-        address: String
-        address_line_2: String
-        city: String
-        state: String
-        zip_code: Int64
-        store_hours: String
-        country: String
-        country_code: String
-        phone_number: String
-        latitude: Float64
-        longitude: Float64
-        all_services: String
-        pharmacy_hours: String
-        pharmacy_phone_number: String
-        website_address: String
-        county: String
-        geo_accuracy: String
-        pharmacy: Int64
-        store_services: String
-        vanity_name: String
-        source_url: String
-        starbucks: String
-        services: String
-        store_type: String
-        district_code: String
-        store_in_store: String
+      exists: false
   mcdonalds_dist_legacy:
     id: mcdonalds_dist_legacy
     path: data/input/mcdonalds_dist_to_site_mi.csv
@@ -554,29 +457,7 @@ datasets:
     downstream: []
     notes: Superseded by site_mcdonalds_distances.csv.
     file_info:
-      exists: true
-      size_bytes: 7844800
-      size_human: 7.5 MB
-      modified: '2026-01-29T20:38:26.528408+00:00'
-    introspection:
-      columns: 16
-      schema:
-        dba: String
-        store_number: Int64
-        address: String
-        city: String
-        state: String
-        zip_code: Int64
-        phone_number: String
-        country: String
-        latitude: Float64
-        longitude: Float64
-        store_hours: String
-        drive_thru_hours: String
-        services: String
-        county: String
-        country_code: String
-        geo_accuracy: String
+      exists: false
   site_aggregated_precleaned:
     id: site_aggregated_precleaned
     path: data/processed/site_aggregated_precleaned.parquet
@@ -604,7 +485,7 @@ datasets:
       exists: true
       size_bytes: 12496609
       size_human: 11.9 MB
-      modified: '2026-02-12T20:13:38.235695+00:00'
+      modified: '2026-02-18T12:40:21.298939+00:00'
     introspection:
       rows: 57675
       columns: 102
@@ -854,7 +735,7 @@ datasets:
       exists: true
       size_bytes: 8641645
       size_human: 8.2 MB
-      modified: '2026-02-12T20:13:38.293179+00:00'
+      modified: '2026-02-18T12:41:40.480413+00:00'
     introspection:
       rows: 26099
       columns: 111
@@ -985,7 +866,7 @@ datasets:
       exists: true
       size_bytes: 27428675
       size_human: 26.2 MB
-      modified: '2026-02-12T20:13:38.305066+00:00'
+      modified: '2026-02-17T11:30:18.666339+00:00'
     introspection:
       columns: 111
       schema:
@@ -1119,8 +1000,8 @@ datasets:
       modified: '2026-02-05T18:38:30.482073+00:00'
     contents:
       exists: true
-      file_count: 56
-      total_size_human: 81.0 MB
+      file_count: 36
+      total_size_human: 67.1 MB
       files:
       - path: site_scoring/outputs/.DS_Store
         size_human: 6.0 KB
@@ -1134,131 +1015,71 @@ datasets:
       - path: site_scoring/outputs/experiments/.DS_Store
         size_human: 8.0 KB
         suffix: ''
-      - path: site_scoring/outputs/experiments/job_1770927948_d9bea043/config.json
-        size_human: 3.1 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770927949_bf7a01f5/config.json
-        size_human: 3.1 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770927949_de8a2fd6/config.json
-        size_human: 3.1 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/best_model.pt
+      - path: site_scoring/outputs/experiments/job_1771270168_99da3bd2/best_model.pt
         size_human: 3.2 MB
         suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/config.json
+      - path: site_scoring/outputs/experiments/job_1771270168_99da3bd2/config.json
         size_human: 3.2 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/preprocessor.pkl
-        size_human: 11.9 KB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/shap_cache.npz
-        size_human: 39.9 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931066_773abb09/shap_importance.json
-        size_human: 3.7 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/best_model.pt
-        size_human: 3.2 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/config.json
-        size_human: 3.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/preprocessor.pkl
-        size_human: 11.9 KB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/shap_cache.npz
-        size_human: 39.9 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931443_ea76363d/shap_importance.json
-        size_human: 3.7 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/best_model.pt
-        size_human: 3.2 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/config.json
-        size_human: 3.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/preprocessor.pkl
+      - path: site_scoring/outputs/experiments/job_1771270168_99da3bd2/preprocessor.pkl
         size_human: 11.8 KB
         suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/shap_cache.npz
+      - path: site_scoring/outputs/experiments/job_1771270168_99da3bd2/shap_cache.npz
+        size_human: 39.9 KB
+        suffix: .npz
+      - path: site_scoring/outputs/experiments/job_1771270168_99da3bd2/shap_importance.json
+        size_human: 3.7 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273201_a725c534/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273202_68eaf8e9/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273203_1ba0517a/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273203_4c9c8c7b/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273204_17dc19d7/best_model.pt
+        size_human: 3.1 MB
+        suffix: .pt
+      - path: site_scoring/outputs/experiments/job_1771273204_17dc19d7/config.json
+        size_human: 3.1 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771273204_17dc19d7/preprocessor.pkl
+        size_human: 7.4 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1771869272_4d482ca8/best_model.pt
+        size_human: 3.2 MB
+        suffix: .pt
+      - path: site_scoring/outputs/experiments/job_1771869272_4d482ca8/config.json
+        size_human: 3.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/experiments/job_1771869272_4d482ca8/preprocessor.pkl
+        size_human: 11.8 KB
+        suffix: .pkl
+      - path: site_scoring/outputs/experiments/job_1771869272_4d482ca8/shap_cache.npz
         size_human: 39.8 KB
         suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931515_ed839b4a/shap_importance.json
+      - path: site_scoring/outputs/experiments/job_1771869272_4d482ca8/shap_importance.json
         size_human: 3.7 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931685_92735211/best_model.pt
+      - path: site_scoring/outputs/experiments/job_1771869420_c685cb52/best_model.pt
         size_human: 3.2 MB
         suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770931685_92735211/config.json
+      - path: site_scoring/outputs/experiments/job_1771869420_c685cb52/config.json
         size_human: 3.2 KB
         suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931685_92735211/preprocessor.pkl
-        size_human: 11.8 KB
+      - path: site_scoring/outputs/experiments/job_1771869420_c685cb52/preprocessor.pkl
+        size_human: 11.9 KB
         suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931685_92735211/shap_cache.npz
-        size_human: 39.8 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931685_92735211/shap_importance.json
-        size_human: 3.7 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/best_model.pt
-        size_human: 3.2 MB
-        suffix: .pt
-      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/config.json
-        size_human: 3.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/preprocessor.pkl
-        size_human: 11.8 KB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/shap_cache.npz
+      - path: site_scoring/outputs/experiments/job_1771869420_c685cb52/shap_cache.npz
         size_human: 39.9 KB
         suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931780_ae021726/shap_importance.json
+      - path: site_scoring/outputs/experiments/job_1771869420_c685cb52/shap_importance.json
         size_human: 3.6 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/best_model.json
-        size_human: 3.0 MB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/config.json
-        size_human: 3.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/model_metadata.json
-        size_human: 2.3 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/model_wrapper.pkl
-        size_human: 2.1 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/preprocessor.pkl
-        size_human: 11.9 KB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/shap_cache.npz
-        size_human: 157.8 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770931883_bace6f99/shap_importance.json
-        size_human: 3.5 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/best_model.json
-        size_human: 3.0 MB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/config.json
-        size_human: 3.2 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/model_metadata.json
-        size_human: 2.3 KB
-        suffix: .json
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/model_wrapper.pkl
-        size_human: 2.1 MB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/preprocessor.pkl
-        size_human: 11.9 KB
-        suffix: .pkl
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/shap_cache.npz
-        size_human: 157.9 KB
-        suffix: .npz
-      - path: site_scoring/outputs/experiments/job_1770993884_2a9bf88f/shap_importance.json
-        size_human: 3.5 KB
         suffix: .json
       - path: site_scoring/outputs/explainability/calibrator.pkl
         size_human: 615.0 B
@@ -1271,6 +1092,24 @@ datasets:
         suffix: .pkl
       - path: site_scoring/outputs/explainability/tier_classifier.pkl
         size_human: 156.0 B
+        suffix: .pkl
+      - path: site_scoring/outputs/feature_selection_history.json
+        size_human: 743.0 B
+        suffix: .json
+      - path: site_scoring/outputs/feature_selection_summary.json
+        size_human: 6.2 KB
+        suffix: .json
+      - path: site_scoring/outputs/preprocessor.pkl
+        size_human: 3.3 MB
+        suffix: .pkl
+      - path: site_scoring/outputs/shap_cache.npz
+        size_human: 166.9 KB
+        suffix: .npz
+      - path: site_scoring/outputs/xgboost_feature_importance.json
+        size_human: 3.4 KB
+        suffix: .json
+      - path: site_scoring/outputs/xgboost_model.pkl
+        size_human: 46.3 MB
         suffix: .pkl
   precleaned_summary:
     id: precleaned_summary

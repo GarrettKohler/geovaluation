@@ -1,0 +1,5 @@
+column_name,description,pct_missing,n_unique,data_type
+GTVID,Public-facing site identifier (GSTV ID),0.0,57675,String
+Latitude,Site latitude coordinate,0.0,57643,Float64
+Longitude,Site longitude coordinate,0.0,57503,Float64
+min_distance_to_mcdonalds_mi,Distance in miles to nearest McDonald's,0.0,57659,Float64

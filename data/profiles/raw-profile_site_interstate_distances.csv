@@ -1,0 +1,6 @@
+column_name,description,pct_missing,n_unique,data_type
+GTVID,Public-facing site identifier (GSTV ID),0.0,67644,String
+Latitude,Site latitude coordinate,0.0,67473,Float64
+Longitude,Site longitude coordinate,0.0,67333,Float64
+nearest_interstate,Name of the nearest interstate highway,0.0,249,String
+distance_to_interstate_mi,Distance in miles to the nearest interstate,0.0,67511,Float64

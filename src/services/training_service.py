@@ -644,7 +644,21 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
             },
         }, f, indent=2)
 
-    # Step 7: Report completion
+    # Step 7: Export classification results (lookalike tasks only)
+    if config.task_type == "lookalike":
+        try:
+            _export_classification_results(
+                job=job,
+                processor=processor,
+                test_predictions=probs if 'probs' in dir() else test_preds,
+                test_targets=y_test,
+                test_roc_auc=test_r2,
+                report_callback=report_callback,
+            )
+        except Exception as e:
+            print(f"Warning: Classification export failed: {e}")
+
+    # Step 8: Report completion
     job.final_metrics = {
         "test_loss": float(test_loss),
         "test_r2": float(test_r2),
@@ -688,6 +702,108 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         val_f1=float(test_f1), val_logloss=float(test_logloss),
         final_metrics=job.final_metrics,
     ))
+
+
+def _export_classification_results(job, processor, test_predictions, test_targets, test_roc_auc, report_callback=None):
+    """
+    Export classification results after a lookalike training run.
+
+    Produces three CSV files in the experiment directory:
+      1. training_sites.csv — all active sites used for training with labels
+      2. test_predictions.csv — test split predictions with probabilities
+      3. non_active_classification.csv — non-active sites scored by the model
+
+    Args:
+        job: TrainingJob with output_dir
+        processor: DataProcessor with source_gtvids, source_revenues, and split indices
+        test_predictions: numpy array of predicted probabilities for test set
+        test_targets: numpy array of actual labels (0/1) for test set
+        test_roc_auc: float, ROC-AUC score on test set
+        report_callback: optional SSE progress callback
+    """
+    import csv
+
+    experiment_dir = job.output_dir
+
+    def _report(msg):
+        if report_callback:
+            report_callback(TrainingProgress(
+                job_id=job.job_id, epoch=0, total_epochs=0,
+                train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+                learning_rate=0, elapsed_time=0,
+                status="running", message=msg
+            ))
+
+    # ── Export 1: Training Sites CSV ─────────────────────────────────────
+    _report("Exporting classification results: training sites...")
+    if processor.source_gtvids and processor.source_revenues:
+        threshold = getattr(processor, 'top_performer_threshold', None)
+        training_sites_path = experiment_dir / "training_sites.csv"
+        with open(training_sites_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["gtvid", "avg_monthly_revenue", "actual_label"])
+            for gtvid, revenue in zip(processor.source_gtvids, processor.source_revenues):
+                label = 1 if (threshold is not None and revenue >= threshold) else 0
+                writer.writerow([gtvid, revenue, label])
+        print(f"  Exported {len(processor.source_gtvids)} training sites → {training_sites_path.name}")
+
+    # ── Export 2: Test Predictions CSV ───────────────────────────────────
+    _report("Exporting classification results: test predictions...")
+    if (processor.source_gtvids and
+            hasattr(processor, 'test_indices') and
+            processor.test_indices is not None):
+        test_predictions_path = experiment_dir / "test_predictions.csv"
+        test_idx = processor.test_indices
+        with open(test_predictions_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["gtvid", "predicted_probability", "actual_label", "model_roc_auc"])
+            for i, idx in enumerate(test_idx):
+                if i < len(test_predictions) and idx < len(processor.source_gtvids):
+                    gtvid = processor.source_gtvids[idx]
+                    prob = float(test_predictions[i])
+                    label = int(test_targets[i])
+                    writer.writerow([gtvid, prob, label, test_roc_auc])
+        print(f"  Exported {len(test_idx)} test predictions → {test_predictions_path.name}")
+
+    # ── Export 3: Non-Active Site Predictions ────────────────────────────
+    _report("Exporting classification results: scoring non-active sites...")
+    try:
+        from site_scoring.predict import BatchPredictor
+        from site_scoring.data_transform import get_all_sites_for_prediction
+        import polars as pl_export
+
+        all_sites_df = get_all_sites_for_prediction()
+
+        # Filter to non-Active sites
+        if 'status' in all_sites_df.columns:
+            non_active_df = all_sites_df.filter(pl_export.col('status') != 'Active')
+        else:
+            print("  Warning: 'status' column not found, skipping non-active export")
+            non_active_df = None
+
+        if non_active_df is not None and len(non_active_df) > 0:
+            predictor = BatchPredictor(experiment_dir)
+            scores = predictor.predict(non_active_df)
+
+            threshold = getattr(processor, 'top_performer_threshold', None)
+            target_col = job.config.target if hasattr(job.config, 'target') else 'avg_monthly_revenue'
+
+            non_active_path = experiment_dir / "non_active_classification.csv"
+            with open(non_active_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["gtvid", "status", "predicted_probability", "actual_label", "model_roc_auc"])
+                gtvids_list = non_active_df['gtvid'].to_list()
+                statuses_list = non_active_df['status'].to_list()
+                revenues = non_active_df[target_col].fill_null(0).to_list() if target_col in non_active_df.columns else [0] * len(gtvids_list)
+                for gtvid, status, revenue in zip(gtvids_list, statuses_list, revenues):
+                    prob = scores.get(gtvid, 0.0)
+                    label = 1 if (threshold is not None and revenue >= threshold) else 0
+                    writer.writerow([gtvid, status, prob, label, test_roc_auc])
+            print(f"  Exported {len(gtvids_list)} non-active sites → {non_active_path.name}")
+    except Exception as e:
+        print(f"  Warning: Non-active site export failed: {e}")
+
+    _report("Classification exports complete.")
 
 
 def _compute_weight_histograms(model, n_bins=30):
@@ -1454,8 +1570,10 @@ def run_training_logic(job: TrainingJob, report_callback):
         test_r2 = float(1 - (ss_res / ss_tot)) if ss_tot > 0 else 0.0
 
     # Save validation metrics before overwriting for comparison
-    val_r2_final = r2  # This is the validation R² from the last training epoch
+    val_r2_final = r2  # Validation R² (regression) or ROC-AUC (classification)
     val_mae_final = mae
+    val_f1_final = f1
+    val_logloss_final = logloss
 
     # Use test metrics for final reporting (not validation metrics)
     mae = test_mae
@@ -1479,6 +1597,45 @@ def run_training_logic(job: TrainingJob, report_callback):
         }
     }, job.output_dir / "best_model.pt")
     processor.save(job.output_dir / "preprocessor.pkl")
+
+    # Write model_metadata.json (consistent with XGBoost/Clustering paths)
+    feature_names = (
+        list(pytorch_config.numeric_features) +
+        list(pytorch_config.categorical_features) +
+        list(pytorch_config.boolean_features)
+    )
+    with open(job.output_dir / "model_metadata.json", "w") as f:
+        json.dump({
+            "model_type": "neural_network",
+            "task_type": config.task_type,
+            "epochs_trained": epoch,
+            "feature_names": feature_names,
+            "test_metrics": {
+                "test_r2": test_r2,
+                "test_mae": test_mae,
+                "test_rmse": test_rmse,
+                "test_smape": test_smape,
+                "test_mape": test_mape,
+                "test_f1": test_f1,
+                "test_logloss": test_logloss,
+            },
+        }, f, indent=2)
+
+    # Export classification results (lookalike tasks only)
+    if config.task_type == "lookalike":
+        try:
+            # For NN: convert logits to probabilities for export
+            nn_test_probs = 1 / (1 + np.exp(-test_predictions_np.flatten()))
+            _export_classification_results(
+                job=job,
+                processor=processor,
+                test_predictions=nn_test_probs,
+                test_targets=test_targets_np.flatten(),
+                test_roc_auc=test_r2,
+                report_callback=report_callback,
+            )
+        except Exception as e:
+            print(f"Warning: Classification export failed: {e}")
 
     # Compute SHAP feature importance
     report_callback(TrainingProgress(
@@ -1551,13 +1708,25 @@ def run_training_logic(job: TrainingJob, report_callback):
     # DEBUG: Print test vs validation metrics to verify they're different
     print(f"\n{'='*60}")
     print(f"[DEBUG] FINAL METRICS COMPARISON (val vs test)")
-    print(f"  Validation R² (last epoch):  {val_r2_final:.6f}")
-    print(f"  Test R² (held-out 15%):      {test_r2:.6f}")
-    print(f"  Difference:                  {test_r2 - val_r2_final:+.6f}")
-    print(f"  ---")
-    print(f"  Validation MAE: ${val_mae_final:,.2f}")
-    print(f"  Test MAE:       ${test_mae:,.2f}")
-    print(f"  Test Loss:      {test_loss:.6f}")
+    if config.task_type == "lookalike":
+        print(f"  Validation ROC-AUC:  {val_r2_final:.6f}")
+        print(f"  Test ROC-AUC:        {test_r2:.6f}")
+        print(f"  Difference:          {test_r2 - val_r2_final:+.6f}")
+        print(f"  ---")
+        print(f"  Validation F1:       {val_f1_final:.6f}")
+        print(f"  Test F1:             {test_f1:.6f}")
+        print(f"  ---")
+        print(f"  Validation Log Loss: {val_logloss_final:.6f}")
+        print(f"  Test Log Loss:       {test_logloss:.6f}")
+        print(f"  Test Loss (BCE):     {test_loss:.6f}")
+    else:
+        print(f"  Validation R² (last epoch):  {val_r2_final:.6f}")
+        print(f"  Test R² (held-out 15%):      {test_r2:.6f}")
+        print(f"  Difference:                  {test_r2 - val_r2_final:+.6f}")
+        print(f"  ---")
+        print(f"  Validation MAE: ${val_mae_final:,.2f}")
+        print(f"  Test MAE:       ${test_mae:,.2f}")
+        print(f"  Test Loss:      {test_loss:.6f}")
     print(f"{'='*60}\n")
 
     report_callback(TrainingProgress(
@@ -1577,16 +1746,48 @@ def run_training_logic(job: TrainingJob, report_callback):
 # =============================================================================
 
 def detect_apple_chip() -> Dict:
-    """Detect the Apple Silicon chip model."""
+    """Detect the Apple Silicon chip model, GPU cores, and unified memory."""
     import subprocess
     import re
     chip_info = {"detected_chip": "unknown", "chip_name": "Unknown", "gpu_cores": None, "total_memory": None}
+
+    # 1. Get chip name from sysctl and parse into lookup key
     try:
-        res = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True)
-        if "Apple" in res.stdout:
+        res = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+                             capture_output=True, text=True, timeout=5)
+        if res.returncode == 0 and "Apple" in res.stdout:
             chip_info["chip_name"] = res.stdout.strip()
-            chip_info["detected_chip"] = "m1" # Simplified fallback
-    except: pass
+            # Parse "Apple M4 Pro" → "m4_pro", "Apple M2" → "m2"
+            m = re.match(r"Apple (M\d+)(?:\s+(Pro|Max|Ultra))?", res.stdout.strip())
+            if m:
+                key = m.group(1).lower()  # "m4"
+                if m.group(2):
+                    key += "_" + m.group(2).lower()  # "m4_pro"
+                chip_info["detected_chip"] = key
+    except Exception:
+        pass
+
+    # 2. Get GPU core count from system_profiler
+    try:
+        res = subprocess.run(["system_profiler", "SPDisplaysDataType"],
+                             capture_output=True, text=True, timeout=10)
+        if res.returncode == 0:
+            m = re.search(r"Total Number of Cores:\s*(\d+)", res.stdout)
+            if m:
+                chip_info["gpu_cores"] = int(m.group(1))
+    except Exception:
+        pass
+
+    # 3. Get total unified memory from sysctl
+    try:
+        res = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                             capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            mem_bytes = int(res.stdout.strip())
+            chip_info["total_memory"] = f"{mem_bytes // (1024 ** 3)} GB"
+    except Exception:
+        pass
+
     return chip_info
 
 def get_system_info() -> Dict:
@@ -1652,6 +1853,148 @@ def _sanitize_for_json(obj):
     return obj
 
 
+# =============================================================================
+# Experiment Catalog — Persistent, restart-safe experiment registry
+# =============================================================================
+
+_catalog_cache: Optional[List[Dict]] = None
+_catalog_cache_mtime: float = 0.0
+
+
+def _parse_experiment_folder(exp_dir: Path) -> Optional[Dict]:
+    """Parse a single experiment folder into a catalog entry.
+
+    Reads config.json for model/task/feature info, model_metadata.json for
+    test metrics, and checks which artifact files exist. Falls back to
+    reading metrics from best_model.pt for legacy NN experiments that
+    lack model_metadata.json.
+    """
+    config_path = exp_dir / "config.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Warning: Skipping {exp_dir.name} — invalid config.json: {e}")
+        return None
+
+    job_id = exp_dir.name
+
+    # Parse created_at from job_id: "job_{unix_timestamp}_{hex}"
+    created_at = None
+    parts = job_id.split("_")
+    if len(parts) >= 2:
+        try:
+            from datetime import datetime, timezone
+            ts = int(parts[1])
+            created_at = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        except (ValueError, OSError):
+            pass
+
+    # Extract feature counts from training_features dict
+    training_features = config.get("training_features", {})
+    feature_count = {
+        "numeric": len(training_features.get("numeric", [])),
+        "categorical": len(training_features.get("categorical", [])),
+        "boolean": len(training_features.get("boolean", [])),
+    }
+
+    # Load test metrics from model_metadata.json
+    test_metrics = {}
+    metadata_path = exp_dir / "model_metadata.json"
+    if metadata_path.exists():
+        try:
+            with open(metadata_path) as f:
+                metadata = json.load(f)
+            test_metrics = metadata.get("test_metrics", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Fallback for legacy NN experiments: read from best_model.pt checkpoint
+    if not test_metrics and (exp_dir / "best_model.pt").exists() and not metadata_path.exists():
+        try:
+            import torch as _torch
+            checkpoint = _torch.load(
+                exp_dir / "best_model.pt",
+                map_location="cpu",
+                weights_only=False,
+            )
+            test_metrics = checkpoint.get("final_metrics", {})
+        except Exception:
+            pass
+
+    # Check which artifacts exist
+    artifact_names = [
+        "config.json", "best_model.pt", "best_model.json",
+        "model_wrapper.pkl", "preprocessor.pkl",
+        "shap_cache.npz", "shap_importance.json",
+        "training_sites.csv", "test_predictions.csv",
+        "non_active_classification.csv", "model_metadata.json",
+    ]
+    artifacts = [name for name in artifact_names if (exp_dir / name).exists()]
+
+    # Determine completeness
+    has_model = (exp_dir / "best_model.pt").exists() or (exp_dir / "model_wrapper.pkl").exists()
+    is_complete = (
+        config_path.exists()
+        and (exp_dir / "preprocessor.pkl").exists()
+        and has_model
+    )
+
+    return _sanitize_for_json({
+        "job_id": job_id,
+        "created_at": created_at,
+        "model_type": config.get("model_type", "unknown"),
+        "task_type": config.get("task_type", "unknown"),
+        "target": config.get("target", ""),
+        "feature_count": feature_count,
+        "training_features": training_features,
+        "test_metrics": test_metrics,
+        "network_filter": config.get("network_filter"),
+        "lookalike_lower_percentile": config.get("lookalike_lower_percentile"),
+        "lookalike_upper_percentile": config.get("lookalike_upper_percentile"),
+        "is_complete": is_complete,
+        "has_shap": (exp_dir / "shap_cache.npz").exists(),
+        "has_predictions": (exp_dir / "test_predictions.csv").exists(),
+        "artifacts": artifacts,
+    })
+
+
+def scan_experiment_folders() -> List[Dict]:
+    """Scan disk for all experiment folders and return catalog.
+
+    Results are cached and invalidated when the experiments directory
+    modification time changes (i.e., when a new experiment is created
+    or an old one is deleted).
+    """
+    global _catalog_cache, _catalog_cache_mtime
+
+    experiments_dir = DEFAULT_OUTPUT_DIR / "experiments"
+    if not experiments_dir.exists():
+        return []
+
+    current_mtime = experiments_dir.stat().st_mtime
+    if _catalog_cache is not None and current_mtime == _catalog_cache_mtime:
+        return _catalog_cache
+
+    catalog = []
+    for exp_dir in experiments_dir.iterdir():
+        if not exp_dir.is_dir() or not exp_dir.name.startswith("job_"):
+            continue
+        entry = _parse_experiment_folder(exp_dir)
+        if entry:
+            catalog.append(entry)
+
+    # Sort newest first by created_at (or job_id as fallback)
+    catalog.sort(key=lambda e: e.get("created_at") or e["job_id"], reverse=True)
+
+    _catalog_cache = catalog
+    _catalog_cache_mtime = current_mtime
+    return catalog
+
+
 def stream_training_progress() -> Generator[str, None, None]:
     """Stream progress events from the global broadcaster."""
     q = job_manager.subscribe()
@@ -1691,6 +2034,7 @@ def load_explainability_components(output_dir: Path) -> Dict:
         'calibrator': None,
         'conformal': None,
         'tier_classifier': None,
+        'metadata': {},
     }
 
     # Check explainability subdirectory first (legacy location)
@@ -1727,6 +2071,17 @@ def load_explainability_components(output_dir: Path) -> Dict:
                     components['tier_classifier'] = tier_data
         except Exception as e:
             print(f"Warning: Failed to load tier classifier: {e}")
+
+    # Load metadata (feature names, dimensions, etc.)
+    metadata_path = explainability_dir / "metadata.pkl"
+    if metadata_path.exists():
+        try:
+            with open(metadata_path, 'rb') as f:
+                metadata = pickle.load(f)
+                if isinstance(metadata, dict):
+                    components['metadata'] = metadata
+        except Exception as e:
+            print(f"Warning: Failed to load metadata: {e}")
 
     return components
 

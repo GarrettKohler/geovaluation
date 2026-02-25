@@ -2878,6 +2878,624 @@
             color: var(--kepler-text-label);
         }
 
+        /* ============================================
+           Experiment Browser — Past Experiments Panel
+           ============================================ */
+        .experiment-browser-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--kepler-border);
+            margin-bottom: 0;
+        }
+        .experiment-browser-header:hover {
+            color: var(--kepler-text-highlight);
+        }
+        .experiment-browser-header .header-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--kepler-info);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .experiment-browser-header .chevron {
+            transition: transform 0.2s ease;
+            color: var(--kepler-text-label);
+        }
+        .experiment-browser-header .chevron.expanded {
+            transform: rotate(90deg);
+        }
+        .experiment-count-badge {
+            background: var(--kepler-bg-hover);
+            color: var(--kepler-text);
+            font-size: 0.65rem;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .experiment-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .experiment-list.expanded {
+            max-height: 2000px;
+            overflow-y: auto;
+        }
+        .experiment-card {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px 12px;
+            margin-top: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .experiment-card:hover {
+            border-color: var(--kepler-active);
+            background: var(--kepler-bg-hover);
+        }
+        .experiment-card.selected {
+            border-color: var(--kepler-active);
+            box-shadow: 0 0 0 1px var(--kepler-active);
+        }
+        .experiment-card.incomplete {
+            opacity: 0.5;
+        }
+        .experiment-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .experiment-card-badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .exp-badge {
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 1px 5px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .exp-badge-nn { background: #276EF1; color: #fff; }
+        .exp-badge-xgb { background: #0F9668; color: #fff; }
+        .exp-badge-cluster { background: #9B59B6; color: #fff; }
+        .exp-badge-regression { background: rgba(255,192,67,0.15); color: var(--kepler-warning); }
+        .exp-badge-lookalike { background: rgba(31,186,214,0.15); color: var(--kepler-active); }
+        .exp-badge-clustering { background: rgba(155,89,182,0.15); color: #9B59B6; }
+        .exp-badge-artifact {
+            background: var(--kepler-bg-hover);
+            color: var(--kepler-text-label);
+            font-size: 0.55rem;
+        }
+        .experiment-card-date {
+            font-size: 0.65rem;
+            color: var(--kepler-text-label);
+        }
+        .experiment-card-metric {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .experiment-card-metric .metric-label {
+            font-size: 0.65rem;
+            color: var(--kepler-text-label);
+        }
+        .experiment-card-metric .metric-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--kepler-text-highlight);
+        }
+        .experiment-card-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .experiment-card-meta span {
+            font-size: 0.6rem;
+            color: var(--kepler-text-subtext);
+        }
+        .experiment-empty {
+            text-align: center;
+            padding: 20px 12px;
+            color: var(--kepler-text-label);
+            font-size: 0.8rem;
+        }
+
+        /* ============================================
+           Scoring & Export Section
+           ============================================ */
+        .scoring-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--kepler-border);
+            margin-bottom: 0;
+        }
+        .scoring-section-header:hover {
+            color: var(--kepler-text-highlight);
+        }
+        .scoring-section-header .header-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--kepler-primary-btn);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .scoring-section-header .chevron {
+            transition: transform 0.2s ease;
+            color: var(--kepler-text-label);
+        }
+        .scoring-section-header .chevron.expanded {
+            transform: rotate(90deg);
+        }
+        .scoring-section-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .scoring-section-body.expanded {
+            max-height: 3000px;
+            overflow-y: auto;
+        }
+        .scoring-form-group {
+            margin-bottom: 12px;
+        }
+        .scoring-form-group label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--kepler-text-label);
+            margin-bottom: 4px;
+        }
+        .scoring-select-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .scoring-select-row select {
+            flex: 1;
+            background: var(--kepler-bg-input);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            color: var(--kepler-text-highlight);
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+        .scoring-select-row select:focus {
+            outline: none;
+            border-color: var(--kepler-primary-btn);
+            box-shadow: 0 0 0 3px rgba(15, 150, 104, 0.15);
+        }
+        .scoring-refresh-btn {
+            background: var(--kepler-bg-input);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            color: var(--kepler-text-label);
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--kepler-transition);
+        }
+        .scoring-refresh-btn:hover {
+            border-color: var(--kepler-primary-btn);
+            color: var(--kepler-primary-btn);
+        }
+        .scoring-refresh-btn.spinning svg {
+            animation: spin 1s linear infinite;
+        }
+        .scoring-btn-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .scoring-btn-row .training-btn {
+            flex: 1;
+            font-size: 0.75rem;
+            padding: 9px 8px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .scoring-results-panel {
+            display: none;
+            margin-top: 12px;
+        }
+        .scoring-results-panel.visible {
+            display: block;
+        }
+        .scoring-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .scoring-stat-card {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .scoring-stat-card .stat-label {
+            font-size: 0.6rem;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 2px;
+        }
+        .scoring-stat-card .stat-value {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--kepler-text-highlight);
+        }
+        .scoring-stat-card.wide {
+            grid-column: 1 / -1;
+        }
+        .scoring-chart-container {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 8px;
+            margin-bottom: 12px;
+            height: 150px;
+        }
+        .scoring-export-row {
+            display: flex;
+            gap: 8px;
+        }
+        .scoring-export-row .training-btn {
+            flex: 1;
+            font-size: 0.75rem;
+            padding: 8px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .scoring-spinner {
+            display: none;
+            text-align: center;
+            padding: 16px 0;
+        }
+        .scoring-spinner.visible {
+            display: block;
+        }
+        .scoring-spinner .spinner-ring {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--kepler-border);
+            border-top-color: var(--kepler-primary-btn);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .scoring-spinner .spinner-text {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--kepler-text-label);
+            margin-top: 6px;
+        }
+        .scoring-map-legend {
+            display: none;
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+        }
+        .scoring-map-legend.visible {
+            display: block;
+        }
+        .scoring-map-legend .legend-title {
+            font-size: 0.65rem;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .scoring-gradient-bar {
+            height: 10px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+            margin-bottom: 4px;
+        }
+        .scoring-gradient-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6rem;
+            color: var(--kepler-text-subtext);
+        }
+
+        /* ============================================
+           Compare Experiments Section
+           ============================================ */
+        .compare-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--kepler-border);
+            margin-bottom: 0;
+        }
+        .compare-section-header:hover {
+            color: var(--kepler-text-highlight);
+        }
+        .compare-section-header .header-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--kepler-warning);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .compare-section-header .chevron {
+            transition: transform 0.2s ease;
+            color: var(--kepler-text-label);
+        }
+        .compare-section-header .chevron.expanded {
+            transform: rotate(90deg);
+        }
+        .compare-section-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .compare-section-body.expanded {
+            max-height: 3000px;
+            overflow-y: auto;
+        }
+        .compare-form-group {
+            margin-bottom: 10px;
+        }
+        .compare-form-group label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--kepler-text-label);
+            margin-bottom: 4px;
+        }
+        .compare-form-group select {
+            width: 100%;
+            background: var(--kepler-bg-input);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            color: var(--kepler-text-highlight);
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+        .compare-form-group select:focus {
+            outline: none;
+            border-color: var(--kepler-warning);
+            box-shadow: 0 0 0 3px rgba(255, 192, 67, 0.15);
+        }
+        .compare-results-panel {
+            display: none;
+            margin-top: 12px;
+        }
+        .compare-results-panel.visible {
+            display: block;
+        }
+        .compare-metric-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .compare-metric-card {
+            flex: 1;
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px;
+        }
+        .compare-metric-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .compare-metric-card .card-header .exp-badge {
+            font-size: 0.55rem;
+        }
+        .compare-metric-card .card-label {
+            font-size: 0.65rem;
+            color: var(--kepler-text-label);
+            margin-bottom: 2px;
+        }
+        .compare-metric-card .card-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--kepler-text-highlight);
+        }
+        .compare-feature-overlap {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .compare-feature-overlap .overlap-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--kepler-text);
+            margin-bottom: 6px;
+        }
+        .compare-feature-overlap .overlap-stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .compare-feature-overlap .overlap-stats span {
+            font-size: 0.7rem;
+            color: var(--kepler-text-label);
+        }
+        .compare-feature-overlap .overlap-stats span strong {
+            color: var(--kepler-text-highlight);
+        }
+        .compare-top-features {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .compare-top-features .features-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--kepler-text);
+            margin-bottom: 6px;
+        }
+        .compare-top-features .features-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .compare-top-features .features-col-header {
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .compare-top-features .feature-item {
+            font-size: 0.7rem;
+            color: var(--kepler-text);
+            padding: 2px 0;
+        }
+        .compare-top-features .feature-item.shared {
+            color: var(--kepler-primary-btn);
+        }
+        /* Score Comparison */
+        .compare-score-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.7rem;
+            color: var(--kepler-text-label);
+        }
+        .compare-score-toggle input[type="checkbox"] {
+            accent-color: var(--kepler-warning);
+        }
+        .compare-score-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .compare-score-stat {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .compare-score-stat .stat-label {
+            font-size: 0.6rem;
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .compare-score-stat .stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--kepler-text-highlight);
+        }
+        .compare-score-stat .stat-value.good { color: var(--kepler-primary-btn); }
+        .compare-score-stat .stat-value.moderate { color: var(--kepler-warning); }
+        .compare-score-stat .stat-value.poor { color: var(--kepler-error); }
+        .compare-scatter-container {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .compare-scatter-container .chart-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--kepler-text);
+            margin-bottom: 6px;
+        }
+        .compare-disagreement-table {
+            background: var(--kepler-bg-content);
+            border: 1px solid var(--kepler-border);
+            border-radius: var(--kepler-radius-md);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .compare-disagreement-table .table-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--kepler-text);
+            margin-bottom: 6px;
+        }
+        .compare-disagreement-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.65rem;
+        }
+        .compare-disagreement-table th {
+            text-align: left;
+            padding: 4px 6px;
+            border-bottom: 1px solid var(--kepler-border);
+            color: var(--kepler-text-label);
+            text-transform: uppercase;
+            font-size: 0.55rem;
+            letter-spacing: 0.3px;
+        }
+        .compare-disagreement-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: var(--kepler-text);
+        }
+        .compare-disagreement-table tr:hover td {
+            background: rgba(255,255,255,0.03);
+        }
+        .compare-spinner {
+            display: none;
+            text-align: center;
+            padding: 16px 0;
+        }
+        .compare-spinner.visible {
+            display: block;
+        }
+        .compare-spinner .spinner-ring {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--kepler-border);
+            border-top-color: var(--kepler-warning);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .compare-spinner .spinner-text {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--kepler-text-label);
+            margin-top: 6px;
+        }
 
     </style>
 </head>
@@ -3664,6 +4282,233 @@
                 </button>
             </div>
 
+            <!-- Past Experiments Browser -->
+            <div class="training-section" id="experiment-browser-section">
+                <div class="experiment-browser-header" id="experiment-browser-toggle">
+                    <div class="header-left">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Past Experiments
+                        <span class="experiment-count-badge" id="experiment-count-badge">0</span>
+                    </div>
+                    <svg class="chevron" id="experiment-browser-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </div>
+                <div class="experiment-list" id="experiment-list">
+                    <div class="experiment-empty">Loading experiments...</div>
+                </div>
+            </div>
+
+            <!-- Scoring & Export Section -->
+            <div class="training-section" id="scoring-section">
+                <div class="scoring-section-header" id="scoring-section-toggle">
+                    <div class="header-left">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        Scoring & Export
+                    </div>
+                    <svg class="chevron" id="scoring-section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </div>
+                <div class="scoring-section-body" id="scoring-section-body">
+                    <!-- Experiment Selector -->
+                    <div class="scoring-form-group" style="margin-top: 10px;">
+                        <label>Experiment</label>
+                        <div class="scoring-select-row">
+                            <select id="scoring-experiment-select">
+                                <option value="">(Latest experiment)</option>
+                            </select>
+                            <button class="scoring-refresh-btn" id="scoring-refresh-btn" title="Refresh catalog">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"/>
+                                    <path d="M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Score Buttons -->
+                    <div class="scoring-btn-row">
+                        <button class="training-btn training-btn-primary" id="score-all-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                            Score All Sites
+                        </button>
+                        <button class="training-btn training-btn-secondary" id="score-filtered-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                            </svg>
+                            Score Filtered
+                        </button>
+                    </div>
+
+                    <!-- Scoring Spinner -->
+                    <div class="scoring-spinner" id="scoring-spinner">
+                        <div class="spinner-ring"></div>
+                        <span class="spinner-text" id="scoring-spinner-text">Scoring sites...</span>
+                    </div>
+
+                    <!-- Results Panel (hidden until scoring) -->
+                    <div class="scoring-results-panel" id="scoring-results-panel">
+                        <div class="scoring-stats-grid">
+                            <div class="scoring-stat-card wide">
+                                <div class="stat-label">Sites Scored</div>
+                                <div class="stat-value" id="scoring-count">-</div>
+                            </div>
+                            <div class="scoring-stat-card">
+                                <div class="stat-label">Mean</div>
+                                <div class="stat-value" id="scoring-mean">-</div>
+                            </div>
+                            <div class="scoring-stat-card">
+                                <div class="stat-label">Median</div>
+                                <div class="stat-value" id="scoring-median">-</div>
+                            </div>
+                            <div class="scoring-stat-card">
+                                <div class="stat-label">P10</div>
+                                <div class="stat-value" id="scoring-p10">-</div>
+                            </div>
+                            <div class="scoring-stat-card">
+                                <div class="stat-label">P90</div>
+                                <div class="stat-value" id="scoring-p90">-</div>
+                            </div>
+                        </div>
+
+                        <!-- Score Distribution Chart -->
+                        <div class="scoring-chart-container">
+                            <canvas id="scoring-distribution-chart"></canvas>
+                        </div>
+
+                        <!-- Map Legend for Score Overlay -->
+                        <div class="scoring-map-legend" id="scoring-map-legend">
+                            <div class="legend-title" id="scoring-legend-title">Score Overlay</div>
+                            <div class="scoring-gradient-bar"></div>
+                            <div class="scoring-gradient-labels">
+                                <span id="scoring-legend-low">Low</span>
+                                <span id="scoring-legend-high">High</span>
+                            </div>
+                        </div>
+
+                        <!-- Export Buttons -->
+                        <div class="scoring-export-row" style="margin-top: 8px;">
+                            <button class="training-btn training-btn-secondary" id="export-csv-btn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Export CSV
+                            </button>
+                            <button class="training-btn training-btn-secondary" id="export-xlsx-btn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Export Excel
+                            </button>
+                        </div>
+
+                        <!-- Clear Score Overlay Button -->
+                        <button class="training-btn training-btn-secondary" id="clear-scoring-btn" style="margin-top: 8px; font-size: 0.75rem; padding: 8px; text-transform: none; letter-spacing: 0;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            Clear Score Overlay
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare Experiments Section -->
+            <div class="training-section" id="compare-section">
+                <div class="compare-section-header" id="compare-section-toggle">
+                    <div class="header-left">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                        Compare Experiments
+                    </div>
+                    <svg class="chevron" id="compare-section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </div>
+                <div class="compare-section-body" id="compare-section-body">
+                    <!-- Experiment A -->
+                    <div class="compare-form-group" style="margin-top: 10px;">
+                        <label>Experiment A</label>
+                        <select id="compare-exp-1">
+                            <option value="">Select experiment...</option>
+                        </select>
+                    </div>
+
+                    <!-- Experiment B -->
+                    <div class="compare-form-group">
+                        <label>Experiment B</label>
+                        <select id="compare-exp-2">
+                            <option value="">Select experiment...</option>
+                        </select>
+                    </div>
+
+                    <!-- Include Score Comparison checkbox -->
+                    <div class="compare-score-toggle">
+                        <input type="checkbox" id="compare-include-scores">
+                        <label for="compare-include-scores">Include score comparison (slower — runs inference on both models)</label>
+                    </div>
+
+                    <!-- Compare Button -->
+                    <button class="training-btn training-btn-primary" id="compare-btn" style="margin-bottom: 12px; font-size: 0.75rem; padding: 9px 8px; text-transform: none; letter-spacing: 0; background: var(--kepler-warning); color: #1a1a2e;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                            <polyline points="17 6 23 6 23 12"/>
+                        </svg>
+                        Compare
+                    </button>
+
+                    <!-- Compare Spinner -->
+                    <div class="compare-spinner" id="compare-spinner">
+                        <div class="spinner-ring"></div>
+                        <span class="spinner-text">Comparing experiments...</span>
+                    </div>
+
+                    <!-- Compare Results -->
+                    <div class="compare-results-panel" id="compare-results-panel">
+                        <!-- Metrics Side-by-Side -->
+                        <div id="compare-metrics-container"></div>
+
+                        <!-- Feature Overlap -->
+                        <div id="compare-feature-overlap-container"></div>
+
+                        <!-- Top Features -->
+                        <div id="compare-top-features-container"></div>
+
+                        <!-- Score Comparison (only shown when include_scores checked) -->
+                        <div id="compare-score-section" style="display: none;">
+                            <!-- Correlation & Agreement Stats -->
+                            <div id="compare-score-stats-container"></div>
+
+                            <!-- Scatter Plot -->
+                            <div class="compare-scatter-container">
+                                <div class="chart-title">Score Correlation (Exp A vs Exp B)</div>
+                                <canvas id="compare-scatter-chart" height="200"></canvas>
+                            </div>
+
+                            <!-- Top Disagreements Table -->
+                            <div id="compare-disagreement-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Fleet-Wide Intervention Analysis (Phase 5) -->
             <div class="training-section" id="fleet-analysis-section" style="display: none;">
                 <div class="training-section-header">
@@ -3832,6 +4677,12 @@
         // Site status tracking for training
         let activeSiteIds = new Set();    // Sites with status "Active"
         let inactiveSiteIds = new Set();  // Sites with status other than "Active"
+
+        // Scoring overlay state (for Scoring & Export panel)
+        let scoringOverlayActive = false;
+        let scoringPredictionMap = {};    // GTVID -> score for map color overlay
+        let lastScoringTaskType = null;   // 'regression' or 'lookalike'
+        let scoringPredMinMax = null;     // { min, max, range } cached for regression normalization
 
         // ================================================
         // PORTAL LOADING SCREEN FUNCTIONS
@@ -4015,6 +4866,46 @@
         // Compute the fill color for a site point
         function getSiteFillColor(i) {
             const site = allSites[i];
+
+            // Scoring overlay colors (from Scoring & Export panel)
+            if (scoringOverlayActive) {
+                const score = scoringPredictionMap[site.GTVID];
+                if (score != null && isFinite(score)) {
+                    // Apply filter visibility
+                    if (filterModeActive && !filteredSiteIds.has(site.GTVID)) {
+                        return { r: 0, g: 0, b: 0, a: 0 };
+                    }
+
+                    // Normalize score to 0-1 range
+                    let normalized = score;
+                    if (lastScoringTaskType === 'regression' && scoringPredMinMax) {
+                        normalized = (score - scoringPredMinMax.min) / scoringPredMinMax.range;
+                    }
+                    // Clamp to 0-1
+                    normalized = Math.max(0, Math.min(1, normalized));
+
+                    // Color gradient: red (low) -> yellow (mid) -> green (high)
+                    let r, g, b;
+                    if (normalized < 0.5) {
+                        const t = normalized * 2;  // 0-1 within low half
+                        r = 0.91 + (0.95 - 0.91) * t;  // red to yellow
+                        g = 0.30 + (0.77 - 0.30) * t;
+                        b = 0.24 + (0.19 - 0.24) * t;
+                    } else {
+                        const t = (normalized - 0.5) * 2;  // 0-1 within high half
+                        r = 0.95 + (0.18 - 0.95) * t;  // yellow to green
+                        g = 0.77 + (0.80 - 0.77) * t;
+                        b = 0.19 + (0.44 - 0.19) * t;
+                    }
+                    return { r: r, g: g, b: b, a: 0.9 };
+                } else {
+                    // Site not scored - dim it
+                    if (filterModeActive && !filteredSiteIds.has(site.GTVID)) {
+                        return { r: 0, g: 0, b: 0, a: 0 };
+                    }
+                    return { r: 0.3, g: 0.3, b: 0.3, a: 0.25 };
+                }
+            }
 
             // Lookalike model colors
             if (modelTrainingState.isModelTrained && modelTrainingState.taskType === 'lookalike') {
@@ -5096,17 +5987,15 @@
                 return;
             }
 
-            // Collect site IDs and get predictions from model (using stored prediction scores)
+            // Collect site IDs and lookalike prediction scores from training state
             const siteIds = [];
             const probabilities = [];
 
-            // Get site scores from the rendered data (these are the lookalike predictions)
             inactiveSites.forEach(site => {
-                // Assuming lookalike scores are stored with sites after training
-                if (site.revenueScore !== undefined && site.revenueScore !== null) {
+                const score = modelTrainingState.lookalikeScores?.[site.GTVID];
+                if (score !== undefined && score !== null) {
                     siteIds.push(site.GTVID);
-                    // revenueScore is used to store prediction probability for lookalike models
-                    probabilities.push(site.revenueScore);
+                    probabilities.push(score);
                 }
             });
 
@@ -7247,6 +8136,8 @@
 
                         if (data.status === 'completed') {
                             showTrainingResults(data);
+                            // Refresh experiment catalog after successful training
+                            loadExperimentCatalog();
                         } else if (data.status === 'error') {
                             addLogEntry('Error: ' + data.message, 'error');
                         } else if (data.status === 'stopped') {
@@ -7606,7 +8497,7 @@
         // Store last training metrics for export from modal/details page
         let lastTrainingMetrics = null;
 
-        function showTrainingResults(data) {
+        async function showTrainingResults(data) {
             // Keep the progress section visible but update status to "Complete"
             const progressStatus = document.getElementById('progress-status');
             progressStatus.textContent = 'Complete';
@@ -7756,8 +8647,9 @@
             modelTrainingState.modelPreset = document.getElementById('model-preset').value;
 
             if (taskType === 'lookalike') {
-                // For lookalike model, compute top 10% training sites and identify lookalikes
-                applyLookalikeVisualization();
+                // For lookalike model, fetch real predictions from the trained model
+                const experimentDir = data.final_metrics?.experiment_dir;
+                await applyLookalikeVisualization(experimentDir);
                 // Enable clustering option now that lookalike model is trained
                 if (typeof checkLookalikeModelExists === 'function') {
                     checkLookalikeModelExists();
@@ -7964,10 +8856,9 @@
             window.open('/training-details', '_blank');
         }
 
-        // Apply lookalike visualization using ACTIVE sites for training, INACTIVE sites for prediction
-        function applyLookalikeVisualization() {
+        // Apply lookalike visualization using real model predictions from the API
+        async function applyLookalikeVisualization(experimentDir) {
             // TRAINING SET: Only ACTIVE sites with revenue data
-            // These are the sites we're using to learn what a "high performer" looks like
             const activeSitesWithRevenue = allSites.filter(s =>
                 activeSiteIds.has(s.GTVID) && revenueDataMap[s.GTVID]
             );
@@ -7976,48 +8867,97 @@
             const sortedActiveByRevenue = [...activeSitesWithRevenue].sort((a, b) => {
                 const revA = revenueDataMap[a.GTVID]?.avgMonthly || 0;
                 const revB = revenueDataMap[b.GTVID]?.avgMonthly || 0;
-                return revB - revA; // Descending
+                return revB - revA;
             });
 
-            // Top 10% of ACTIVE sites are the training examples (purple)
-            // These define the "ideal performer" profile
             const top10Count = Math.ceil(sortedActiveByRevenue.length * 0.1);
             const trainingExamples = sortedActiveByRevenue.slice(0, top10Count);
-
             modelTrainingState.trainingSiteIds = new Set(trainingExamples.map(s => s.GTVID));
 
-            // PREDICTION SET: Only INACTIVE sites
-            // These are sites we want to strategically reactivate
+            // Try to get real predictions from the batch prediction API
+            let usedRealPredictions = false;
+            try {
+                const body = experimentDir ? { experiment_dir: experimentDir } : {};
+                const response = await fetch('/api/predict/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const predictions = result.predictions || {};
+                    const predictionCount = Object.keys(predictions).length;
+
+                    if (predictionCount > 0) {
+                        usedRealPredictions = true;
+
+                        // Store ALL predictions
+                        modelTrainingState.predictions = predictions;
+
+                        // Filter to inactive sites with probability >= 0.5 as lookalikes
+                        const inactiveSitesList = allSites.filter(s => inactiveSiteIds.has(s.GTVID));
+                        const predictedLookalikes = inactiveSitesList.filter(s => {
+                            const score = predictions[s.GTVID];
+                            return score !== undefined && score >= 0.5;
+                        });
+
+                        modelTrainingState.lookalikeSiteIds = new Set(predictedLookalikes.map(s => s.GTVID));
+
+                        // Populate lookalikeScores from real predictions
+                        modelTrainingState.lookalikeScores = {};
+                        predictedLookalikes.forEach(s => {
+                            modelTrainingState.lookalikeScores[s.GTVID] = predictions[s.GTVID];
+                        });
+
+                        console.log(`=== LOOKALIKE MODEL RESULTS (Real Predictions) ===`);
+                        console.log(`Training Set: ${modelTrainingState.trainingSiteIds.size} top-performing ACTIVE sites (purple)`);
+                        console.log(`Total predictions received: ${predictionCount} sites`);
+                        console.log(`Prediction Set: ${inactiveSitesList.length} INACTIVE sites evaluated`);
+                        console.log(`Lookalike Matches: ${modelTrainingState.lookalikeSiteIds.size} INACTIVE sites with score >= 0.5 (green)`);
+                        console.log(`Reactivation Opportunity: ${(modelTrainingState.lookalikeSiteIds.size / inactiveSitesList.length * 100).toFixed(1)}% of inactive sites recommended`);
+                        console.log(`Model: ${result.model_type}, Experiment: ${result.experiment_dir}`);
+
+                        // Store lists for file export
+                        modelTrainingState.trainingExamples = trainingExamples;
+                        modelTrainingState.predictedLookalikes = predictedLookalikes;
+                        modelTrainingState.totalActiveSites = activeSitesWithRevenue.length;
+                        modelTrainingState.totalInactiveSites = inactiveSitesList.length;
+                    }
+                }
+            } catch (err) {
+                console.warn('Batch prediction API failed, falling back to simulation:', err.message);
+            }
+
+            // Fallback: simulate predictions if API failed
+            if (!usedRealPredictions) {
+                _applySimulatedLookalike(activeSitesWithRevenue, trainingExamples);
+            }
+
+            // DEBUG: Score verification after training
+            logScoreVerification('AFTER LOOKALIKE TRAINING');
+        }
+
+        // Fallback simulation when batch prediction API is unavailable
+        function _applySimulatedLookalike(activeSitesWithRevenue, trainingExamples) {
             const inactiveSitesList = allSites.filter(s => inactiveSiteIds.has(s.GTVID));
 
-            // Simulate model scoring: identify INACTIVE sites that look like top performers
-            // In production, the trained model would score each inactive site
-            // For demo: randomly select ~20% of inactive sites as "lookalikes"
-            // (sites the model predicts would perform well if reactivated)
             const lookalikeCount = Math.ceil(inactiveSitesList.length * 0.20);
             const shuffled = [...inactiveSitesList].sort(() => 0.5 - Math.random());
             const predictedLookalikes = shuffled.slice(0, lookalikeCount);
 
             modelTrainingState.lookalikeSiteIds = new Set(predictedLookalikes.map(s => s.GTVID));
 
-            // Generate similarity scores for lookalike sites (0.5 to 1.0 range)
-            // Higher score = more similar to top performers
             modelTrainingState.lookalikeScores = {};
             predictedLookalikes.forEach(s => {
-                // Simulate a similarity score (in production, this would come from the model)
                 modelTrainingState.lookalikeScores[s.GTVID] = 0.5 + Math.random() * 0.5;
             });
 
-            console.log(`=== LOOKALIKE MODEL RESULTS ===`);
+            console.log(`=== LOOKALIKE MODEL RESULTS (Simulated) ===`);
             console.log(`Training Set: ${modelTrainingState.trainingSiteIds.size} top-performing ACTIVE sites (purple)`);
             console.log(`Prediction Set: ${inactiveSitesList.length} INACTIVE sites evaluated`);
             console.log(`Lookalike Matches: ${modelTrainingState.lookalikeSiteIds.size} INACTIVE sites predicted as high-potential (green)`);
-            console.log(`Reactivation Opportunity: ${(modelTrainingState.lookalikeSiteIds.size / inactiveSitesList.length * 100).toFixed(1)}% of inactive sites recommended`);
 
-            // DEBUG: Score verification after training
-            logScoreVerification('AFTER LOOKALIKE TRAINING');
-
-            // Store lists for file export
             modelTrainingState.trainingExamples = trainingExamples;
             modelTrainingState.predictedLookalikes = predictedLookalikes;
             modelTrainingState.totalActiveSites = activeSitesWithRevenue.length;
@@ -8587,6 +9527,10 @@ END OF FILE
                 output += `--- Site ${i + 1} of ${siteIds.length} ---\n`;
                 output += `GTVID:              ${siteId}\n`;
                 output += `Category:           ${category}\n`;
+                if (category === 'LOOKALIKE') {
+                    const modelScore = modelTrainingState.lookalikeScores?.[siteId];
+                    output += `Model Score:        ${modelScore !== undefined ? modelScore.toFixed(4) : 'N/A'}\n`;
+                }
                 output += `Status:             ${site.Status || 'Unknown'}\n`;
                 output += `Latitude:           ${site.Latitude || ''}\n`;
                 output += `Longitude:          ${site.Longitude || ''}\n`;
@@ -8669,6 +9613,867 @@ END OF FILE
             URL.revokeObjectURL(url);
         }
 
+        // =============================================================================
+        // Experiment Browser — Past Experiments Catalog
+        // =============================================================================
+
+        let experimentCatalog = [];
+        let selectedExperimentId = null;
+
+        async function loadExperimentCatalog() {
+            try {
+                const response = await fetch('/api/experiments/catalog');
+                const data = await response.json();
+                experimentCatalog = data.experiments || [];
+
+                const badge = document.getElementById('experiment-count-badge');
+                if (badge) badge.textContent = experimentCatalog.length;
+
+                renderExperimentList();
+            } catch (err) {
+                console.error('Failed to load experiment catalog:', err);
+            }
+        }
+
+        function renderExperimentList() {
+            const listEl = document.getElementById('experiment-list');
+            if (!listEl) return;
+
+            if (experimentCatalog.length === 0) {
+                listEl.innerHTML = '<div class="experiment-empty">No experiments yet. Train a model to get started.</div>';
+                return;
+            }
+
+            listEl.innerHTML = experimentCatalog.map(exp => renderExperimentCard(exp)).join('');
+        }
+
+        function renderExperimentCard(exp) {
+            const isSelected = exp.job_id === selectedExperimentId;
+            const incompleteClass = exp.is_complete ? '' : ' incomplete';
+            const selectedClass = isSelected ? ' selected' : '';
+
+            // Model type badge
+            const modelBadge = exp.model_type === 'neural_network'
+                ? '<span class="exp-badge exp-badge-nn">NN</span>'
+                : exp.model_type === 'xgboost'
+                    ? '<span class="exp-badge exp-badge-xgb">XGB</span>'
+                    : '<span class="exp-badge exp-badge-cluster">DEC</span>';
+
+            // Task type badge
+            const taskBadge = exp.task_type === 'regression'
+                ? '<span class="exp-badge exp-badge-regression">Regression</span>'
+                : exp.task_type === 'lookalike'
+                    ? '<span class="exp-badge exp-badge-lookalike">Lookalike</span>'
+                    : '<span class="exp-badge exp-badge-clustering">Clustering</span>';
+
+            // Format date
+            const dateStr = exp.created_at
+                ? new Date(exp.created_at).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })
+                : 'Unknown date';
+
+            // Primary metric
+            const metricHtml = formatPrimaryMetric(exp);
+
+            // Feature count
+            const fc = exp.feature_count || {};
+            const totalFeatures = (fc.numeric || 0) + (fc.categorical || 0) + (fc.boolean || 0);
+
+            // Artifact badges
+            let artifactBadges = '';
+            if (exp.has_shap) artifactBadges += '<span class="exp-badge exp-badge-artifact">SHAP</span>';
+            if (exp.has_predictions) artifactBadges += '<span class="exp-badge exp-badge-artifact">Predictions</span>';
+            if (!exp.is_complete) artifactBadges += '<span class="exp-badge exp-badge-artifact" style="color: var(--kepler-warning);">(incomplete)</span>';
+
+            // Network filter
+            const networkInfo = exp.network_filter ? `<span>${exp.network_filter}</span>` : '';
+
+            return `
+                <div class="experiment-card${selectedClass}${incompleteClass}" onclick="selectExperiment('${exp.job_id}')">
+                    <div class="experiment-card-top">
+                        <div class="experiment-card-badges">
+                            ${modelBadge}${taskBadge}
+                        </div>
+                        <span class="experiment-card-date">${dateStr}</span>
+                    </div>
+                    ${metricHtml}
+                    <div class="experiment-card-meta">
+                        <span>${totalFeatures} features</span>
+                        ${networkInfo}
+                        ${artifactBadges}
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatPrimaryMetric(exp) {
+            const m = exp.test_metrics || {};
+            if (!m || Object.keys(m).length === 0) {
+                return '<div class="experiment-card-metric"><span class="metric-label">No metrics available</span></div>';
+            }
+
+            if (exp.task_type === 'lookalike') {
+                const auc = m.test_r2 != null ? m.test_r2.toFixed(4) : '—';
+                const f1 = m.test_f1 != null ? m.test_f1.toFixed(4) : '—';
+                return `<div class="experiment-card-metric">
+                    <span class="metric-label">ROC-AUC</span>
+                    <span class="metric-value">${auc}</span>
+                    <span class="metric-label" style="margin-left: 8px;">F1</span>
+                    <span class="metric-value">${f1}</span>
+                </div>`;
+            } else if (exp.task_type === 'clustering') {
+                const sil = m.silhouette_score != null ? m.silhouette_score.toFixed(3) : (m.test_r2 != null ? m.test_r2.toFixed(3) : '—');
+                return `<div class="experiment-card-metric">
+                    <span class="metric-label">Silhouette</span>
+                    <span class="metric-value">${sil}</span>
+                </div>`;
+            } else {
+                const r2 = m.test_r2 != null ? m.test_r2.toFixed(4) : '—';
+                const mae = m.test_mae != null ? '$' + Math.round(m.test_mae).toLocaleString() : '—';
+                return `<div class="experiment-card-metric">
+                    <span class="metric-label">R²</span>
+                    <span class="metric-value">${r2}</span>
+                    <span class="metric-label" style="margin-left: 8px;">MAE</span>
+                    <span class="metric-value">${mae}</span>
+                </div>`;
+            }
+        }
+
+        function selectExperiment(jobId) {
+            selectedExperimentId = (selectedExperimentId === jobId) ? null : jobId;
+            renderExperimentList();
+        }
+
+        function toggleExperimentBrowser() {
+            const list = document.getElementById('experiment-list');
+            const chevron = document.getElementById('experiment-browser-chevron');
+            if (!list || !chevron) return;
+
+            const isExpanded = list.classList.contains('expanded');
+            if (isExpanded) {
+                list.classList.remove('expanded');
+                chevron.classList.remove('expanded');
+            } else {
+                list.classList.add('expanded');
+                chevron.classList.add('expanded');
+                // Refresh catalog when expanding
+                loadExperimentCatalog();
+            }
+        }
+
+        // Wire up the toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('experiment-browser-toggle');
+            if (toggle) toggle.addEventListener('click', toggleExperimentBrowser);
+
+            // Load catalog on page load
+            loadExperimentCatalog();
+        });
+
+        // =============================================================================
+        // Scoring & Export — Score sites from trained experiments
+        // =============================================================================
+
+        let scoringDistributionChart = null;
+        let lastScoringPredictions = null;
+        let lastScoringExperimentDir = null;
+        let lastScoringFilterOnly = false;  // true when "Score Filtered" was used
+
+        // Populate scoring and compare dropdowns from experiment catalog
+        function populateScoringDropdowns() {
+            const scoringSelect = document.getElementById('scoring-experiment-select');
+            const compare1 = document.getElementById('compare-exp-1');
+            const compare2 = document.getElementById('compare-exp-2');
+
+            // Build option HTML from catalog
+            const optionsHtml = experimentCatalog.map(exp => {
+                const modelLabel = exp.model_type === 'neural_network' ? 'NN'
+                    : exp.model_type === 'xgboost' ? 'XGB' : 'DEC';
+                const taskLabel = exp.task_type === 'lookalike' ? 'Lookalike'
+                    : exp.task_type === 'regression' ? 'Regression' : 'Clustering';
+                const dateStr = exp.created_at
+                    ? new Date(exp.created_at).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })
+                    : '';
+                return `<option value="${exp.job_id}">${modelLabel} - ${taskLabel} (${dateStr})</option>`;
+            }).join('');
+
+            if (scoringSelect) {
+                scoringSelect.innerHTML = '<option value="">(Latest experiment)</option>' + optionsHtml;
+            }
+            if (compare1) {
+                compare1.innerHTML = '<option value="">Select experiment...</option>' + optionsHtml;
+            }
+            if (compare2) {
+                compare2.innerHTML = '<option value="">Select experiment...</option>' + optionsHtml;
+            }
+        }
+
+        // Patch loadExperimentCatalog to also refresh scoring dropdowns
+        const _origLoadExperimentCatalog = loadExperimentCatalog;
+        loadExperimentCatalog = async function() {
+            await _origLoadExperimentCatalog();
+            populateScoringDropdowns();
+        };
+
+        // Toggle scoring section expand/collapse
+        function toggleScoringSection() {
+            const body = document.getElementById('scoring-section-body');
+            const chevron = document.getElementById('scoring-section-chevron');
+            if (!body || !chevron) return;
+            const isExpanded = body.classList.contains('expanded');
+            if (isExpanded) {
+                body.classList.remove('expanded');
+                chevron.classList.remove('expanded');
+            } else {
+                body.classList.add('expanded');
+                chevron.classList.add('expanded');
+            }
+        }
+
+        // Toggle compare section expand/collapse
+        function toggleCompareSection() {
+            const body = document.getElementById('compare-section-body');
+            const chevron = document.getElementById('compare-section-chevron');
+            if (!body || !chevron) return;
+            const isExpanded = body.classList.contains('expanded');
+            if (isExpanded) {
+                body.classList.remove('expanded');
+                chevron.classList.remove('expanded');
+            } else {
+                body.classList.add('expanded');
+                chevron.classList.add('expanded');
+            }
+        }
+
+        // Score sites (all or filtered)
+        async function scoreSites(filterOnly) {
+            lastScoringFilterOnly = !!filterOnly;
+            const experimentDir = document.getElementById('scoring-experiment-select').value;
+            const body = {};
+            if (experimentDir) body.experiment_dir = experimentDir;
+            if (filterOnly && Object.keys(activeFilters).length > 0) {
+                body.filter = activeFilters;
+            }
+
+            // Show spinner, hide results
+            document.getElementById('scoring-spinner').classList.add('visible');
+            document.getElementById('scoring-results-panel').classList.remove('visible');
+            document.getElementById('scoring-spinner-text').textContent = filterOnly
+                ? 'Scoring filtered sites...' : 'Scoring all sites...';
+
+            try {
+                const response = await fetch('/api/predict/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `Server returned ${response.status}`);
+                }
+
+                const data = await response.json();
+                const predictions = data.predictions || {};
+                const count = data.count || Object.keys(predictions).length;
+                const summary = data.summary || {};
+                const taskType = data.task_type || 'unknown';
+                const modelType = data.model_type || 'unknown';
+
+                // Store for export and map overlay
+                lastScoringPredictions = predictions;
+                lastScoringExperimentDir = data.experiment_dir || experimentDir || 'latest';
+                lastScoringTaskType = taskType;
+                scoringPredictionMap = predictions;
+
+                // Populate summary stats
+                const isRegression = taskType === 'regression';
+                const fmt = (v) => {
+                    if (v == null) return '-';
+                    if (isRegression) return '$' + Math.round(v).toLocaleString();
+                    return v.toFixed(3);
+                };
+
+                document.getElementById('scoring-count').textContent = count.toLocaleString();
+                document.getElementById('scoring-mean').textContent = fmt(summary.mean);
+                document.getElementById('scoring-median').textContent = fmt(summary.median);
+                document.getElementById('scoring-p10').textContent = fmt(summary.p10);
+                document.getElementById('scoring-p90').textContent = fmt(summary.p90);
+
+                // Build distribution histogram
+                renderScoringHistogram(predictions, taskType);
+
+                // Update map with score overlay
+                scoringOverlayActive = true;
+                updateMapWithScores(predictions, taskType);
+
+                // Show map legend
+                const legendEl = document.getElementById('scoring-map-legend');
+                legendEl.classList.add('visible');
+                document.getElementById('scoring-legend-title').textContent =
+                    taskType === 'lookalike' ? 'Lookalike Probability' : 'Predicted Revenue';
+                document.getElementById('scoring-legend-low').textContent =
+                    isRegression ? '$' + Math.round(summary.min || 0).toLocaleString() : '0.0';
+                document.getElementById('scoring-legend-high').textContent =
+                    isRegression ? '$' + Math.round(summary.max || 0).toLocaleString() : '1.0';
+
+                // Show results
+                document.getElementById('scoring-results-panel').classList.add('visible');
+
+                console.log(`Scoring complete: ${count} sites scored (${modelType} / ${taskType})`);
+
+            } catch (err) {
+                console.error('Scoring failed:', err);
+                alert('Scoring failed: ' + err.message);
+            } finally {
+                document.getElementById('scoring-spinner').classList.remove('visible');
+            }
+        }
+
+        // Render score distribution histogram using Chart.js
+        function renderScoringHistogram(predictions, taskType) {
+            const values = Object.values(predictions).filter(v => v != null && isFinite(v));
+            if (values.length === 0) return;
+
+            const isRegression = taskType === 'regression';
+            const numBins = 20;
+            let min = Infinity, max = -Infinity;
+            for (const v of values) {
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+            const range = max - min || 1;
+            const binWidth = range / numBins;
+
+            const bins = new Array(numBins).fill(0);
+            const labels = [];
+            for (let i = 0; i < numBins; i++) {
+                const lo = min + i * binWidth;
+                const hi = lo + binWidth;
+                if (isRegression) {
+                    labels.push('$' + Math.round(lo).toLocaleString());
+                } else {
+                    labels.push(lo.toFixed(2));
+                }
+            }
+            values.forEach(v => {
+                let idx = Math.floor((v - min) / binWidth);
+                if (idx >= numBins) idx = numBins - 1;
+                if (idx < 0) idx = 0;
+                bins[idx]++;
+            });
+
+            if (scoringDistributionChart) {
+                scoringDistributionChart.destroy();
+                scoringDistributionChart = null;
+            }
+
+            const ctx = document.getElementById('scoring-distribution-chart').getContext('2d');
+            scoringDistributionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Sites',
+                        data: bins,
+                        backgroundColor: 'rgba(15, 150, 104, 0.6)',
+                        borderColor: 'rgba(15, 150, 104, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Score Distribution',
+                            color: '#A0A7B4',
+                            font: { size: 11, weight: '600' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#6A7485',
+                                font: { size: 8 },
+                                maxTicksLimit: 6,
+                                maxRotation: 0
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#6A7485',
+                                font: { size: 9 }
+                            },
+                            grid: {
+                                color: 'rgba(58, 65, 76, 0.5)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update map markers with prediction scores (color overlay)
+        function updateMapWithScores(predictions, taskType) {
+            // Store predictions so getSiteFillColor can use them
+            scoringPredictionMap = predictions;
+            scoringOverlayActive = true;
+
+            // Precompute min/max for regression normalization (avoids O(n^2) in color function)
+            if (taskType === 'regression') {
+                let pMin = Infinity;
+                let pMax = -Infinity;
+                for (const v of Object.values(predictions)) {
+                    if (v != null && isFinite(v)) {
+                        if (v < pMin) pMin = v;
+                        if (v > pMax) pMax = v;
+                    }
+                }
+                if (pMin !== Infinity) {
+                    scoringPredMinMax = { min: pMin, max: pMax, range: (pMax - pMin) || 1 };
+                } else {
+                    scoringPredMinMax = { min: 0, max: 1, range: 1 };
+                }
+            } else {
+                scoringPredMinMax = null;
+            }
+
+            // Force redraw of WebGL points
+            refreshVisualization();
+        }
+
+        // Clear scoring overlay from map
+        function clearScoringOverlay() {
+            scoringOverlayActive = false;
+            scoringPredictionMap = {};
+            scoringPredMinMax = null;
+            lastScoringPredictions = null;
+            lastScoringExperimentDir = null;
+            lastScoringTaskType = null;
+            lastScoringFilterOnly = false;
+
+            document.getElementById('scoring-results-panel').classList.remove('visible');
+            document.getElementById('scoring-map-legend').classList.remove('visible');
+
+            if (scoringDistributionChart) {
+                scoringDistributionChart.destroy();
+                scoringDistributionChart = null;
+            }
+
+            // Redraw map without overlay
+            refreshVisualization();
+        }
+
+        // Export scored predictions as CSV or Excel
+        async function exportPredictions(format) {
+            const experimentDir = document.getElementById('scoring-experiment-select').value;
+            const body = { format: format };
+            if (experimentDir) body.experiment_dir = experimentDir;
+            // Only apply filters if the last scoring used them (Score Filtered)
+            if (lastScoringFilterOnly && Object.keys(activeFilters).length > 0) {
+                body.filter = activeFilters;
+            }
+
+            try {
+                const btn = document.getElementById(format === 'csv' ? 'export-csv-btn' : 'export-xlsx-btn');
+                if (btn) btn.disabled = true;
+
+                const response = await fetch('/api/predict/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `Export failed with status ${response.status}`);
+                }
+
+                // Get filename from Content-Disposition header or use default
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = `site_scores.${format}`;
+                if (disposition) {
+                    const match = disposition.match(/filename=["']?([^"';\n]+)/);
+                    if (match) filename = match[1];
+                }
+
+                // Download the blob
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                console.log(`Exported scores as ${format}: ${filename}`);
+
+            } catch (err) {
+                console.error('Export failed:', err);
+                alert('Export failed: ' + err.message);
+            } finally {
+                const btn = document.getElementById(format === 'csv' ? 'export-csv-btn' : 'export-xlsx-btn');
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // Refresh catalog with spinning indicator
+        async function refreshScoringCatalog() {
+            const btn = document.getElementById('scoring-refresh-btn');
+            if (btn) btn.classList.add('spinning');
+            try {
+                await loadExperimentCatalog();
+            } finally {
+                if (btn) btn.classList.remove('spinning');
+            }
+        }
+
+        // =============================================================================
+        // Compare Experiments — Side-by-side comparison
+        // =============================================================================
+
+        async function compareExperiments() {
+            const exp1 = document.getElementById('compare-exp-1').value;
+            const exp2 = document.getElementById('compare-exp-2').value;
+
+            if (!exp1 || !exp2) {
+                alert('Please select two experiments to compare.');
+                return;
+            }
+            if (exp1 === exp2) {
+                alert('Please select two different experiments.');
+                return;
+            }
+
+            // Show spinner, hide results
+            const includeScores = document.getElementById('compare-include-scores').checked;
+            const spinnerEl = document.getElementById('compare-spinner');
+            spinnerEl.querySelector('.spinner-text').textContent = includeScores
+                ? 'Comparing experiments (scoring all sites with both models...)'
+                : 'Comparing experiments...';
+            spinnerEl.classList.add('visible');
+            document.getElementById('compare-results-panel').classList.remove('visible');
+
+            try {
+                const response = await fetch('/api/experiments/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        experiment_ids: [exp1, exp2],
+                        include_scores: document.getElementById('compare-include-scores').checked
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `Comparison failed with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderComparisonResults(data, exp1, exp2);
+
+                document.getElementById('compare-results-panel').classList.add('visible');
+
+            } catch (err) {
+                console.error('Comparison failed:', err);
+                alert('Comparison failed: ' + err.message);
+            } finally {
+                document.getElementById('compare-spinner').classList.remove('visible');
+            }
+        }
+
+        // Global reference for scatter chart cleanup
+        let compareScatterChart = null;
+
+        function renderCompareScatterPlot(diffs, correlation) {
+            const canvas = document.getElementById('compare-scatter-chart');
+            if (!canvas) return;
+
+            if (compareScatterChart) {
+                compareScatterChart.destroy();
+                compareScatterChart = null;
+            }
+
+            // Use the sites_with_large_diff as scatter points
+            // (these are the 20 most disagreeing sites — enough for a meaningful plot)
+            const scatterData = diffs.map(d => ({ x: d.score_a, y: d.score_b }));
+
+            // Also add the perfect agreement line
+            const minVal = Math.min(...diffs.map(d => Math.min(d.score_a, d.score_b)));
+            const maxVal = Math.max(...diffs.map(d => Math.max(d.score_a, d.score_b)));
+            const lineData = [{ x: minVal, y: minVal }, { x: maxVal, y: maxVal }];
+
+            compareScatterChart = new Chart(canvas, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Sites',
+                            data: scatterData,
+                            backgroundColor: 'rgba(124, 77, 255, 0.6)',
+                            borderColor: 'rgba(124, 77, 255, 0.8)',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                        },
+                        {
+                            label: 'Perfect Agreement',
+                            data: lineData,
+                            type: 'line',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderDash: [4, 4],
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: false,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    if (ctx.datasetIndex === 0) {
+                                        const d = diffs[ctx.dataIndex];
+                                        return d.gtvid + ': A=' + d.score_a.toFixed(3) + ', B=' + d.score_b.toFixed(3) + ' (\u0394' + d.diff.toFixed(3) + ')';
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Experiment A Score', color: '#a0a0b0', font: { size: 10 } },
+                            ticks: { color: '#a0a0b0', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                        },
+                        y: {
+                            title: { display: true, text: 'Experiment B Score', color: '#a0a0b0', font: { size: 10 } },
+                            ticks: { color: '#a0a0b0', font: { size: 9 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderComparisonResults(data, exp1Id, exp2Id) {
+            const metricsContainer = document.getElementById('compare-metrics-container');
+            const overlapContainer = document.getElementById('compare-feature-overlap-container');
+            const topFeaturesContainer = document.getElementById('compare-top-features-container');
+
+            // Metrics comparison
+            const mc = data.metrics_comparison || {};
+            const exp1Data = mc[exp1Id] || {};
+            const exp2Data = mc[exp2Id] || {};
+
+            const exp1Metrics = exp1Data.test_metrics || {};
+            const exp2Metrics = exp2Data.test_metrics || {};
+
+            // Build model type badges
+            function modelBadge(d) {
+                const mt = d.model_type || 'unknown';
+                if (mt === 'neural_network') return '<span class="exp-badge exp-badge-nn">NN</span>';
+                if (mt === 'xgboost') return '<span class="exp-badge exp-badge-xgb">XGB</span>';
+                return '<span class="exp-badge exp-badge-cluster">DEC</span>';
+            }
+            function taskBadge(d) {
+                const tt = d.task_type || 'unknown';
+                if (tt === 'regression') return '<span class="exp-badge exp-badge-regression">Regression</span>';
+                if (tt === 'lookalike') return '<span class="exp-badge exp-badge-lookalike">Lookalike</span>';
+                return '<span class="exp-badge exp-badge-clustering">Clustering</span>';
+            }
+
+            // Collect all metric keys
+            const allKeys = new Set([...Object.keys(exp1Metrics), ...Object.keys(exp2Metrics)]);
+            const fmtMetric = (key, val) => {
+                if (val == null) return '-';
+                if (key.includes('mae') || key.includes('rmse')) return '$' + Math.round(val).toLocaleString();
+                if (key.includes('mape')) return val.toFixed(1) + '%';
+                return val.toFixed(4);
+            };
+
+            let metricsHtml = '<div class="compare-metric-row">';
+            metricsHtml += `<div class="compare-metric-card">
+                <div class="card-header">${modelBadge(exp1Data)} ${taskBadge(exp1Data)}</div>`;
+            allKeys.forEach(key => {
+                const label = key.replace('test_', '').replace(/_/g, ' ').toUpperCase();
+                metricsHtml += `<div class="card-label">${label}</div>
+                    <div class="card-value">${fmtMetric(key, exp1Metrics[key])}</div>`;
+            });
+            metricsHtml += '</div>';
+
+            metricsHtml += `<div class="compare-metric-card">
+                <div class="card-header">${modelBadge(exp2Data)} ${taskBadge(exp2Data)}</div>`;
+            allKeys.forEach(key => {
+                const label = key.replace('test_', '').replace(/_/g, ' ').toUpperCase();
+                metricsHtml += `<div class="card-label">${label}</div>
+                    <div class="card-value">${fmtMetric(key, exp2Metrics[key])}</div>`;
+            });
+            metricsHtml += '</div></div>';
+            metricsContainer.innerHTML = metricsHtml;
+
+            // Feature overlap
+            const fo = data.feature_overlap || {};
+            const fc = data.feature_comparison || {};
+            const fc1 = fc[exp1Id] || {};
+            const fc2 = fc[exp2Id] || {};
+            const fc1Count = fc1.feature_count || {};
+            const fc2Count = fc2.feature_count || {};
+            const total1 = (fc1Count.numeric || 0) + (fc1Count.categorical || 0) + (fc1Count.boolean || 0);
+            const total2 = (fc2Count.numeric || 0) + (fc2Count.categorical || 0) + (fc2Count.boolean || 0);
+
+            overlapContainer.innerHTML = `
+                <div class="compare-feature-overlap">
+                    <div class="overlap-title">Feature Overlap</div>
+                    <div class="overlap-stats">
+                        <span>Exp A: <strong>${total1}</strong> features</span>
+                        <span>Exp B: <strong>${total2}</strong> features</span>
+                        <span>Shared: <strong>${fo.shared_count || 0}</strong></span>
+                    </div>
+                </div>
+            `;
+
+            // Top features comparison (if SHAP data available)
+            const topA = fc1.top_features || [];
+            const topB = fc2.top_features || [];
+            const sharedSet = new Set(fo.shared || []);
+
+            if (topA.length > 0 || topB.length > 0) {
+                let featHtml = `<div class="compare-top-features">
+                    <div class="features-title">Top Features (SHAP Importance)</div>
+                    <div class="features-columns">
+                        <div>
+                            <div class="features-col-header">Experiment A</div>`;
+                topA.slice(0, 10).forEach(f => {
+                    const name = typeof f === 'string' ? f : (f.feature || f.name || f);
+                    const isShared = sharedSet.has(name);
+                    featHtml += `<div class="feature-item${isShared ? ' shared' : ''}">${name}</div>`;
+                });
+                featHtml += `</div><div>
+                            <div class="features-col-header">Experiment B</div>`;
+                topB.slice(0, 10).forEach(f => {
+                    const name = typeof f === 'string' ? f : (f.feature || f.name || f);
+                    const isShared = sharedSet.has(name);
+                    featHtml += `<div class="feature-item${isShared ? ' shared' : ''}">${name}</div>`;
+                });
+                featHtml += '</div></div></div>';
+                topFeaturesContainer.innerHTML = featHtml;
+            } else {
+                topFeaturesContainer.innerHTML = '';
+            }
+
+            // Score comparison (if available)
+            const scoreSection = document.getElementById('compare-score-section');
+            const sc = data.score_comparison;
+
+            if (sc && !sc.error) {
+                scoreSection.style.display = 'block';
+
+                // Stats cards
+                const corrClass = sc.correlation > 0.8 ? 'good' : sc.correlation > 0.5 ? 'moderate' : 'poor';
+                const agreeClass = sc.agreement_pct > 80 ? 'good' : sc.agreement_pct > 60 ? 'moderate' : 'poor';
+
+                document.getElementById('compare-score-stats-container').innerHTML = `
+                    <div class="compare-score-stats">
+                        <div class="compare-score-stat">
+                            <div class="stat-label">Correlation</div>
+                            <div class="stat-value ${corrClass}">${sc.correlation != null ? sc.correlation.toFixed(3) : 'N/A'}</div>
+                        </div>
+                        <div class="compare-score-stat">
+                            <div class="stat-label">Quintile Agreement</div>
+                            <div class="stat-value ${agreeClass}">${sc.agreement_pct != null ? sc.agreement_pct.toFixed(1) + '%' : 'N/A'}</div>
+                        </div>
+                        <div class="compare-score-stat">
+                            <div class="stat-label">Mean Abs Diff</div>
+                            <div class="stat-value">${sc.mean_diff != null ? sc.mean_diff.toFixed(4) : 'N/A'}</div>
+                        </div>
+                        <div class="compare-score-stat">
+                            <div class="stat-label">Sites Compared</div>
+                            <div class="stat-value">${(sc.n_common_sites || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Scatter plot
+                renderCompareScatterPlot(sc.sites_with_large_diff || [], sc.correlation);
+
+                // Disagreement table
+                const diffs = sc.sites_with_large_diff || [];
+                if (diffs.length > 0) {
+                    let tableHtml = `<div class="compare-disagreement-table">
+                        <div class="table-title">Top Score Disagreements</div>
+                        <table>
+                            <thead><tr>
+                                <th>GTVID</th><th>Score A</th><th>Score B</th><th>Diff</th>
+                            </tr></thead><tbody>`;
+                    diffs.slice(0, 10).forEach(d => {
+                        tableHtml += `<tr>
+                            <td>${d.gtvid}</td>
+                            <td>${d.score_a.toFixed(4)}</td>
+                            <td>${d.score_b.toFixed(4)}</td>
+                            <td style="color: var(--kepler-error);">${d.diff.toFixed(4)}</td>
+                        </tr>`;
+                    });
+                    tableHtml += '</tbody></table></div>';
+                    document.getElementById('compare-disagreement-container').innerHTML = tableHtml;
+                } else {
+                    document.getElementById('compare-disagreement-container').innerHTML = '';
+                }
+            } else {
+                scoreSection.style.display = 'none';
+            }
+        }
+
+        // Wire up Scoring and Compare section event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Scoring section toggle
+            const scoringToggle = document.getElementById('scoring-section-toggle');
+            if (scoringToggle) scoringToggle.addEventListener('click', toggleScoringSection);
+
+            // Compare section toggle
+            const compareToggle = document.getElementById('compare-section-toggle');
+            if (compareToggle) compareToggle.addEventListener('click', toggleCompareSection);
+
+            // Score buttons
+            const scoreAllBtn = document.getElementById('score-all-btn');
+            if (scoreAllBtn) scoreAllBtn.addEventListener('click', function() { scoreSites(false); });
+
+            const scoreFilteredBtn = document.getElementById('score-filtered-btn');
+            if (scoreFilteredBtn) scoreFilteredBtn.addEventListener('click', function() { scoreSites(true); });
+
+            // Export buttons
+            const exportCsvBtn = document.getElementById('export-csv-btn');
+            if (exportCsvBtn) exportCsvBtn.addEventListener('click', function() { exportPredictions('csv'); });
+
+            const exportXlsxBtn = document.getElementById('export-xlsx-btn');
+            if (exportXlsxBtn) exportXlsxBtn.addEventListener('click', function() { exportPredictions('xlsx'); });
+
+            // Clear scoring overlay
+            const clearBtn = document.getElementById('clear-scoring-btn');
+            if (clearBtn) clearBtn.addEventListener('click', clearScoringOverlay);
+
+            // Refresh catalog
+            const refreshBtn = document.getElementById('scoring-refresh-btn');
+            if (refreshBtn) refreshBtn.addEventListener('click', refreshScoringCatalog);
+
+            // Compare button
+            const compareBtn = document.getElementById('compare-btn');
+            if (compareBtn) compareBtn.addEventListener('click', compareExperiments);
+        });
+
         function resetTrainingUI() {
             // Show config sections
             document.getElementById('training-config-section').style.display = 'block';
@@ -8712,6 +10517,11 @@ END OF FILE
             modelTrainingState.predictedRevenues = {};
             modelTrainingState.regressionStats = null;
             modelTrainingState.predictions = {};
+
+            // Clear scoring overlay if active
+            if (scoringOverlayActive) {
+                clearScoringOverlay();
+            }
 
             // Redraw sites with default color scheme
             refreshVisualization();

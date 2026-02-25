@@ -1,0 +1,256 @@
+/* ============================================
+   GSTV Design System — Kepler.gl Dark Theme
+   Shared across all pages (home, map, etc.)
+   ============================================ */
+
+/* Fonts: DM Sans (headings/body) + JetBrains Mono (metrics/values) */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    /* Kepler.gl Core Colors */
+    --kepler-active: #1FBAD6;
+    --kepler-active-hover: #108188;
+    --kepler-primary-btn: #0F9668;
+    --kepler-primary-btn-hover: #13B17B;
+    --kepler-error: #F9042C;
+    --kepler-warning: #FFC043;
+    --kepler-success: #47B275;
+    --kepler-info: #276EF1;
+
+    /* Kepler.gl Background Colors */
+    --kepler-bg-base: #242730;
+    --kepler-bg-panel: #29323C;
+    --kepler-bg-content: #292E36;
+    --kepler-bg-hover: #3A4552;
+    --kepler-bg-input: #29323C;
+    --kepler-bg-input-hover: #3A414C;
+
+    /* Kepler.gl Text Colors */
+    --kepler-text: #A0A7B4;
+    --kepler-text-highlight: #F0F0F0;
+    --kepler-text-title: #FFFFFF;
+    --kepler-text-label: #6A7485;
+    --kepler-text-subtext: #6A7485;
+
+    /* Kepler.gl Border Colors */
+    --kepler-border: #3A414C;
+    --kepler-border-light: #3A414C;
+
+    /* Kepler.gl Button Colors */
+    --kepler-btn-secondary: #6A7485;
+    --kepler-btn-secondary-hover: #A0A7B4;
+    --kepler-btn-floating: #29323C;
+    --kepler-btn-floating-hover: #3A4552;
+
+    /* Kepler.gl Slider/Switch */
+    --kepler-slider-bar: #6A7485;
+    --kepler-slider-handle: #D3D8E0;
+
+    /* Shadows */
+    --kepler-shadow-1: 0 2px 4px rgba(0,0,0,0.3);
+    --kepler-shadow-2: 0 4px 8px rgba(0,0,0,0.4);
+    --kepler-shadow-dropdown: 0 8px 16px rgba(0,0,0,0.5);
+
+    /* Motion */
+    --kepler-transition: 200ms ease;
+
+    /* Shape */
+    --kepler-radius-sm: 2px;
+    --kepler-radius-md: 4px;
+    --kepler-radius-lg: 8px;
+
+    /* Legacy mappings for backward compatibility */
+    --primary: #1FBAD6;
+    --primary-dark: #108188;
+    --primary-light: #3DD0E7;
+    --secondary: #FFC043;
+    --secondary-coral: #F9042C;
+    --accent-yellow: #FFC043;
+    --accent-blue: #276EF1;
+    --background: #242730;
+    --card-bg: #29323C;
+    --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    --card-shadow-hover: 0 4px 8px rgba(0,0,0,0.4);
+    --border-light: #3A414C;
+    --border-medium: #3A414C;
+    --text-primary: #F0F0F0;
+    --text-secondary: #A0A7B4;
+    --text-muted: #6A7485;
+    --success: #47B275;
+    --error: #F9042C;
+    --warning: #FFC043;
+    --gstv-green: #1FBAD6;
+    --gstv-green-dark: #108188;
+    --gstv-blue: #276EF1;
+    --gstv-blue-dark: #1E5BC6;
+    --gstv-teal: #1FBAD6;
+    --gstv-black: #242730;
+    --gstv-dark: #29323C;
+    --gstv-darker: #242730;
+    --gstv-gray: #3A414C;
+    --gstv-gray-light: #3A4552;
+    --gstv-text: #F0F0F0;
+    --gstv-text-muted: #6A7485;
+    --gstv-error: #F9042C;
+
+    /* Font families */
+    --font-heading: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+}
+
+/* ============================================
+   Base Reset & Body
+   ============================================ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-body);
+    background: var(--kepler-bg-base);
+    color: var(--kepler-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--kepler-text-title);
+    margin: 0;
+}
+
+/* ============================================
+   Base Button Styles
+   ============================================ */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--kepler-radius-md);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--kepler-transition);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: var(--kepler-primary-btn);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--kepler-primary-btn-hover);
+    box-shadow: 0 0 20px rgba(15, 150, 104, 0.3);
+}
+
+.btn-secondary {
+    background: var(--kepler-bg-hover);
+    color: var(--kepler-text);
+    border: 1px solid var(--kepler-border);
+}
+
+.btn-secondary:hover {
+    background: var(--kepler-bg-input-hover);
+    color: var(--kepler-text-highlight);
+}
+
+.btn-danger {
+    background: rgba(249, 4, 44, 0.15);
+    color: var(--kepler-error);
+    border: 1px solid rgba(249, 4, 44, 0.3);
+}
+
+.btn-danger:hover {
+    background: rgba(249, 4, 44, 0.25);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   Spinner Animation
+   ============================================ */
+
+.spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--kepler-border);
+    border-top-color: var(--kepler-active);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+    from { transform: rotate(360deg); }
+    to { transform: rotate(0deg); }
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--kepler-border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--kepler-bg-hover);
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.mono {
+    font-family: var(--font-mono);
+}
+
+.text-highlight {
+    color: var(--kepler-text-highlight);
+}
+
+.text-label {
+    color: var(--kepler-text-label);
+}
+
+.text-success {
+    color: var(--kepler-success);
+}
+
+.text-error {
+    color: var(--kepler-error);
+}
+
+.text-warning {
+    color: var(--kepler-warning);
+}

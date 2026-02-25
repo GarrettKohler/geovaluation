@@ -34,6 +34,7 @@ from src.services.training_service import (
     stream_training_progress,
     load_explainability_components,
     explain_prediction,
+    scan_experiment_folders,
 )
 from site_scoring.config import get_all_model_presets, get_model_preset, get_all_available_features, DEFAULT_OUTPUT_DIR
 from src.services.fleet_analysis_service import (
@@ -51,9 +52,16 @@ app = Flask(__name__)
 # =============================================================================
 
 @app.route('/')
-def index():
-    """Render the main map visualization page."""
-    return render_template('index.html')
+def home():
+    """Render the experiment hub home page."""
+    return render_template('home.html')
+
+
+@app.route('/map')
+@app.route('/map/<job_id>')
+def map_view(job_id=None):
+    """Render the map visualization page."""
+    return render_template('index.html', job_id=job_id)
 
 
 @app.route('/training-details')
@@ -391,6 +399,168 @@ def api_get_experiments():
     return jsonify(get_training_status())
 
 
+@app.route('/api/experiments/catalog')
+def api_get_catalog():
+    """Persistent experiment catalog — survives Flask restarts.
+
+    Scans all experiment folders on disk, parses config and metadata files,
+    and returns a sorted list of experiments with their metrics, features,
+    and artifact inventory.
+    """
+    catalog = scan_experiment_folders()
+    return jsonify({"experiments": catalog})
+
+
+@app.route('/api/experiments/compare', methods=['POST'])
+def api_compare_experiments():
+    """Compare two or more experiments across metrics and features."""
+    import json as json_mod
+
+    data = request.get_json() or {}
+    experiment_ids = data.get('experiment_ids', [])
+
+    if len(experiment_ids) < 2:
+        return jsonify({'error': 'Need at least 2 experiment IDs to compare'}), 400
+
+    catalog = scan_experiment_folders()
+    catalog_lookup = {exp['job_id']: exp for exp in catalog}
+
+    metrics_comparison = {}
+    feature_comparison = {}
+
+    for exp_id in experiment_ids:
+        exp = catalog_lookup.get(exp_id)
+        if exp is None:
+            return jsonify({'error': f'Experiment not found: {exp_id}'}), 404
+
+        metrics_comparison[exp_id] = {
+            'model_type': exp.get('model_type'),
+            'task_type': exp.get('task_type'),
+            'test_metrics': exp.get('test_metrics', {}),
+            'created_at': exp.get('created_at'),
+        }
+
+        # Feature comparison
+        training_features = exp.get('training_features', {})
+        all_features = []
+        for feat_type in ['numeric', 'categorical', 'boolean']:
+            all_features.extend(training_features.get(feat_type, []))
+
+        # Load SHAP importance if available
+        shap_path = DEFAULT_OUTPUT_DIR / "experiments" / exp_id / "shap_importance.json"
+        top_features = []
+        if shap_path.exists():
+            try:
+                with open(shap_path) as f:
+                    shap_data = json_mod.load(f)
+                top_features = shap_data if isinstance(shap_data, list) else shap_data.get('features', [])
+            except Exception:
+                pass
+
+        feature_comparison[exp_id] = {
+            'feature_count': exp.get('feature_count', {}),
+            'all_features': all_features,
+            'top_features': top_features[:15],
+        }
+
+    # Compute feature overlap between experiments
+    all_feature_sets = {eid: set(fc['all_features']) for eid, fc in feature_comparison.items()}
+    if len(all_feature_sets) == 2:
+        sets = list(all_feature_sets.values())
+        overlap = sets[0] & sets[1]
+        only_first = sets[0] - sets[1]
+        only_second = sets[1] - sets[0]
+        feature_overlap = {
+            'shared': sorted(overlap),
+            'shared_count': len(overlap),
+            'unique_to_first': sorted(only_first),
+            'unique_to_second': sorted(only_second),
+        }
+    else:
+        common = set.intersection(*all_feature_sets.values()) if all_feature_sets else set()
+        feature_overlap = {
+            'shared': sorted(common),
+            'shared_count': len(common),
+        }
+
+    # Score comparison (optional — expensive, requires two inference passes)
+    score_comparison = None
+    include_scores = data.get('include_scores', False)
+
+    if include_scores and len(experiment_ids) == 2:
+        try:
+            import numpy as np
+            from site_scoring.data_transform import get_all_sites_for_prediction
+            from site_scoring.predict import BatchPredictor
+
+            all_sites_df = get_all_sites_for_prediction()
+
+            exp_id_a, exp_id_b = experiment_ids[0], experiment_ids[1]
+            dir_a = DEFAULT_OUTPUT_DIR / "experiments" / exp_id_a
+            dir_b = DEFAULT_OUTPUT_DIR / "experiments" / exp_id_b
+
+            if dir_a.exists() and dir_b.exists():
+                predictor_a = BatchPredictor(dir_a)
+                predictor_b = BatchPredictor(dir_b)
+
+                scores_a = predictor_a.predict(all_sites_df)
+                scores_b = predictor_b.predict(all_sites_df)
+
+                # Align scores on common gtvids
+                common_ids = sorted(set(scores_a.keys()) & set(scores_b.keys()))
+                arr_a = np.array([scores_a[gid] for gid in common_ids])
+                arr_b = np.array([scores_b[gid] for gid in common_ids])
+
+                # Pearson correlation
+                correlation = float(np.corrcoef(arr_a, arr_b)[0, 1]) if len(arr_a) > 1 else None
+
+                # Mean absolute difference
+                mean_diff = float(np.mean(np.abs(arr_a - arr_b)))
+
+                # Quintile agreement: % of sites in same quintile by both models
+                def quintile_labels(arr):
+                    percentiles = np.percentile(arr, [20, 40, 60, 80])
+                    return np.digitize(arr, percentiles)
+
+                q_a = quintile_labels(arr_a)
+                q_b = quintile_labels(arr_b)
+                agreement_pct = float(np.mean(q_a == q_b) * 100)
+
+                # Top 20 sites with largest score disagreement
+                diffs = np.abs(arr_a - arr_b)
+                top_diff_indices = np.argsort(diffs)[-20:][::-1]
+                sites_with_large_diff = []
+                for idx in top_diff_indices:
+                    sites_with_large_diff.append({
+                        'gtvid': common_ids[idx],
+                        'score_a': float(arr_a[idx]),
+                        'score_b': float(arr_b[idx]),
+                        'diff': float(diffs[idx]),
+                    })
+
+                score_comparison = {
+                    'correlation': correlation,
+                    'mean_diff': mean_diff,
+                    'agreement_pct': round(agreement_pct, 1),
+                    'n_common_sites': len(common_ids),
+                    'sites_with_large_diff': sites_with_large_diff,
+                }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            score_comparison = {'error': str(e)}
+
+    result = {
+        'metrics_comparison': _clean_nan_values(metrics_comparison),
+        'feature_comparison': feature_comparison,
+        'feature_overlap': feature_overlap,
+    }
+    if score_comparison is not None:
+        result['score_comparison'] = _clean_nan_values(score_comparison)
+
+    return jsonify(result)
+
+
 @app.route('/api/training/stream')
 def api_stream_training():
     """
@@ -408,6 +578,341 @@ def api_stream_training():
             'X-Accel-Buffering': 'no'
         }
     )
+
+
+# =============================================================================
+# API Routes - Batch Prediction
+# =============================================================================
+
+# Module-level cache for BatchPredictor (reloads only when experiment changes)
+_cached_predictor = None
+_cached_predictor_experiment = None
+
+
+def _find_latest_experiment() -> Path:
+    """Find the most recent experiment directory with a complete model."""
+    experiments_dir = DEFAULT_OUTPUT_DIR / "experiments"
+    if not experiments_dir.exists():
+        return None
+
+    experiment_dirs = sorted(
+        [d for d in experiments_dir.iterdir() if d.is_dir()],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True,
+    )
+
+    for exp_dir in experiment_dirs:
+        config_path = exp_dir / "config.json"
+        preprocessor_path = exp_dir / "preprocessor.pkl"
+        has_model = (
+            (exp_dir / "best_model.pt").exists()
+            or (exp_dir / "model_wrapper.pkl").exists()
+        )
+        if config_path.exists() and preprocessor_path.exists() and has_model:
+            return exp_dir
+
+    return None
+
+
+def _get_cached_predictor(experiment_dir: Path):
+    """Get or create a cached BatchPredictor for the given experiment."""
+    global _cached_predictor, _cached_predictor_experiment
+
+    if _cached_predictor is not None and _cached_predictor_experiment == str(experiment_dir):
+        return _cached_predictor
+
+    from site_scoring.predict import BatchPredictor
+    _cached_predictor = BatchPredictor(experiment_dir)
+    _cached_predictor_experiment = str(experiment_dir)
+    return _cached_predictor
+
+
+@app.route('/api/predict/batch', methods=['POST'])
+def api_predict_batch():
+    """
+    Run batch prediction using a trained model on all (or filtered) sites.
+
+    Request Body:
+        {
+            "experiment_dir": "job_xxx",   // optional, defaults to latest
+            "filter": {"network": ["Wayne"], "state": ["TX"]}  // optional
+        }
+
+    Returns:
+        JSON with:
+        - predictions: {gtvid: score} mapping
+        - model_type: str
+        - task_type: str
+        - count: int
+        - summary: {mean, median, std, min, max, p10, p25, p75, p90}
+    """
+    import numpy as np
+    import polars as pl
+
+    data = request.get_json() or {}
+    experiment_name = data.get('experiment_dir')
+    filters = data.get('filter')
+
+    # Find experiment directory
+    if experiment_name:
+        experiment_dir = DEFAULT_OUTPUT_DIR / "experiments" / experiment_name
+        if not experiment_dir.exists():
+            return jsonify({'error': f'Experiment not found: {experiment_name}'}), 404
+    else:
+        experiment_dir = _find_latest_experiment()
+        if experiment_dir is None:
+            return jsonify({'error': 'No trained model found. Train a model first.'}), 404
+
+    try:
+        # Load predictor (cached)
+        predictor = _get_cached_predictor(experiment_dir)
+
+        # Load all sites for prediction
+        from site_scoring.data_transform import get_all_sites_for_prediction
+        all_sites_df = get_all_sites_for_prediction()
+
+        # Apply filters if provided
+        if filters:
+            matching_ids = get_filtered_site_ids(filters)
+            all_sites_df = all_sites_df.filter(pl.col("gtvid").is_in(matching_ids))
+
+        # Run prediction
+        predictions = predictor.predict(all_sites_df)
+
+        # Compute summary statistics
+        scores = np.array(list(predictions.values()))
+        summary = {}
+        if len(scores) > 0:
+            summary = {
+                'mean': float(np.mean(scores)),
+                'median': float(np.median(scores)),
+                'std': float(np.std(scores)),
+                'min': float(np.min(scores)),
+                'max': float(np.max(scores)),
+                'p10': float(np.percentile(scores, 10)),
+                'p25': float(np.percentile(scores, 25)),
+                'p75': float(np.percentile(scores, 75)),
+                'p90': float(np.percentile(scores, 90)),
+            }
+
+        # Clean NaN/Inf for JSON safety
+        clean_predictions = _clean_nan_values(predictions)
+
+        return jsonify(_clean_nan_values({
+            'predictions': clean_predictions,
+            'model_type': predictor.model_type,
+            'task_type': predictor.task_type,
+            'count': len(clean_predictions),
+            'experiment_dir': experiment_dir.name,
+            'summary': summary,
+        }))
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
+
+
+@app.route('/api/predict/export', methods=['POST'])
+def api_predict_export():
+    """Export scored site predictions as CSV or Excel download.
+
+    For regression tasks: scores all sites with predicted revenue + site metadata.
+    For classification tasks: combines training sites (with actual_label) and
+    non-active sites (with predicted_probability) into a single export with
+    a 'category' column (TRAINING / NON_ACTIVE).
+    """
+    from flask import send_file
+    from io import BytesIO
+    from datetime import datetime
+    import polars as pl
+    import csv as csv_mod
+
+    data = request.get_json() or {}
+    experiment_name = data.get('experiment_dir')
+    export_format = data.get('format', 'csv')
+    filters = data.get('filter')
+
+    # Find experiment
+    if experiment_name:
+        experiment_dir = DEFAULT_OUTPUT_DIR / "experiments" / experiment_name
+        if not experiment_dir.exists():
+            return jsonify({'error': f'Experiment not found: {experiment_name}'}), 404
+    else:
+        experiment_dir = _find_latest_experiment()
+        if experiment_dir is None:
+            return jsonify({'error': 'No trained model found.'}), 404
+
+    try:
+        predictor = _get_cached_predictor(experiment_dir)
+
+        from site_scoring.data_transform import get_all_sites_for_prediction
+        all_sites_df = get_all_sites_for_prediction()
+
+        # Apply filters if provided
+        if filters:
+            matching_ids = get_filtered_site_ids(filters)
+            all_sites_df = all_sites_df.filter(pl.col("gtvid").is_in(matching_ids))
+
+        # For classification: load training labels from experiment artifacts
+        training_labels = None
+        if predictor.task_type == "lookalike":
+            training_labels = _load_training_labels(experiment_dir)
+
+        # Get predictions with metadata (+ labels for classification)
+        result_df = predictor.predict_with_metadata(
+            all_sites_df, training_labels=training_labels
+        )
+
+        # Add export metadata columns
+        result_df = result_df.with_columns([
+            pl.lit(predictor.model_type).alias("model_type"),
+            pl.lit(experiment_dir.name).alias("experiment_id"),
+            pl.lit(datetime.now().isoformat()).alias("scored_at"),
+        ])
+
+        # Generate file
+        timestamp = datetime.now().strftime("%Y-%m-%d")
+        filename = f"site_scores_{predictor.task_type}_{predictor.model_type}_{timestamp}"
+
+        buf = BytesIO()
+        if export_format == 'xlsx':
+            result_df.write_excel(buf)
+            buf.seek(0)
+            return send_file(
+                buf,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'{filename}.xlsx',
+            )
+        else:
+            csv_bytes = result_df.write_csv().encode('utf-8')
+            buf.write(csv_bytes)
+            buf.seek(0)
+            return send_file(
+                buf,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f'{filename}.csv',
+            )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500
+
+
+def _load_training_labels(experiment_dir: Path) -> dict:
+    """Load training site labels from an experiment's training_sites.csv.
+
+    Returns dict mapping gtvid -> actual_label (0 or 1).
+    Falls back to empty dict if the file doesn't exist.
+    """
+    import csv as csv_mod
+
+    labels = {}
+    training_csv = experiment_dir / "training_sites.csv"
+    if training_csv.exists():
+        with open(training_csv) as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                gtvid = row.get("gtvid", "")
+                label = int(row.get("actual_label", 0))
+                if gtvid:
+                    labels[gtvid] = label
+    return labels
+
+
+@app.route('/api/predict/filtered', methods=['POST'])
+def api_predict_filtered():
+    """Score only sites matching filter criteria.
+
+    Request Body:
+        {
+            "experiment_dir": "job_xxx",  (optional, defaults to latest)
+            "filters": {
+                "network": ["Wayne", "Dover"],
+                "state": ["TX", "CA"],
+                "status": ["Active"]
+            }
+        }
+
+    Returns same format as /api/predict/batch with summary stats.
+    """
+    import numpy as np
+    import polars as pl
+
+    data = request.get_json() or {}
+    filters = data.get('filters', {})
+    experiment_name = data.get('experiment_dir')
+
+    if not filters:
+        return jsonify({'error': 'No filters provided. Use /api/predict/batch for all sites.'}), 400
+
+    # Find experiment directory
+    if experiment_name:
+        experiment_dir = DEFAULT_OUTPUT_DIR / "experiments" / experiment_name
+        if not experiment_dir.exists():
+            return jsonify({'error': f'Experiment not found: {experiment_name}'}), 404
+    else:
+        experiment_dir = _find_latest_experiment()
+        if experiment_dir is None:
+            return jsonify({'error': 'No trained model found. Train a model first.'}), 404
+
+    try:
+        predictor = _get_cached_predictor(experiment_dir)
+
+        from site_scoring.data_transform import get_all_sites_for_prediction
+        all_sites_df = get_all_sites_for_prediction()
+
+        # Apply filters
+        matching_ids = get_filtered_site_ids(filters)
+        filtered_df = all_sites_df.filter(pl.col("gtvid").is_in(matching_ids))
+
+        if len(filtered_df) == 0:
+            return jsonify({
+                'predictions': {},
+                'model_type': predictor.model_type,
+                'task_type': predictor.task_type,
+                'count': 0,
+                'experiment_dir': experiment_dir.name,
+                'filter_applied': filters,
+                'summary': {},
+            })
+
+        predictions = predictor.predict(filtered_df)
+        clean_predictions = _clean_nan_values(predictions)
+
+        # Summary stats
+        scores = np.array(list(predictions.values()))
+        summary = {}
+        if len(scores) > 0:
+            summary = {
+                'mean': float(np.mean(scores)),
+                'median': float(np.median(scores)),
+                'std': float(np.std(scores)),
+                'min': float(np.min(scores)),
+                'max': float(np.max(scores)),
+                'p10': float(np.percentile(scores, 10)),
+                'p25': float(np.percentile(scores, 25)),
+                'p75': float(np.percentile(scores, 75)),
+                'p90': float(np.percentile(scores, 90)),
+            }
+
+        return jsonify(_clean_nan_values({
+            'predictions': clean_predictions,
+            'model_type': predictor.model_type,
+            'task_type': predictor.task_type,
+            'count': len(clean_predictions),
+            'experiment_dir': experiment_dir.name,
+            'filter_applied': filters,
+            'summary': summary,
+        }))
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
 
 
 # =============================================================================
@@ -787,7 +1292,9 @@ def api_start_fleet_analysis():
 
         # Get feature names from metadata
         feature_names = metadata.get('feature_names', [])
-        continuous_features = metadata.get('continuous_features', [])
+        # Derive continuous features: first n_numeric features in the ordered list
+        n_numeric = metadata.get('n_numeric', 0)
+        continuous_features = metadata.get('continuous_features', feature_names[:n_numeric])
 
         if not feature_names:
             return jsonify({
@@ -807,23 +1314,22 @@ def api_start_fleet_analysis():
         from site_scoring.explainability.conformal import SklearnModelWrapper
         import torch
 
-        # Load model architecture info from metadata
+        # Load the actual PyTorch model from checkpoint (contains config + weights)
+        device = 'cpu'
+        from site_scoring.model import SiteScoringModel
+        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        nn_config = checkpoint['config']
+        # Load preprocessor to get categorical vocab sizes
+        import pickle
+        preprocessor_path = SHAP_OUTPUT_DIR / 'preprocessor.pkl'
+        with open(preprocessor_path, 'rb') as pf:
+            preprocessor_data = pickle.load(pf)
+        model = SiteScoringModel.from_config(nn_config, preprocessor_data['categorical_vocab_sizes'])
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
         n_numeric = metadata.get('n_numeric', 0)
         n_categorical = metadata.get('n_categorical', 0)
         n_boolean = metadata.get('n_boolean', 0)
-        device = 'cpu'
-
-        # Load the actual PyTorch model
-        from site_scoring.model import DOOHScoringModel
-        model = DOOHScoringModel(
-            n_numeric=n_numeric,
-            n_categorical=n_categorical,
-            n_boolean=n_boolean,
-            hidden_layers=[512, 256, 128, 64],
-            dropout=0.2,
-        )
-        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-        model.eval()
 
         # Create sklearn wrapper
         sklearn_model = SklearnModelWrapper(

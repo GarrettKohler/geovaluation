@@ -1,0 +1,112 @@
+column_name,description,pct_missing,n_unique,data_type
+id_gbase,Internal site identifier (primary key in monthly data),0.0,26099,String
+active_months,Count of months the site appeared in the dataset,0.0,47,UInt32
+first_month,Earliest month the site has data for,0.0,47,String
+last_month,Most recent month the site has data for,0.0,34,String
+gtvid,Public-facing site identifier (GSTV ID),0.0,26099,String
+site_activated_date,Date the site was first activated,0.02,3141,String
+network,"Hardware network provider (Gilbarco, Wayne, Dover, etc)",0.0,4,String
+latitude,Site latitude coordinate,0.0,26096,Float64
+longitude,Site longitude coordinate,0.0,26057,Float64
+dma_rank,DMA ranking by TV household count (1=largest),0.0,207,Int64
+status,Site operational status (cleaned from source 'statuis'),0.0,1,String
+program,GSTV program type the site belongs to,0.0,14,String
+experience_type,Type of media experience at the site,0.0,3,String
+hardware_type,Physical hardware model installed,0.02,17,String
+retailer,Fuel retailer brand operating the site,0.0,31,String
+screen_count,Number of media screens at the site,0.54,33,Int64
+avg_household_income,Average household income in the ZIP code,0.13,10595,Int64
+median_age,Median age of population in the ZIP code,0.12,403,Float64
+pct_african_american,Percent African American population in ZIP,1.44,3489,Float64
+pct_asian,Percent Asian population in ZIP,2.84,1599,Float64
+pct_female,Percent female population in ZIP,0.12,11285,Float64
+pct_male,Percent male population in ZIP,0.12,11286,Float64
+pct_hispanic,Percent Hispanic population in ZIP,0.62,3474,Float64
+brand_fuel,Fuel brand sold at the site,0.0,11,String
+brand_restaurant,Restaurant brand co-located at the site,95.8,176,String
+brand_c_store,Convenience store brand at the site,0.0,31,String
+total_revenue,Sum of all monthly revenue across site lifetime,0.0,25694,Float64
+total_monthly_impressions,Sum of monthly impressions across lifetime,0.0,25161,Int64
+total_monthly_nvis,Sum of monthly network video impressions,0.0,25165,Int64
+total_monthly_impressions_per_screen,Sum of monthly impressions per screen,0.0,25438,Float64
+total_monthly_nvis_per_screen,Sum of monthly NVIs per screen,0.0,25432,Float64
+total_monthly_revenue_per_screen,Sum of monthly revenue per screen,0.0,25661,Float64
+avg_monthly_revenue,Mean monthly revenue across active months,0.0,25746,Float64
+avg_monthly_monthly_impressions,Mean monthly impressions across active months,0.0,25589,Float64
+avg_monthly_monthly_nvis,Mean monthly NVIs across active months,0.0,25606,Float64
+avg_monthly_monthly_impressions_per_screen,Mean monthly impressions per screen,0.0,25595,Float64
+avg_monthly_monthly_nvis_per_screen,Mean monthly NVIs per screen,0.0,25607,Float64
+avg_monthly_monthly_revenue_per_screen,Mean monthly revenue per screen,0.0,25683,Float64
+rs_Impressions_95_185,Relative strength of Impressions (95/185 day horizon),0.0,22387,Float64
+rs_NVIs_95_185,Relative strength of NVIs (95/185 day horizon),0.0,22355,Float64
+rs_Revenue_95_185,Relative strength of Revenue (95/185 day horizon),0.0,22537,Float64
+rs_RevenuePerScreen_95_185,Relative strength of RevenuePerScreen (95/185 day horizon),0.0,22524,Float64
+rs_Impressions_185_370,Relative strength of Impressions (185/370 day horizon),0.0,21836,Float64
+rs_NVIs_185_370,Relative strength of NVIs (185/370 day horizon),0.0,21809,Float64
+rs_Revenue_185_370,Relative strength of Revenue (185/370 day horizon),0.0,21967,Float64
+rs_RevenuePerScreen_185_370,Relative strength of RevenuePerScreen (185/370 day horizon),0.0,21963,Float64
+rs_Impressions_370_740,Relative strength of Impressions (370/740 day horizon),0.0,20636,Float64
+rs_NVIs_370_740,Relative strength of NVIs (370/740 day horizon),0.0,20559,Float64
+rs_Revenue_370_740,Relative strength of Revenue (370/740 day horizon),0.0,22928,Float64
+rs_RevenuePerScreen_370_740,Relative strength of RevenuePerScreen (370/740 day horizon),0.0,22876,Float64
+nearest_site,GTVID of the nearest other GSTV site,0.0,22879,String
+min_distance_to_nearest_site_mi,Distance in miles to nearest GSTV site,0.0,22721,Float64
+min_distance_to_interstate_mi,Min distance in miles to nearest interstate,0.0,26097,Float64
+nearest_interstate,Name of the nearest interstate highway,0.0,228,String
+min_distance_to_kroger_mi,Distance in miles to nearest Kroger store,0.0,26097,Float64
+min_distance_to_mcdonalds_mi,Distance in miles to nearest McDonald's,0.0,26097,Float64
+min_distance_to_walmart_mi,Distance in miles to nearest Walmart store,0.0,26097,Float64
+min_distance_to_target_mi,Distance in miles to nearest Target store,0.0,26097,Float64
+log_total_revenue,Log-transformed: Sum of all monthly revenue across site lifetime,0.0,25607,Float64
+log_total_monthly_impressions,Log-transformed: Sum of monthly impressions across lifetime,0.0,25161,Float64
+log_total_monthly_nvis,Log-transformed: Sum of monthly network video impressions,0.0,25165,Float64
+log_total_monthly_impressions_per_screen,Log-transformed: Sum of monthly impressions per screen,0.0,25362,Float64
+log_total_monthly_nvis_per_screen,Log-transformed: Sum of monthly NVIs per screen,0.0,25319,Float64
+log_total_monthly_revenue_per_screen,Log-transformed: Sum of monthly revenue per screen,0.0,25611,Float64
+log_min_distance_to_nearest_site_mi,Log-transformed: Distance in miles to nearest GSTV site,0.0,22721,Float64
+log_min_distance_to_interstate_mi,Log-transformed: Min distance in miles to nearest interstate,0.0,26097,Float64
+log_min_distance_to_kroger_mi,Log-transformed: Distance in miles to nearest Kroger store,0.0,26097,Float64
+log_min_distance_to_mcdonalds_mi,Log-transformed: Distance in miles to nearest McDonald's,0.0,26097,Float64
+log_min_distance_to_walmart_mi,Log-transformed: Distance in miles to nearest Walmart store,0.0,26097,Float64
+log_min_distance_to_target_mi,Log-transformed: Distance in miles to nearest Target store,0.0,26097,Float64
+log_avg_household_income,Log-transformed: Average household income in the ZIP code,0.13,10595,Float64
+c_emv_enabled_encoded,Binary encoded: EMV chip payment terminal enabled,91.79,3,Int8
+c_nfc_enabled_encoded,Binary encoded: NFC contactless payment enabled,13.52,3,Int8
+c_open_24_hours_encoded,Binary encoded: Site operates 24 hours a day,0.0,2,Int8
+c_sells_beer_encoded,Binary encoded: Site sells beer,0.46,3,Int8
+c_sells_diesel_fuel_encoded,Binary encoded: Site sells diesel fuel,85.9,3,Int8
+c_sells_lottery_encoded,Binary encoded: Site sells lottery tickets,1.26,3,Int8
+c_vistar_programmatic_enabled_encoded,Binary encoded: Vistar programmatic ads enabled,0.0,2,Int8
+c_walk_up_enabled_encoded,Binary encoded: Walk-up customer interaction enabled,98.1,3,Int8
+c_sells_wine_encoded,Binary encoded: Site sells wine,0.49,3,Int8
+r_lottery_encoded,Restriction flag: Lottery,0.0,2,Int8
+r_government_encoded,Restriction flag: Government,0.0,2,Int8
+r_travel_and_tourism_encoded,Restriction flag: Travel And Tourism,0.0,2,Int8
+r_retail_car_wash_encoded,Restriction flag: Retail Car Wash,0.0,2,Int8
+r_cpg_beverage_beer_oof_encoded,Restriction flag: Cpg Beverage Beer Oof,0.0,2,Int8
+r_cpg_beverage_beer_vide_encoded,Restriction flag: Cpg Beverage Beer Vide,0.0,2,Int8
+r_cpg_beverage_wine_oof_encoded,Restriction flag: Cpg Beverage Wine Oof,0.0,2,Int8
+r_cpg_beverage_wine_video_encoded,Restriction flag: Cpg Beverage Wine Video,0.0,2,Int8
+r_finance_credit_cards_encoded,Restriction flag: Finance Credit Cards,0.0,2,Int8
+r_cpg_cbd_hemp_ingestibles_non_thc_encoded,Restriction flag: Cpg Cbd Hemp Ingestibles Non Thc,0.0,2,Int8
+r_cpg_non_food_beverage_cannabis_medical_encoded,Restriction flag: Cpg Non Food Beverage Cannabis Medical,0.0,2,Int8
+r_cpg_non_food_beverage_cannabis_recreational_encoded,Restriction flag: Cpg Non Food Beverage Cannabis Recreational,0.0,2,Int8
+r_cpg_non_food_beverage_cbd_hemp_non_thc_encoded,Restriction flag: Cpg Non Food Beverage Cbd Hemp Non Thc,0.0,2,Int8
+r_alcohol_drink_responsibly_message_encoded,Restriction flag: Alcohol Drink Responsibly Message,0.0,1,Int8
+r_alternative_transportation_encoded,Restriction flag: Alternative Transportation,0.0,2,Int8
+r_associations_and_npo_anti_smoking_encoded,Restriction flag: Associations And Npo Anti Smoking,0.0,2,Int8
+r_automotive_after_market_oil_encoded,Restriction flag: Automotive After Market Oil,0.0,2,Int8
+r_cpg_beverage_spirits_ooh_encoded,Restriction flag: Cpg Beverage Spirits Ooh,0.0,2,Int8
+r_cpg_beverage_spirits_video_encoded,Restriction flag: Cpg Beverage Spirits Video,0.0,2,Int8
+r_cpg_non_food_beverage_e_cigarette_encoded,Restriction flag: Cpg Non Food Beverage E Cigarette,0.0,2,Int8
+r_entertainment_casinos_and_gambling_encoded,Restriction flag: Entertainment Casinos And Gambling,0.0,2,Int8
+r_government_political_encoded,Restriction flag: Government Political,0.0,2,Int8
+r_automotive_electric_encoded,Restriction flag: Automotive Electric,0.0,2,Int8
+r_recruitment_encoded,Restriction flag: Recruitment,0.0,2,Int8
+r_restaurants_cdr_encoded,Restriction flag: Restaurants Cdr,0.0,2,Int8
+r_restaurants_qsr_encoded,Restriction flag: Restaurants Qsr,0.0,2,Int8
+r_retail_automotive_service_encoded,Restriction flag: Retail Automotive Service,0.0,2,Int8
+r_retail_grocery_encoded,Restriction flag: Retail Grocery,0.0,2,Int8
+r_retail_grocerty_with_fuel_encoded,Restriction flag: Retail Grocerty With Fuel,0.0,2,Int8
+schedule_site_encoded,Binary encoded: Whether the site supports scheduled content,0.0,1,Int8
+sellable_site_encoded,Binary encoded: Whether the site is available for ad sales,0.0,2,Int8

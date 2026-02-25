@@ -100,6 +100,11 @@ class DataProcessor:
             filtered_count = len(df)
             print(f"Filtered to sites with >11 active months: {filtered_count:,} sites ({original_count - filtered_count:,} excluded)")
 
+        # Store site metadata for post-training exports (e.g. classification CSVs)
+        self.source_gtvids = df['gtvid'].to_list() if 'gtvid' in df.columns else None
+        self.source_statuses = df['status'].to_list() if 'status' in df.columns else None
+        self.source_revenues = df[self.config.target].fill_null(0).to_list() if self.config.target in df.columns else None
+
         # Process features
         numeric_data = self._process_numeric(df)
         categorical_data = self._process_categorical(df)
@@ -302,6 +307,11 @@ def create_data_loaders(
     train_idx = indices[:n_train]
     val_idx = indices[n_train:n_train + n_val]
     test_idx = indices[n_train + n_val:]
+
+    # Store split indices for post-training export reconstruction
+    processor.train_indices = train_idx.tolist()
+    processor.val_indices = val_idx.tolist()
+    processor.test_indices = test_idx.tolist()
 
     print(f"Train: {len(train_idx):,}, Val: {len(val_idx):,}, Test: {len(test_idx):,}")
 

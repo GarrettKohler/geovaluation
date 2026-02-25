@@ -1,318 +1,362 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glossary - GSTV Site Visualization</title>
-    <!-- Google Fonts - Inter for Kepler.gl style -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        /* ============================================
-           Kepler.gl Dark Theme - Glossary
-           Based on Uber's Kepler.gl design system
-           ============================================ */
-        :root {
-            /* Kepler.gl Core Colors */
-            --kepler-active: #1FBAD6;
-            --kepler-active-hover: #3DD0E7;
-            --kepler-primary-btn: #0F9668;
-            --kepler-primary-btn-hover: #12B17C;
-            --kepler-secondary-btn: #6A7485;
+{% extends "_base.html" %}
 
-            /* Kepler.gl Backgrounds (dark theme hierarchy) */
-            --kepler-bg-base: #242730;
-            --kepler-bg-panel: #29323C;
-            --kepler-bg-content: #292E36;
-            --kepler-bg-input: #3A4552;
-            --kepler-bg-hover: #3A4552;
+{% block title %}Glossary — GSTV Site Analysis{% endblock %}
 
-            /* Kepler.gl Text Colors */
-            --kepler-text: #A0A7B4;
-            --kepler-text-highlight: #F0F0F0;
-            --kepler-text-label: #6A7485;
-            --kepler-text-secondary: #6A7485;
+{% block page_styles %}
+<style>
+    /* ============ Page Layout ============ */
+    .page-container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 32px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
 
-            /* Kepler.gl Border & Accents */
-            --kepler-border: #3A414C;
-            --kepler-border-light: #4A5568;
-            --kepler-selection: rgba(31, 186, 214, 0.15);
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--kepler-border);
+        flex-shrink: 0;
+    }
 
-            /* Tag colors (dark theme adapted) */
-            --tag-metrics-bg: rgba(31, 186, 214, 0.15);
-            --tag-metrics-text: #1FBAD6;
-            --tag-training-bg: rgba(167, 139, 250, 0.15);
-            --tag-training-text: #A78BFA;
-            --tag-model-bg: rgba(96, 165, 250, 0.15);
-            --tag-model-text: #60A5FA;
-            --tag-data-bg: rgba(251, 191, 36, 0.15);
-            --tag-data-text: #FBBF24;
-            --tag-interpretability-bg: rgba(248, 113, 113, 0.15);
-            --tag-interpretability-text: #F87171;
+    .page-header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
 
-            /* Motion */
-            --kepler-transition: 200ms ease;
+    .page-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--kepler-text-title);
+        letter-spacing: 0.5px;
+        text-decoration: none;
+    }
 
-            /* Shape */
-            --kepler-radius-sm: 2px;
-            --kepler-radius-md: 4px;
-            --kepler-radius-lg: 8px;
+    .page-logo span {
+        color: var(--kepler-active);
+    }
+
+    .page-nav {
+        display: flex;
+        gap: 4px;
+    }
+
+    .page-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: var(--kepler-radius-md);
+        color: var(--kepler-text-label);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all var(--kepler-transition);
+    }
+
+    .page-nav a:hover {
+        color: var(--kepler-text);
+        background: var(--kepler-bg-hover);
+    }
+
+    .page-nav a.active {
+        color: var(--kepler-active);
+        background: rgba(31, 186, 214, 0.1);
+    }
+
+    .page-nav a svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    /* ============ Content ============ */
+    .page-content {
+        flex: 1;
+        padding: 28px 0;
+        max-width: 920px;
+    }
+
+    .page-title-block {
+        margin-bottom: 24px;
+    }
+
+    .page-title-block h1 {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--kepler-text-title);
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
+    }
+
+    .page-title-block .subtitle {
+        font-size: 0.85rem;
+        color: var(--kepler-text-label);
+    }
+
+    /* ============ Search ============ */
+    .glossary-search-bar {
+        margin-bottom: 20px;
+    }
+
+    .glossary-search-bar input {
+        width: 100%;
+        max-width: 400px;
+        padding: 10px 14px 10px 36px;
+        background: var(--kepler-bg-panel);
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-md);
+        color: var(--kepler-text-highlight);
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color var(--kepler-transition);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236A7485' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: 12px center;
+    }
+
+    .glossary-search-bar input::placeholder {
+        color: var(--kepler-text-label);
+    }
+
+    .glossary-search-bar input:focus {
+        border-color: var(--kepler-active);
+    }
+
+    /* ============ Category Filters ============ */
+    .category-filter {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
+    }
+
+    .filter-btn {
+        padding: 7px 14px;
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-md);
+        background: transparent;
+        color: var(--kepler-text-label);
+        font-family: var(--font-body);
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all var(--kepler-transition);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-btn:hover {
+        background: var(--kepler-bg-hover);
+        border-color: var(--kepler-active);
+        color: var(--kepler-active);
+    }
+
+    .filter-btn.active {
+        background: var(--kepler-active);
+        border-color: var(--kepler-active);
+        color: var(--kepler-bg-base);
+    }
+
+    /* ============ Glossary Sections ============ */
+    .glossary-section {
+        margin-bottom: 36px;
+    }
+
+    .section-title {
+        font-family: var(--font-heading);
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--kepler-text-label);
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--kepler-border);
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+    }
+
+    /* ============ Glossary Entries ============ */
+    .glossary-entry {
+        background: var(--kepler-bg-panel);
+        border-radius: var(--kepler-radius-lg);
+        padding: 18px 22px;
+        margin-bottom: 12px;
+        border: 1px solid var(--kepler-border);
+        transition: all var(--kepler-transition);
+    }
+
+    .glossary-entry:hover {
+        border-color: rgba(31, 186, 214, 0.25);
+        background: var(--kepler-bg-content);
+    }
+
+    .glossary-entry.hidden {
+        display: none;
+    }
+
+    .entry-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+
+    .entry-term {
+        font-family: var(--font-heading);
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--kepler-text-highlight);
+    }
+
+    .entry-abbr {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: var(--kepler-radius-sm);
+        color: var(--kepler-active);
+        background: rgba(31, 186, 214, 0.12);
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .entry-tag {
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        padding: 3px 8px;
+        border-radius: var(--kepler-radius-sm);
+    }
+
+    /* Tag color palette */
+    .tag-metrics { background: rgba(31, 186, 214, 0.12); color: #1FBAD6; }
+    .tag-training { background: rgba(167, 139, 250, 0.12); color: #A78BFA; }
+    .tag-model { background: rgba(96, 165, 250, 0.12); color: #60A5FA; }
+    .tag-data { background: rgba(251, 191, 36, 0.12); color: #FBBF24; }
+    .tag-interpretability { background: rgba(248, 113, 113, 0.12); color: #F87171; }
+
+    .entry-definition {
+        font-size: 0.85rem;
+        color: var(--kepler-text);
+        line-height: 1.7;
+    }
+
+    .entry-formula {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 8px 14px;
+        background: var(--kepler-bg-base);
+        border-radius: var(--kepler-radius-sm);
+        border: 1px solid var(--kepler-border);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--kepler-active);
+    }
+
+    .entry-context {
+        margin-top: 10px;
+        font-size: 0.78rem;
+        color: var(--kepler-text-label);
+        font-style: italic;
+        padding-left: 12px;
+        border-left: 2px solid var(--kepler-active);
+        line-height: 1.5;
+    }
+
+    /* ============ Responsive ============ */
+    @media (max-width: 1200px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .page-container { padding: 0 16px; }
+
+        .page-nav {
+            flex-wrap: wrap;
+            gap: 2px;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--kepler-bg-base);
-            color: var(--kepler-text);
-            min-height: 100vh;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            background: var(--kepler-bg-panel);
-            padding: 16px 24px;
-            border-radius: var(--kepler-radius-lg);
-            border: 1px solid var(--kepler-border);
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--kepler-text);
-            text-decoration: none;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            padding: 8px 14px;
-            border-radius: var(--kepler-radius-sm);
-            border: 1px solid var(--kepler-border);
-            background: transparent;
-            transition: all var(--kepler-transition);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .back-link:hover {
-            background: var(--kepler-bg-hover);
-            border-color: var(--kepler-active);
-            color: var(--kepler-active);
-        }
-
-        .back-link svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--kepler-text-highlight);
-            letter-spacing: -0.01em;
-        }
-
-        .header-subtitle {
-            font-size: 0.75rem;
-            color: var(--kepler-text-label);
-            margin-top: 2px;
-            font-weight: 400;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Category filter - Kepler.gl style filter chips */
         .category-filter {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
+            justify-content: flex-start;
         }
 
-        .filter-btn {
-            padding: 8px 14px;
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-sm);
-            background: transparent;
-            color: var(--kepler-text);
-            font-size: 0.75rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all var(--kepler-transition);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        .page-title-block h1 { font-size: 1.2rem; }
+    }
+</style>
+{% endblock %}
 
-        .filter-btn:hover {
-            background: var(--kepler-bg-hover);
-            border-color: var(--kepler-active);
-            color: var(--kepler-active);
-        }
+{% block content %}
+<div class="page-container">
 
-        .filter-btn.active {
-            background: var(--kepler-active);
-            border-color: var(--kepler-active);
-            color: var(--kepler-bg-base);
-        }
+    <!-- Header -->
+    <header class="page-header">
+        <a href="/" class="page-logo">GSTV <span>Site Analysis</span></a>
+        <nav class="page-nav">
+            <a href="/datasets">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                Datasets
+            </a>
+            <a href="/glossary" class="active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                Glossary
+            </a>
+            <a href="/training-details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Training Details
+            </a>
+            <a href="/shap-values">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                SHAP Values
+            </a>
+            <a href="/map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                    <line x1="8" y1="2" x2="8" y2="18"/>
+                    <line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                Map View
+            </a>
+        </nav>
+    </header>
 
-        /* Glossary entries */
-        .glossary-section {
-            margin-bottom: 32px;
-        }
+    <!-- Content -->
+    <div class="page-content">
+        <div class="page-title-block">
+            <h1>Glossary</h1>
+            <div class="subtitle">Machine Learning & Statistics Terminology</div>
+        </div>
 
-        .section-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--kepler-text-label);
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--kepler-border);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .glossary-entry {
-            background: var(--kepler-bg-panel);
-            border-radius: var(--kepler-radius-md);
-            padding: 16px 20px;
-            margin-bottom: 12px;
-            border: 1px solid var(--kepler-border);
-            transition: all var(--kepler-transition);
-        }
-
-        .glossary-entry:hover {
-            border-color: var(--kepler-border-light);
-            background: var(--kepler-bg-content);
-        }
-
-        .entry-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
-        }
-
-        .entry-term {
-            font-size: 0.9375rem;
-            font-weight: 600;
-            color: var(--kepler-text-highlight);
-        }
-
-        .entry-abbr {
-            font-size: 0.6875rem;
-            font-weight: 500;
-            padding: 3px 8px;
-            border-radius: var(--kepler-radius-sm);
-            color: var(--kepler-active);
-            background: rgba(31, 186, 214, 0.15);
-            font-family: 'Roboto Mono', monospace;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .entry-tag {
-            font-size: 0.625rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 3px 8px;
-            border-radius: var(--kepler-radius-sm);
-        }
-
-        .tag-metrics { background: var(--tag-metrics-bg); color: var(--tag-metrics-text); }
-        .tag-training { background: var(--tag-training-bg); color: var(--tag-training-text); }
-        .tag-model { background: var(--tag-model-bg); color: var(--tag-model-text); }
-        .tag-data { background: var(--tag-data-bg); color: var(--tag-data-text); }
-        .tag-interpretability { background: var(--tag-interpretability-bg); color: var(--tag-interpretability-text); }
-
-        .entry-definition {
-            font-size: 0.8125rem;
-            color: var(--kepler-text);
-            line-height: 1.7;
-        }
-
-        .entry-formula {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 8px 12px;
-            background: var(--kepler-bg-base);
-            border-radius: var(--kepler-radius-sm);
-            border: 1px solid var(--kepler-border);
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--kepler-active);
-        }
-
-        .entry-context {
-            margin-top: 10px;
-            font-size: 0.75rem;
-            color: var(--kepler-text-secondary);
-            font-style: italic;
-            padding-left: 12px;
-            border-left: 2px solid var(--kepler-active);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .container {
-                padding: 16px;
-            }
-
-            header {
-                flex-direction: column;
-                gap: 12px;
-                text-align: center;
-            }
-
-            .category-filter {
-                justify-content: center;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <a href="/" class="back-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                    Home
-                </a>
-                <a href="/datasets" class="back-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                    Datasets
-                </a>
-                <div>
-                    <h1>Glossary</h1>
-                    <div class="header-subtitle">Machine Learning & Statistics Terminology</div>
-                </div>
-            </div>
-        </header>
+        <!-- Search -->
+        <div class="glossary-search-bar">
+            <input type="text" id="glossary-search" placeholder="Search terms..." autocomplete="off">
+        </div>
 
         <!-- Category Filter -->
         <div class="category-filter">
@@ -324,7 +368,9 @@
             <button class="filter-btn" data-category="interpretability">Interpretability</button>
         </div>
 
-        <!-- Metrics Section -->
+        <!-- ================================================================
+             METRICS
+             ================================================================ -->
         <div class="glossary-section" data-section="metrics">
             <div class="section-title">Evaluation Metrics</div>
 
@@ -337,7 +383,20 @@
                 <div class="entry-definition">
                     The average of absolute differences between predicted and actual values. Expressed in the same units as the target (dollars for revenue prediction). Lower is better.
                     <div class="entry-formula">MAE = (1/n) * &Sigma;|predicted - actual|</div>
-                    <div class="entry-context">In this app: A MAE of $50 means predictions are off by $50/month on average.</div>
+                    <div class="entry-context">In this app: A MAE of $50 means predictions are off by $50/month on average. Reported for both XGBoost and Neural Network regression models.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Mean Absolute Percentage Error</span>
+                    <span class="entry-abbr">MAPE</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The average of absolute percentage differences between predicted and actual values. Unlike MAE, it provides a scale-independent measure of prediction accuracy. Can be undefined when actual values are zero.
+                    <div class="entry-formula">MAPE = (1/n) * &Sigma;(|predicted - actual| / |actual|) * 100%</div>
+                    <div class="entry-context">In this app: A MAPE of 15% means predictions are off by 15% of the actual revenue on average. Shown alongside MAE in regression results.</div>
                 </div>
             </div>
 
@@ -376,7 +435,7 @@
                 <div class="entry-definition">
                     Measures how much variance in the target the model explains, compared to simply predicting the mean. Ranges from -&infin; to 1.0 where 1.0 is perfect and 0 means "no better than guessing the average."
                     <div class="entry-formula">R&sup2; = 1 - (&Sigma;(actual - pred)&sup2; / &Sigma;(actual - mean)&sup2;)</div>
-                    <div class="entry-context">In this app: R&sup2; of 0.7 means the model explains 70% of the variance in site revenue.</div>
+                    <div class="entry-context">In this app: R&sup2; of 0.7 means the model explains 70% of the variance in site revenue. The primary metric for comparing regression experiments.</div>
                 </div>
             </div>
 
@@ -388,7 +447,31 @@
                 </div>
                 <div class="entry-definition">
                     Measures how well the model distinguishes between positive and negative classes across all possible thresholds. Ranges from 0.5 (random guessing) to 1.0 (perfect separation). Used for classification tasks.
-                    <div class="entry-context">In this app: Used for the lookalike model to measure how well it identifies top-performing sites vs. others.</div>
+                    <div class="entry-context">In this app: The primary metric for lookalike models. Measures how well the model identifies top-performing sites vs. others.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">F1 Score</span>
+                    <span class="entry-abbr">F1</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    The harmonic mean of precision and recall. Ranges from 0 to 1. It balances the trade-off between catching all positive examples (recall) and avoiding false positives (precision). More informative than accuracy for imbalanced datasets.
+                    <div class="entry-formula">F1 = 2 * (precision * recall) / (precision + recall)</div>
+                    <div class="entry-context">In this app: Reported alongside AUC for lookalike classification. A high F1 means the model both finds most top performers and doesn't misclassify too many non-performers.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Silhouette Score</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    Measures how similar a data point is to its own cluster compared to neighboring clusters. Ranges from -1 (wrong cluster) to +1 (well-separated clusters). 0 indicates overlapping clusters.
+                    <div class="entry-context">In this app: The primary metric for evaluating Deep Embedded Clustering (DEC) results. Higher scores mean more distinct performer segments.</div>
                 </div>
             </div>
 
@@ -398,7 +481,7 @@
                     <span class="entry-tag tag-metrics">Metrics</span>
                 </div>
                 <div class="entry-definition">
-                    The objective function that the model minimizes during training. Lower loss means better predictions. For regression, this app uses Huber Loss (robust to outliers). For classification, it uses Binary Cross-Entropy Loss.
+                    The objective function that the model minimizes during training. Lower loss means better predictions. For regression, this app uses Huber Loss (robust to outliers). For classification, it uses Binary Cross-Entropy Loss. For clustering, it uses a combination of reconstruction loss and KL-divergence.
                     <div class="entry-context">In this app: Training loss should decrease over epochs. Validation loss that stops decreasing signals overfitting.</div>
                 </div>
             </div>
@@ -411,12 +494,26 @@
                 <div class="entry-definition">
                     The proportion of correct predictions out of total predictions. For classification only. Can be misleading with imbalanced classes (e.g., 90% accuracy by always predicting the majority class).
                     <div class="entry-formula">Accuracy = correct predictions / total predictions</div>
-                    <div class="entry-context">In this app: Used alongside AUC for the lookalike model. AUC is the primary metric since classes are imbalanced (90/10 split).</div>
+                    <div class="entry-context">In this app: Used alongside AUC and F1 for the lookalike model. AUC is the primary metric since classes are imbalanced (90/10 split).</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="metrics">
+                <div class="entry-header">
+                    <span class="entry-term">Brier Score</span>
+                    <span class="entry-tag tag-metrics">Metrics</span>
+                </div>
+                <div class="entry-definition">
+                    Measures the accuracy of probabilistic predictions. Calculated as the mean squared difference between predicted probabilities and actual binary outcomes. Ranges from 0 (perfect) to 1 (worst). Sensitive to calibration.
+                    <div class="entry-formula">Brier = (1/n) * &Sigma;(predicted_prob - actual)&sup2;</div>
+                    <div class="entry-context">In this app: Used to evaluate probability calibration before and after applying isotonic regression or Platt scaling.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Training Section -->
+        <!-- ================================================================
+             TRAINING
+             ================================================================ -->
         <div class="glossary-section" data-section="training">
             <div class="section-title">Training Parameters</div>
 
@@ -427,7 +524,7 @@
                 </div>
                 <div class="entry-definition">
                     One complete pass through the entire training dataset. Multiple epochs allow the model to refine its parameters iteratively. Too many epochs can lead to overfitting; too few leads to underfitting.
-                    <div class="entry-context">In this app: Default is 50 epochs. Early stopping may halt training before reaching this limit if performance stops improving.</div>
+                    <div class="entry-context">In this app: Default is 50 epochs for neural networks. XGBoost uses "boosting rounds" which serve a similar purpose. Early stopping may halt training before the limit.</div>
                 </div>
             </div>
 
@@ -438,7 +535,7 @@
                 </div>
                 <div class="entry-definition">
                     The number of training examples processed together before updating model weights. Larger batches provide more stable gradient estimates but use more GPU memory. Smaller batches add noise that can help escape local minima.
-                    <div class="entry-context">In this app: Default is 4096, optimized for Apple Silicon GPU (MPS) memory bandwidth.</div>
+                    <div class="entry-context">In this app: Default is 4096, optimized for Apple Silicon GPU (MPS) memory bandwidth. Only applies to neural network training; XGBoost processes data differently.</div>
                 </div>
             </div>
 
@@ -450,7 +547,7 @@
                 </div>
                 <div class="entry-definition">
                     Controls how much model weights are adjusted in response to each batch's error gradient. Too high causes instability (loss oscillates or diverges). Too low causes extremely slow convergence.
-                    <div class="entry-context">In this app: Default is 0.0001 (1e-4). A scheduler automatically reduces LR when validation loss plateaus.</div>
+                    <div class="entry-context">In this app: Default is 0.0001 (1e-4) for neural networks. XGBoost uses a separate learning rate (eta) that controls the contribution of each tree. A scheduler automatically reduces LR when validation loss plateaus.</div>
                 </div>
             </div>
 
@@ -461,7 +558,7 @@
                 </div>
                 <div class="entry-definition">
                     A regularization technique that randomly sets a fraction of neuron outputs to zero during training. This prevents the network from relying too heavily on any single neuron, reducing overfitting.
-                    <div class="entry-context">In this app: Default is 0.2 (20% of neurons deactivated per layer during training). Only active during training, not prediction.</div>
+                    <div class="entry-context">In this app: Default is 0.2 (20% of neurons deactivated per layer during training). Only applies to neural networks, not XGBoost. Only active during training, not prediction.</div>
                 </div>
             </div>
 
@@ -472,7 +569,7 @@
                 </div>
                 <div class="entry-definition">
                     Halts training when validation performance stops improving for a specified number of epochs (the "patience"). Prevents overfitting by keeping the model from memorizing training data noise.
-                    <div class="entry-context">In this app: Patience is 10 epochs. If validation loss doesn't improve for 10 consecutive epochs, training stops and the best model is restored.</div>
+                    <div class="entry-context">In this app: Patience is 10 epochs for neural networks and 10 boosting rounds for XGBoost. The best model checkpoint is restored after stopping.</div>
                 </div>
             </div>
 
@@ -484,7 +581,7 @@
                 <div class="entry-definition">
                     A regularization technique that penalizes large model weights by adding a fraction of the weight magnitude to the loss. Encourages simpler models that generalize better.
                     <div class="entry-formula">effective_loss = loss + weight_decay * &Sigma;(w&sup2;)</div>
-                    <div class="entry-context">In this app: Default is 1e-5 (very small penalty). Helps prevent the model from becoming overconfident about any single feature.</div>
+                    <div class="entry-context">In this app: Default is 1e-5 for neural networks. XGBoost uses separate L1/L2 regularization parameters (alpha/lambda).</div>
                 </div>
             </div>
 
@@ -495,14 +592,28 @@
                 </div>
                 <div class="entry-definition">
                     Automatically adjusts the learning rate during training. This app uses "Reduce on Plateau" &mdash; when validation loss stops improving for a set number of epochs (scheduler patience), the learning rate is halved.
-                    <div class="entry-context">In this app: Scheduler patience is 5 epochs. The LR is multiplied by 0.5 each time the plateau is detected.</div>
+                    <div class="entry-context">In this app: Scheduler patience is 5 epochs. The LR is multiplied by 0.5 each time the plateau is detected. Only applies to neural network training.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Model Architecture Section -->
+        <!-- ================================================================
+             MODEL ARCHITECTURE
+             ================================================================ -->
         <div class="glossary-section" data-section="model">
             <div class="section-title">Model Architecture</div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">XGBoost</span>
+                    <span class="entry-abbr">Extreme Gradient Boosting</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A gradient boosting framework that builds an ensemble of decision trees sequentially. Each new tree corrects errors from prior trees. Known for speed, accuracy, and built-in regularization. Uses histogram-based split finding for efficiency on large datasets.
+                    <div class="entry-context">In this app: Available for regression and as one of two model types. Uses the 'hist' tree method optimized for CPU. Automatically handles missing values and feature interactions without embeddings. Generally faster to train than neural networks but may underperform on high-cardinality categorical features.</div>
+                </div>
+            </div>
 
             <div class="glossary-entry" data-category="model">
                 <div class="entry-header">
@@ -511,7 +622,30 @@
                 </div>
                 <div class="entry-definition">
                     A machine learning model inspired by biological neurons. Composed of layers of interconnected nodes that transform input features through learned weights and non-linear activations to produce predictions.
-                    <div class="entry-context">In this app: A deep feedforward network with 4 hidden layers (512 &rarr; 256 &rarr; 128 &rarr; 64 neurons).</div>
+                    <div class="entry-context">In this app: A deep feedforward network with configurable hidden layers (default: 512 &rarr; 256 &rarr; 128 &rarr; 64 neurons), residual connections, and categorical embeddings. Available for all task types: regression, lookalike classification, and clustering. Runs on Apple Silicon GPU (MPS) for acceleration.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Deep Embedded Clustering</span>
+                    <span class="entry-abbr">DEC</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    An unsupervised deep learning approach that jointly learns feature representations and cluster assignments. Combines an autoencoder (for learning a compact latent space) with learnable cluster centroids. Uses two training phases: pretraining (reconstruction) and clustering refinement via KL-divergence.
+                    <div class="entry-context">In this app: Used for the "Cluster Performers" task to discover natural groupings among high-performing sites. Soft cluster assignments are refined using Student's t-distribution, and sites are assigned to clusters based on a configurable probability threshold.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Gradient Boosting</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    An ensemble technique that builds models sequentially, where each new model attempts to correct the residual errors of the combined ensemble so far. The "gradient" refers to using gradient descent in function space to optimize a loss function. Decision trees are the most common base learner.
+                    <div class="entry-context">In this app: XGBoost is the gradient boosting implementation. Each boosting round adds a new tree that focuses on examples the ensemble currently gets wrong.</div>
                 </div>
             </div>
 
@@ -522,7 +656,19 @@
                 </div>
                 <div class="entry-definition">
                     The intermediate layers between input and output in a neural network. Each layer applies a linear transformation followed by a non-linear activation function. More/wider layers increase capacity but also risk overfitting.
-                    <div class="entry-context">In this app: Default is [512, 256, 128, 64] &mdash; a progressively narrowing architecture that forces the model to learn compact representations.</div>
+                    <div class="entry-context">In this app: Default is [512, 256, 128, 64] &mdash; a progressively narrowing architecture that forces the model to learn compact representations. Configurable via the hyperparameters panel.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Residual Connections</span>
+                    <span class="entry-abbr">Skip Connections</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    Shortcut paths that add a layer's input directly to its output, allowing gradients to flow more easily through deep networks. Helps prevent vanishing gradients and enables training of deeper architectures.
+                    <div class="entry-context">In this app: The neural network uses residual blocks where each hidden layer's output is added to its input (when dimensions match). This improves training stability for the 4-layer architecture.</div>
                 </div>
             </div>
 
@@ -533,7 +679,7 @@
                 </div>
                 <div class="entry-definition">
                     The size of the dense vector representation learned for each categorical feature value. Embeddings capture relationships between categories (e.g., similar networks have similar embeddings) in a continuous space.
-                    <div class="entry-context">In this app: Each categorical feature (network, program, retailer, etc.) gets a 16-dimensional embedding vector.</div>
+                    <div class="entry-context">In this app: Each categorical feature (network, program, retailer, etc.) gets a 16-dimensional embedding vector. Only used by neural networks; XGBoost handles categoricals natively via label encoding.</div>
                 </div>
             </div>
 
@@ -544,7 +690,7 @@
                 </div>
                 <div class="entry-definition">
                     Normalizes the output of each layer to have zero mean and unit variance. This stabilizes training, allows higher learning rates, and acts as mild regularization.
-                    <div class="entry-context">In this app: Applied after each hidden layer. Helps the model train faster and more reliably on the diverse site features.</div>
+                    <div class="entry-context">In this app: Applied after each hidden layer in the neural network. Helps the model train faster and more reliably on the diverse site features.</div>
                 </div>
             </div>
 
@@ -555,7 +701,7 @@
                 </div>
                 <div class="entry-definition">
                     A task where the model predicts a continuous numeric value. The model outputs a single unbounded number representing the predicted quantity.
-                    <div class="entry-context">In this app: Predicts average monthly revenue per site. Uses Huber Loss and reports MAE, SMAPE, RMSE, R&sup2;.</div>
+                    <div class="entry-context">In this app: "Predict Revenue" task. Predicts average monthly revenue per site. Available with both XGBoost and Neural Network. Uses Huber Loss and reports MAE, MAPE, SMAPE, RMSE, R&sup2;.</div>
                 </div>
             </div>
 
@@ -566,7 +712,18 @@
                 </div>
                 <div class="entry-definition">
                     A task where the model predicts which class an example belongs to. In binary classification, the model outputs a probability of belonging to the positive class (top performers).
-                    <div class="entry-context">In this app: The "lookalike" model identifies sites that resemble top 10% revenue performers. Uses BCEWithLogitsLoss and reports AUC.</div>
+                    <div class="entry-context">In this app: The "Find Lookalikes" task identifies sites that resemble top revenue performers. Uses configurable percentile bounds (default: p90-p100). Neural network only. Reports AUC, F1, and accuracy.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">Clustering</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    An unsupervised task where the model discovers natural groupings in data without labeled examples. Sites are assigned to clusters based on feature similarity, revealing hidden segments in the portfolio.
+                    <div class="entry-context">In this app: The "Cluster Performers" task uses Deep Embedded Clustering (DEC) to segment high-performing sites into distinct groups. Configurable number of clusters (default: 5) and assignment confidence threshold.</div>
                 </div>
             </div>
 
@@ -589,7 +746,19 @@
                 </div>
                 <div class="entry-definition">
                     The standard loss function for binary classification. Measures how far predicted probabilities are from actual binary labels (0 or 1). Penalizes confident wrong predictions more heavily than uncertain ones.
-                    <div class="entry-context">In this app: Used with pos_weight=9.0 to compensate for the 90/10 class imbalance (only 10% of sites are top performers).</div>
+                    <div class="entry-context">In this app: Used with pos_weight for the lookalike task to compensate for class imbalance (only ~10% of sites are top performers).</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="model">
+                <div class="entry-header">
+                    <span class="entry-term">KL-Divergence</span>
+                    <span class="entry-abbr">Kullback-Leibler</span>
+                    <span class="entry-tag tag-model">Model</span>
+                </div>
+                <div class="entry-definition">
+                    A measure of how one probability distribution diverges from a second expected distribution. In clustering, it drives soft cluster assignments toward a sharper target distribution, encouraging the model to make confident cluster assignments.
+                    <div class="entry-context">In this app: Used as the clustering refinement loss in DEC. Minimizing KL-divergence between soft assignments and an auxiliary target distribution sharpens cluster boundaries.</div>
                 </div>
             </div>
 
@@ -600,13 +769,15 @@
                     <span class="entry-tag tag-model">Model</span>
                 </div>
                 <div class="entry-definition">
-                    A correction applied when one class is much rarer than the other. Multiplies the loss for the minority class by a weight (n_majority / n_minority) so the model doesn't learn to always predict the majority class.
-                    <div class="entry-context">In this app: pos_weight=9.0 because ~10% of sites are top performers. Each positive example counts 9x in the loss calculation.</div>
+                    A correction applied when one class is much rarer than the other. Multiplies the loss for the minority class by a weight so the model doesn't learn to always predict the majority class.
+                    <div class="entry-context">In this app: Automatically computed based on the percentile bounds. For p90-p100 (top 10%), pos_weight &asymp; 9.0 &mdash; each positive example counts ~9x in the loss calculation.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Data Processing Section -->
+        <!-- ================================================================
+             DATA & PROCESSING
+             ================================================================ -->
         <div class="glossary-section" data-section="data">
             <div class="section-title">Data & Processing</div>
 
@@ -617,7 +788,7 @@
                 </div>
                 <div class="entry-definition">
                     The portion of data used to train the model (learn weights). The model sees these examples repeatedly during training and optimizes its parameters to minimize prediction error on them.
-                    <div class="entry-context">In this app: 70% of active sites. Displayed as blue dots on the map.</div>
+                    <div class="entry-context">In this app: 70% of active sites (~18,270 sites). Displayed as blue dots on the map.</div>
                 </div>
             </div>
 
@@ -650,9 +821,20 @@
                     <span class="entry-tag tag-data">Data</span>
                 </div>
                 <div class="entry-definition">
-                    Transforms numeric features to have zero mean and unit standard deviation. Essential for neural networks because features on different scales (e.g., latitude vs. revenue) would otherwise dominate gradient updates unevenly.
+                    Transforms numeric features to have zero mean and unit standard deviation. Essential for neural networks because features on different scales (e.g., latitude vs. revenue) would otherwise dominate gradient updates unevenly. XGBoost is scale-invariant and doesn't require this step, but it's applied uniformly.
                     <div class="entry-formula">scaled = (value - mean) / std_deviation</div>
-                    <div class="entry-context">In this app: Applied to all 28 numeric features. The target (revenue) is also scaled during training, then inverse-transformed for reporting.</div>
+                    <div class="entry-context">In this app: Applied to all numeric features. The scaler is saved in the experiment folder as preprocessor.pkl for consistent inference.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Feature Types</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    Features are categorized into three types: <strong>Numeric</strong> (13 default) for continuous variables like distances and income; <strong>Categorical</strong> (7 default) for discrete labels like network and retailer; and <strong>Boolean</strong> (40 default) for binary flags like EMV-enabled or NFC-capable.
+                    <div class="entry-context">In this app: You can select individual features from each type via the tabbed feature selector on the home page. The feature count badge shows selected vs. available.</div>
                 </div>
             </div>
 
@@ -680,12 +862,23 @@
 
             <div class="glossary-entry" data-category="data">
                 <div class="entry-header">
-                    <span class="entry-term">Top 10% Threshold</span>
+                    <span class="entry-term">Percentile Bounds (Lookalike)</span>
                     <span class="entry-tag tag-data">Data</span>
                 </div>
                 <div class="entry-definition">
-                    In classification mode, the 90th percentile of revenue is used as the cutoff to define "top performers." Sites at or above this threshold are labeled positive (1), all others negative (0).
-                    <div class="entry-context">In this app: Approximately $613/month avg revenue. ~2,610 out of ~26,100 active sites qualify as top performers.</div>
+                    Configurable thresholds that define the "top performer" positive class for the lookalike model. Sites with revenue at or above the lower percentile and at or below the upper percentile are labeled as positive (1).
+                    <div class="entry-context">In this app: Default is p90-p100 (top 10%). Configurable via the home page. Narrower ranges (e.g., p95-p100) create a more selective model; wider ranges (e.g., p80-p100) are more inclusive.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="data">
+                <div class="entry-header">
+                    <span class="entry-term">Network Subset</span>
+                    <span class="entry-tag tag-data">Data</span>
+                </div>
+                <div class="entry-definition">
+                    A filter that restricts training and prediction to sites belonging to a specific network. This allows building specialized models for different network segments of the portfolio.
+                    <div class="entry-context">In this app: Available networks are All Networks (26,099 sites), Gilbarco (18,210), Speedway (2,760), and Wayne/Dover (5,129). Selected on the home page before training.</div>
                 </div>
             </div>
 
@@ -696,12 +889,14 @@
                 </div>
                 <div class="entry-definition">
                     When a model memorizes training data noise rather than learning generalizable patterns. Symptoms: training loss keeps decreasing but validation loss starts increasing. Remedies include dropout, early stopping, weight decay, and more data.
-                    <div class="entry-context">In this app: Monitored by comparing train_loss vs val_loss each epoch. Early stopping and dropout are the primary defenses.</div>
+                    <div class="entry-context">In this app: Monitored by comparing train_loss vs val_loss each epoch in the training charts. Early stopping, dropout (NN), and regularization (XGBoost) are the primary defenses.</div>
                 </div>
             </div>
         </div>
 
-        <!-- Interpretability Section -->
+        <!-- ================================================================
+             INTERPRETABILITY
+             ================================================================ -->
         <div class="glossary-section" data-section="interpretability">
             <div class="section-title">Model Interpretability</div>
 
@@ -713,7 +908,7 @@
                 </div>
                 <div class="entry-definition">
                     A game-theoretic approach to explain the output of any machine learning model. SHAP assigns each feature an importance value (Shapley value) for a particular prediction, showing how much each feature pushes the prediction above or below the average.
-                    <div class="entry-context">In this app: After training completes, SHAP values are computed on test samples to identify which site features most influence revenue predictions or lookalike scores. View them via "View SHAP Values" in the training results.</div>
+                    <div class="entry-context">In this app: After training completes, SHAP values are computed on test samples to identify which site features most influence revenue predictions or lookalike scores. Works with both Neural Network (KernelExplainer) and XGBoost (TreeExplainer) models.</div>
                 </div>
             </div>
 
@@ -726,6 +921,50 @@
                     The contribution of a single feature to the difference between the actual prediction and the average prediction (base value). Positive SHAP values push the prediction higher; negative values push it lower. The sum of all SHAP values equals the difference between the model's prediction and the base value.
                     <div class="entry-formula">prediction = base_value + &Sigma; SHAP_values</div>
                     <div class="entry-context">In this app: A positive SHAP value for "screen_count" means more screens pushes the predicted revenue higher for that site.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Probability Calibration</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    The process of adjusting model-output probabilities so they reflect true observed frequencies. A well-calibrated model that predicts 80% probability should be correct ~80% of the time. Methods include Isotonic Regression (non-parametric) and Platt Scaling (logistic fit).
+                    <div class="entry-context">In this app: Applied to lookalike classification output. Calibrated probabilities are essential for the tier classification system and for meaningful probability thresholds in business decisions.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Conformal Prediction</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A framework that provides prediction sets with statistical coverage guarantees. Instead of a single prediction, it outputs a set of possible classes with a guaranteed probability of containing the true label. Based on split conformal inference using non-conformity scores.
+                    <div class="entry-context">In this app: For lookalike classification, conformal prediction wraps the model output to give confidence-aware prediction sets. If the set contains both classes, the model is uncertain about that site.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Counterfactual Explanations</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    "What-if" explanations that show the smallest changes to input features that would flip the model's prediction. They answer: "What would need to change for this site to be classified as a top performer?" Only actionable features (not location or demographics) are modified.
+                    <div class="entry-context">In this app: Uses DiCE (Diverse Counterfactual Explanations) to generate actionable recommendations. Immutable features (latitude, household income) are locked; actionable features (hardware, payment tech) can vary.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">Tier Classification</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    A business-friendly translation of calibrated model probabilities into actionable tiers. Maps continuous probability scores to discrete recommendation levels, making model output interpretable for non-technical stakeholders.
+                    <div class="entry-context">In this app: Tier 1 "Recommended" (&gt;85%), Tier 2 "Promising" (65-85%), Tier 3 "Review" (50-65%), Tier 4 "Not Recommended" (&lt;50%). Each tier includes recommended actions and historical accuracy context.</div>
                 </div>
             </div>
 
@@ -747,9 +986,9 @@
                     <span class="entry-tag tag-interpretability">Interpretability</span>
                 </div>
                 <div class="entry-definition">
-                    The mean absolute SHAP value for each feature across all explained samples. Features with higher mean |SHAP| have a greater overall impact on model predictions. This is the primary ranking shown in the SHAP bar chart.
+                    The mean absolute SHAP value for each feature across all explained samples. Features with higher mean |SHAP| have a greater overall impact on model predictions.
                     <div class="entry-formula">importance(feature) = mean(|SHAP_values|) across all samples</div>
-                    <div class="entry-context">In this app: The bar chart ranks all site features by their average impact on revenue predictions. Top features drive the most difference between high- and low-revenue sites.</div>
+                    <div class="entry-context">In this app: The bar chart on the SHAP Values page ranks all features by their average impact. For XGBoost, native feature importance (gain) is also available as an alternative ranking.</div>
                 </div>
             </div>
 
@@ -772,7 +1011,18 @@
                 </div>
                 <div class="entry-definition">
                     A model-agnostic method for computing SHAP values that works with any prediction function. It approximates Shapley values by sampling feature coalitions and measuring how predictions change. Slower than tree-specific methods but compatible with neural networks.
-                    <div class="entry-context">In this app: Used because the model is a PyTorch neural network. Computes SHAP on ~200 test samples using 100 background samples for efficiency.</div>
+                    <div class="entry-context">In this app: Used for neural network models. Computes SHAP on ~200 test samples using 100 background samples for efficiency.</div>
+                </div>
+            </div>
+
+            <div class="glossary-entry" data-category="interpretability">
+                <div class="entry-header">
+                    <span class="entry-term">TreeExplainer</span>
+                    <span class="entry-tag tag-interpretability">Interpretability</span>
+                </div>
+                <div class="entry-definition">
+                    An exact, polynomial-time algorithm for computing SHAP values on tree-based models (XGBoost, Random Forest, etc.). Much faster than KernelExplainer because it exploits the tree structure to compute exact Shapley values without sampling.
+                    <div class="entry-context">In this app: Automatically used when the model is XGBoost. Computes exact SHAP values for all features across all test samples.</div>
                 </div>
             </div>
 
@@ -799,24 +1049,56 @@
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        // Category filter
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
+{% block page_scripts %}
+<script>
+    // Category filter
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
 
-                const category = this.dataset.category;
-                document.querySelectorAll('.glossary-section').forEach(section => {
-                    if (category === 'all') {
-                        section.style.display = '';
-                    } else {
-                        section.style.display = section.dataset.section === category ? '' : 'none';
-                    }
-                });
+            const category = this.dataset.category;
+            document.querySelectorAll('.glossary-section').forEach(section => {
+                if (category === 'all') {
+                    section.style.display = '';
+                } else {
+                    section.style.display = section.dataset.section === category ? '' : 'none';
+                }
             });
+
+            // Clear search when switching categories
+            document.getElementById('glossary-search').value = '';
+            document.querySelectorAll('.glossary-entry').forEach(e => e.classList.remove('hidden'));
         });
-    </script>
-</body>
-</html>
+    });
+
+    // Search filter
+    document.getElementById('glossary-search').addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+
+        document.querySelectorAll('.glossary-entry').forEach(entry => {
+            if (!query) {
+                entry.classList.remove('hidden');
+                return;
+            }
+
+            const term = entry.querySelector('.entry-term')?.textContent.toLowerCase() || '';
+            const abbr = entry.querySelector('.entry-abbr')?.textContent.toLowerCase() || '';
+            const definition = entry.querySelector('.entry-definition')?.textContent.toLowerCase() || '';
+
+            const matches = term.includes(query) || abbr.includes(query) || definition.includes(query);
+            entry.classList.toggle('hidden', !matches);
+        });
+
+        // Reset category filter to "All" when searching
+        if (query) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.filter-btn[data-category="all"]').classList.add('active');
+            document.querySelectorAll('.glossary-section').forEach(s => s.style.display = '');
+        }
+    });
+</script>
+{% endblock %}

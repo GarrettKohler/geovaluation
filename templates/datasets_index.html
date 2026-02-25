@@ -1,349 +1,309 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Input Datasets - GSTV Site Visualization</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --kepler-active: #1FBAD6;
-            --kepler-active-hover: #108188;
-            --kepler-primary-btn: #0F9668;
-            --kepler-error: #F9042C;
-            --kepler-warning: #FFC043;
-            --kepler-success: #47B275;
-            --kepler-info: #276EF1;
-            --kepler-bg-base: #242730;
-            --kepler-bg-panel: #29323C;
-            --kepler-bg-content: #292E36;
-            --kepler-bg-hover: #3A4552;
-            --kepler-text: #A0A7B4;
-            --kepler-text-highlight: #F0F0F0;
-            --kepler-text-title: #FFFFFF;
-            --kepler-text-label: #6A7485;
-            --kepler-border: #3A414C;
-            --kepler-shadow-dropdown: 0 8px 16px rgba(0,0,0,0.5);
-            --kepler-transition: 200ms ease;
-            --kepler-radius-sm: 2px;
-            --kepler-radius-md: 4px;
-            --kepler-radius-lg: 8px;
-        }
+{% extends "_base.html" %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}Input Datasets — GSTV Site Analysis{% endblock %}
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--kepler-bg-base);
-            color: var(--kepler-text);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
+{% block page_styles %}
+<style>
+    /* ============ Page Layout ============ */
+    .page-container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 32px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 16px 20px;
-        }
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--kepler-border);
+        flex-shrink: 0;
+    }
 
-        /* ============ Header ============ */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            background: var(--kepler-bg-panel);
-            padding: 14px 18px;
-            border-radius: var(--kepler-radius-md);
-            border: 1px solid var(--kepler-border);
-            flex-wrap: wrap;
+    .page-header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .page-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--kepler-text-title);
+        letter-spacing: 0.5px;
+        text-decoration: none;
+    }
+
+    .page-logo span {
+        color: var(--kepler-active);
+    }
+
+    .page-nav {
+        display: flex;
+        gap: 4px;
+    }
+
+    .page-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: var(--kepler-radius-md);
+        color: var(--kepler-text-label);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all var(--kepler-transition);
+    }
+
+    .page-nav a:hover {
+        color: var(--kepler-text);
+        background: var(--kepler-bg-hover);
+    }
+
+    .page-nav a.active {
+        color: var(--kepler-active);
+        background: rgba(31, 186, 214, 0.1);
+    }
+
+    .page-nav a svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    /* ============ Content ============ */
+    .page-content {
+        flex: 1;
+        padding: 28px 0;
+    }
+
+    .page-title-block {
+        margin-bottom: 24px;
+    }
+
+    .page-title-block h1 {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--kepler-text-title);
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
+    }
+
+    .page-title-block .subtitle {
+        font-size: 0.85rem;
+        color: var(--kepler-text-label);
+    }
+
+    /* ============ Pipeline Intro ============ */
+    .pipeline-intro {
+        background: var(--kepler-bg-panel);
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-lg);
+        padding: 18px 22px;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .pipeline-intro svg {
+        width: 32px;
+        height: 32px;
+        color: var(--kepler-active);
+        flex-shrink: 0;
+    }
+
+    .pipeline-intro-text {
+        font-size: 0.85rem;
+        color: var(--kepler-text);
+        line-height: 1.65;
+    }
+
+    .pipeline-intro-text strong {
+        color: var(--kepler-text-highlight);
+    }
+
+    .pipeline-intro-text code {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--kepler-active);
+        background: rgba(31, 186, 214, 0.1);
+        padding: 1px 6px;
+        border-radius: var(--kepler-radius-sm);
+    }
+
+    /* ============ Dataset Cards Grid ============ */
+    .dataset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        gap: 16px;
+    }
+
+    .dataset-card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: var(--kepler-bg-panel);
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-lg);
+        padding: 22px;
+        transition: all var(--kepler-transition);
+    }
+
+    .dataset-card:hover {
+        border-color: var(--kepler-active);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(31, 186, 214, 0.1);
+    }
+
+    .dataset-card-name {
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--kepler-active);
+        margin-bottom: 8px;
+    }
+
+    .dataset-card-desc {
+        font-size: 0.85rem;
+        color: var(--kepler-text);
+        line-height: 1.5;
+        margin-bottom: 14px;
+    }
+
+    .dataset-card-stats {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .dataset-stat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.7rem;
+        color: var(--kepler-text-label);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .dataset-stat svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.6;
+    }
+
+    .dataset-stat-value {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        color: var(--kepler-text-highlight);
+    }
+
+    .dataset-card-path {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--kepler-text-label);
+        padding-top: 10px;
+        border-top: 1px solid var(--kepler-border);
+    }
+
+    .dataset-card-arrow {
+        float: right;
+        color: var(--kepler-text-label);
+        transition: all var(--kepler-transition);
+    }
+
+    .dataset-card:hover .dataset-card-arrow {
+        color: var(--kepler-active);
+        transform: translateX(3px);
+    }
+
+    /* ============ Responsive ============ */
+    @media (max-width: 1200px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
             gap: 12px;
         }
+    }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
+    @media (max-width: 768px) {
+        .page-container { padding: 0 16px; }
 
-        h1 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--kepler-text-title);
-            letter-spacing: -0.01em;
-        }
-
-        .header-subtitle {
-            font-size: 0.75rem;
-            color: var(--kepler-text-label);
-            margin-top: 2px;
-            font-weight: 400;
-        }
-
-        /* ============ Navigation Menu ============ */
-        .nav-menu-wrapper { position: relative; }
-
-        .nav-menu-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: var(--kepler-bg-base);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--kepler-text);
-            transition: all var(--kepler-transition);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .nav-menu-btn:hover {
-            border-color: var(--kepler-active);
-            color: var(--kepler-active);
-            background: var(--kepler-bg-hover);
-        }
-
-        .nav-menu-btn svg { width: 16px; height: 16px; }
-
-        .nav-dropdown {
-            display: none;
-            position: absolute;
-            top: calc(100% + 4px);
-            left: 0;
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            box-shadow: var(--kepler-shadow-dropdown);
-            min-width: 180px;
-            z-index: 100;
-            overflow: hidden;
-        }
-
-        .nav-dropdown.open {
-            display: block;
-            animation: menuFadeIn 150ms ease;
-        }
-
-        @keyframes menuFadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .nav-dropdown a {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            color: var(--kepler-text);
-            text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: 400;
-            transition: all var(--kepler-transition);
-            border-bottom: 1px solid var(--kepler-border);
-        }
-
-        .nav-dropdown a:last-child { border-bottom: none; }
-
-        .nav-dropdown a:hover {
-            background: rgba(31, 186, 214, 0.1);
-            color: var(--kepler-active);
-        }
-
-        .nav-dropdown a svg { width: 16px; height: 16px; opacity: 0.7; }
-        .nav-dropdown a:hover svg { opacity: 1; }
-
-        /* ============ Pipeline Intro ============ */
-        .pipeline-intro {
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 14px 18px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .pipeline-intro svg {
-            width: 32px;
-            height: 32px;
-            color: var(--kepler-active);
-            flex-shrink: 0;
-        }
-
-        .pipeline-intro-text {
-            font-size: 0.8125rem;
-            color: var(--kepler-text);
-            line-height: 1.6;
-        }
-
-        .pipeline-intro-text strong {
-            color: var(--kepler-text-highlight);
-        }
-
-        /* ============ Dataset Cards Grid ============ */
-        .dataset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-            gap: 16px;
-        }
-
-        .dataset-card {
-            display: block;
-            text-decoration: none;
-            color: inherit;
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-lg);
-            padding: 20px;
-            transition: all var(--kepler-transition);
-        }
-
-        .dataset-card:hover {
-            border-color: var(--kepler-active);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(31, 186, 214, 0.1);
-        }
-
-        .dataset-card-name {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--kepler-active);
-            margin-bottom: 8px;
-        }
-
-        .dataset-card-desc {
-            font-size: 0.8125rem;
-            color: var(--kepler-text);
-            line-height: 1.5;
-            margin-bottom: 14px;
-        }
-
-        .dataset-card-stats {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 12px;
+        .page-nav {
             flex-wrap: wrap;
+            gap: 2px;
         }
 
-        .dataset-stat {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.6875rem;
-            color: var(--kepler-text-label);
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
+        .dataset-grid {
+            grid-template-columns: 1fr;
         }
 
-        .dataset-stat svg {
-            width: 14px;
-            height: 14px;
-            opacity: 0.6;
-        }
+        .page-title-block h1 { font-size: 1.2rem; }
+    }
+</style>
+{% endblock %}
 
-        .dataset-stat-value {
-            font-family: 'Roboto Mono', monospace;
-            font-weight: 500;
-            color: var(--kepler-text-highlight);
-        }
+{% block content %}
+<div class="page-container">
 
-        .dataset-card-path {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.6875rem;
-            color: var(--kepler-text-label);
-            padding-top: 10px;
-            border-top: 1px solid var(--kepler-border);
-        }
+    <!-- Header -->
+    <header class="page-header">
+        <a href="/" class="page-logo">GSTV <span>Site Analysis</span></a>
+        <nav class="page-nav">
+            <a href="/datasets" class="active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                Datasets
+            </a>
+            <a href="/glossary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                Glossary
+            </a>
+            <a href="/training-details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Training Details
+            </a>
+            <a href="/shap-values">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                SHAP Values
+            </a>
+            <a href="/map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                    <line x1="8" y1="2" x2="8" y2="18"/>
+                    <line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                Map View
+            </a>
+        </nav>
+    </header>
 
-        .dataset-card-arrow {
-            float: right;
-            color: var(--kepler-text-label);
-            transition: all var(--kepler-transition);
-        }
-
-        .dataset-card:hover .dataset-card-arrow {
-            color: var(--kepler-active);
-            transform: translateX(3px);
-        }
-
-        /* ============ Responsive ============ */
-        @media (max-width: 768px) {
-            .container { padding: 10px; }
-
-            header {
-                flex-direction: column;
-                gap: 10px;
-                padding: 12px 14px;
-            }
-
-            .header-left {
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .dataset-grid {
-                grid-template-columns: 1fr;
-            }
-
-            h1 { font-size: 1rem; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <div class="nav-menu-wrapper">
-                    <button class="nav-menu-btn" onclick="toggleNavMenu()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="6" x2="21" y2="6"/>
-                            <line x1="3" y1="12" x2="21" y2="12"/>
-                            <line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
-                        Menu
-                    </button>
-                    <div class="nav-dropdown" id="nav-dropdown">
-                        <a href="/">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                                <polyline points="9 22 9 12 15 12 15 22"/>
-                            </svg>
-                            Home
-                        </a>
-                        <a href="/training-details">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                            </svg>
-                            Training Details
-                        </a>
-                        <a href="/glossary">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                            </svg>
-                            Glossary
-                        </a>
-                        <a href="/shap-values">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="20" x2="18" y2="10"/>
-                                <line x1="12" y1="20" x2="12" y2="4"/>
-                                <line x1="6" y1="20" x2="6" y2="14"/>
-                            </svg>
-                            SHAP Values
-                        </a>
-                    </div>
-                </div>
-                <div>
-                    <h1>Input Datasets</h1>
-                    <div class="header-subtitle">Source data files feeding the ML training pipeline</div>
-                </div>
-            </div>
-        </header>
+    <!-- Content -->
+    <div class="page-content">
+        <div class="page-title-block">
+            <h1>Input Datasets</h1>
+            <div class="subtitle">Source data files feeding the ML training pipeline</div>
+        </div>
 
         <div class="pipeline-intro">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -403,18 +363,5 @@
             {% endfor %}
         </div>
     </div>
-
-    <script>
-        function toggleNavMenu() {
-            document.getElementById('nav-dropdown').classList.toggle('open');
-        }
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.nav-menu-wrapper');
-            if (wrapper && !wrapper.contains(e.target)) {
-                document.getElementById('nav-dropdown').classList.remove('open');
-            }
-        });
-    </script>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+column_name,description,pct_missing,n_unique,data_type
+ID - Gbase,Internal site identifier (Salesforce Gbase ID),0.0,52720,String
+Sellable,Whether the site is available for ad sales,0.0,2,Boolean
+Schedulable,Whether the site supports scheduled content delivery,0.0,1,Boolean
+Program,"GSTV program type (e.g. IOTV2, Dover - IOTV2)",0.0,17,String
+Network,"Hardware network provider (Wayne, Dover, Gilbarco, etc)",0.0,5,String
+Average Revenue,Average monthly revenue from advertising ($),0.0,66204,Float64
+Average DMA Rank,Average DMA ranking by TV household count (1=largest),0.0,209,Float64

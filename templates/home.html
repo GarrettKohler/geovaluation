@@ -1,0 +1,576 @@
+{% extends "_base.html" %}
+
+{% block title %}GSTV Site Analysis — Experiment Hub{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+<!-- Chart.js for training visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="home-container">
+
+    <!-- ============================================================
+         Header
+         ============================================================ -->
+    <header class="home-header">
+        <div class="home-header-left">
+            <div class="home-logo">GSTV <span>Site Analysis</span></div>
+        </div>
+        <nav class="home-nav">
+            <a href="/datasets">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                Datasets
+            </a>
+            <a href="/glossary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                Glossary
+            </a>
+            <a href="/training-details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Training Details
+            </a>
+            <a href="/shap-values">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                SHAP Values
+            </a>
+            <a href="/map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                    <line x1="8" y1="2" x2="8" y2="18"/>
+                    <line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                Map View
+            </a>
+        </nav>
+    </header>
+
+    <!-- ============================================================
+         Two-Column Layout
+         ============================================================ -->
+    <div class="home-columns">
+
+        <!-- ========================================================
+             LEFT COLUMN — New Experiment Config
+             ======================================================== -->
+        <div class="column-config">
+            <div class="column-header">New Experiment</div>
+
+            <!-- Hidden fields for backward compatibility -->
+            <input type="hidden" id="hidden-task-type" value="regression">
+            <input type="hidden" id="hidden-model-type" value="xgboost">
+            <input type="hidden" id="hidden-training-task" value="regression_xgboost">
+
+            <!-- ---- What to Predict ---- -->
+            <div class="config-card">
+                <div class="config-card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="6"/>
+                        <circle cx="12" cy="12" r="2"/>
+                    </svg>
+                    What to Predict
+                </div>
+                <div class="selection-grid">
+                    <div class="selection-card task-card selected" data-task="regression" onclick="selectTask('regression')">
+                        <div class="selection-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"/>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <div class="selection-card-title">Predict Revenue</div>
+                        <div class="selection-card-desc">Estimate monthly revenue for each site</div>
+                    </div>
+                    <div class="selection-card task-card" data-task="lookalike" onclick="selectTask('lookalike')">
+                        <div class="selection-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </div>
+                        <div class="selection-card-title">Find Lookalikes</div>
+                        <div class="selection-card-desc">Find sites similar to your top performers</div>
+                    </div>
+                    <div class="selection-card task-card disabled" data-task="clustering" onclick="selectTask('clustering')" id="clustering-card">
+                        <div class="selection-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="6" cy="6" r="3"/>
+                                <circle cx="18" cy="6" r="3"/>
+                                <circle cx="12" cy="18" r="3"/>
+                                <line x1="6" y1="9" x2="12" y2="15"/>
+                                <line x1="18" y1="9" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <div class="selection-card-title">Cluster Performers</div>
+                        <div class="selection-card-desc">Segment top performers into groups</div>
+                        <div class="selection-card-prereq">Requires trained lookalike model</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Model Type ---- -->
+            <div class="config-card">
+                <div class="config-card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        <path d="M9 9h6v6H9z"/>
+                    </svg>
+                    Model Type
+                </div>
+                <div class="selection-grid">
+                    <div class="selection-card model-card selected" data-model="xgboost" onclick="selectModel('xgboost')">
+                        <div class="selection-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            </svg>
+                        </div>
+                        <div class="selection-card-title">XGBoost</div>
+                        <div class="selection-card-desc">Fast training, great accuracy for tabular data</div>
+                    </div>
+                    <div class="selection-card model-card" data-model="neural_network" onclick="selectModel('neural_network')">
+                        <div class="selection-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="6" cy="6" r="2"/>
+                                <circle cx="6" cy="18" r="2"/>
+                                <circle cx="18" cy="12" r="2"/>
+                                <circle cx="12" cy="6" r="2"/>
+                                <circle cx="12" cy="18" r="2"/>
+                                <line x1="8" y1="6" x2="10" y2="6"/>
+                                <line x1="8" y1="18" x2="10" y2="18"/>
+                                <line x1="14" y1="6" x2="16" y2="11"/>
+                                <line x1="14" y1="18" x2="16" y2="13"/>
+                            </svg>
+                        </div>
+                        <div class="selection-card-title">Neural Network</div>
+                        <div class="selection-card-desc">Deep learning with GPU acceleration (MPS)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Network Subset ---- -->
+            <div class="config-card">
+                <div class="config-card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    Network Subset
+                </div>
+                <select class="config-select" id="hp-network-filter">
+                    <option value="" selected>All Networks (26,099 sites)</option>
+                    <option value="Gilbarco">Gilbarco (18,210 sites)</option>
+                    <option value="Speedway">Speedway (2,760 sites)</option>
+                    <option value="Wayne/Dover">Wayne/Dover (5,129 sites)</option>
+                </select>
+                <div class="config-hint">Choose which network's sites to train on</div>
+            </div>
+
+            <!-- ---- Feature Selection ---- -->
+            <div class="config-card">
+                <div class="config-card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 11 12 14 22 4"/>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                    Feature Selection
+                </div>
+
+                <div class="feature-header">
+                    <div class="feature-count">
+                        Selected: <strong id="feature-selected-count">0</strong> / <strong id="feature-total-count">0</strong>
+                    </div>
+                </div>
+
+                <input type="text" class="feature-search" id="feature-search-input" placeholder="Search features...">
+
+                <div class="feature-tabs">
+                    <button class="feature-tab active" data-type="numeric">
+                        Numeric <span class="tab-count" id="tab-count-numeric">0/0</span>
+                    </button>
+                    <button class="feature-tab" data-type="categorical">
+                        Categorical <span class="tab-count" id="tab-count-categorical">0/0</span>
+                    </button>
+                    <button class="feature-tab" data-type="boolean">
+                        Boolean <span class="tab-count" id="tab-count-boolean">0/0</span>
+                    </button>
+                </div>
+
+                <div id="feature-grids-container">
+                    <div style="font-size: 0.78rem; color: var(--kepler-text-label); padding: 12px;">Loading features...</div>
+                </div>
+
+                <div class="feature-actions">
+                    <button class="feature-action-btn" onclick="selectAllFeatures(activeFeatureTab)">Select All</button>
+                    <button class="feature-action-btn" onclick="deselectAllFeatures(activeFeatureTab)">Clear All</button>
+                </div>
+
+                <div class="feature-warning" id="feature-warning">
+                    At least 3 features must be selected for training.
+                </div>
+            </div>
+
+            <!-- ---- Hyperparameters (Collapsible) ---- -->
+            <div class="config-card">
+                <button class="hyperparam-toggle" id="hyperparam-toggle">
+                    <svg class="hyperparam-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    Hyperparameters
+                </button>
+                <div class="hyperparam-body" id="hyperparam-body">
+                    <div class="hyperparam-content">
+                        <div class="param-row">
+                            <div class="param-group">
+                                <label for="hp-epochs">Epochs</label>
+                                <input type="number" id="hp-epochs" value="50" min="1" max="500">
+                            </div>
+                            <div class="param-group">
+                                <label for="hp-batch-size">Batch Size</label>
+                                <select id="hp-batch-size">
+                                    <option value="1024">1024</option>
+                                    <option value="2048">2048</option>
+                                    <option value="4096" selected>4096 (Recommended)</option>
+                                    <option value="8192">8192</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="param-row">
+                            <div class="param-group">
+                                <label for="hp-learning-rate">Learning Rate</label>
+                                <select id="hp-learning-rate">
+                                    <option value="0.001">1e-3 (Fast)</option>
+                                    <option value="0.0001" selected>1e-4 (Recommended)</option>
+                                    <option value="0.00001">1e-5 (Stable)</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label for="hp-early-stopping">Early Stopping</label>
+                                <input type="number" id="hp-early-stopping" value="10" min="3" max="50">
+                                <div class="param-hint">Patience epochs</div>
+                            </div>
+                        </div>
+
+                        <div class="param-row nn-only">
+                            <div class="param-group">
+                                <label for="hp-dropout">Dropout</label>
+                                <select id="hp-dropout">
+                                    <option value="0.1">0.1 (Light)</option>
+                                    <option value="0.2" selected>0.2 (Recommended)</option>
+                                    <option value="0.3">0.3 (Heavy)</option>
+                                    <option value="0.5">0.5 (Very Heavy)</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label for="hp-embedding-dim">Embedding Dim</label>
+                                <select id="hp-embedding-dim">
+                                    <option value="8">8</option>
+                                    <option value="16" selected>16</option>
+                                    <option value="32">32</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="param-group nn-only">
+                            <label for="hp-hidden-layers">Hidden Layers</label>
+                            <select id="hp-hidden-layers">
+                                <option value="256,128,64">Small: [256, 128, 64]</option>
+                                <option value="512,256,128,64" selected>Medium: [512, 256, 128, 64]</option>
+                                <option value="1024,512,256,128">Large: [1024, 512, 256, 128]</option>
+                            </select>
+                            <div class="param-hint">Larger networks may overfit on smaller datasets</div>
+                        </div>
+
+                        <!-- Lookalike Percentile Config (shown when task=lookalike) -->
+                        <div id="percentile-config" style="display: none;">
+                            <div class="param-row">
+                                <div class="param-group">
+                                    <label for="hp-lower-percentile">Lower Percentile</label>
+                                    <input type="number" id="hp-lower-percentile" value="90" min="1" max="99" step="1">
+                                </div>
+                                <div class="param-group">
+                                    <label for="hp-upper-percentile">Upper Percentile</label>
+                                    <input type="number" id="hp-upper-percentile" value="100" min="1" max="100" step="1">
+                                </div>
+                            </div>
+                            <div class="param-hint" id="percentile-hint-text">Top 10% of sites by revenue will be labeled as top performers</div>
+                            <div class="percentile-error" id="percentile-error-text"></div>
+                        </div>
+
+                        <!-- Clustering Config (shown when task=clustering) -->
+                        <div id="cluster-config-section" style="display: none;">
+                            <div class="param-row">
+                                <div class="param-group">
+                                    <label for="hp-n-clusters">Number of Clusters</label>
+                                    <input type="number" id="hp-n-clusters" value="5" min="2" max="10" step="1">
+                                </div>
+                                <div class="param-group">
+                                    <label for="hp-cluster-threshold">Probability Threshold</label>
+                                    <input type="range" id="hp-cluster-threshold" value="0.5" min="0.3" max="0.9" step="0.1" style="padding: 0;">
+                                    <div class="param-hint" id="cluster-threshold-display">0.5 (50% confidence)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Start Training Button ---- -->
+            <div class="train-button-area">
+                <button class="btn-train" id="btn-start-training" onclick="startTraining()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Start Training
+                </button>
+            </div>
+
+            <!-- ---- System Info Bar ---- -->
+            <div class="system-info-bar">
+                <div class="info-item">
+                    <span>Chip:</span>
+                    <span class="info-value" id="sys-chip">Detecting...</span>
+                </div>
+                <div class="info-item">
+                    <span>GPU:</span>
+                    <span class="info-value" id="sys-gpu-cores">-</span>
+                </div>
+                <div class="info-item">
+                    <span>Memory:</span>
+                    <span class="info-value" id="sys-memory">-</span>
+                </div>
+                <div class="info-item">
+                    <span>MPS:</span>
+                    <span class="info-value" id="sys-mps">-</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================================
+             RIGHT COLUMN — Past Experiments
+             ======================================================== -->
+        <div class="column-experiments">
+            <div class="column-header">
+                Past Experiments <span id="experiment-count" style="color: var(--kepler-active); margin-left: 6px;">0</span>
+            </div>
+
+            <!-- Filter/Sort Bar -->
+            <div class="experiment-filter-bar">
+                <select id="catalog-filter-task">
+                    <option value="">All Tasks</option>
+                    <option value="regression">Regression</option>
+                    <option value="lookalike">Lookalike</option>
+                    <option value="clustering">Clustering</option>
+                </select>
+                <select id="catalog-sort">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="best">Best Metric</option>
+                </select>
+            </div>
+
+            <!-- Experiment Cards -->
+            <div class="experiment-gallery" id="experiment-gallery">
+                <div class="experiment-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <div>Loading experiments...</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================================================================
+     Training Modal Overlay
+     ================================================================ -->
+<div class="training-modal-overlay" id="training-modal-overlay">
+    <div class="training-modal">
+        <!-- Header -->
+        <div class="modal-header">
+            <div class="modal-header-left">
+                <div class="modal-header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="modal-title" id="modal-training-title">Training in Progress</div>
+                    <div class="modal-subtitle" id="modal-training-subtitle">Revenue Prediction &mdash; XGBoost</div>
+                </div>
+            </div>
+            <button class="modal-close-btn" onclick="hideTrainingModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+
+            <!-- Phase A: In Progress -->
+            <div id="modal-phase-progress">
+                <!-- Progress Header -->
+                <div class="modal-progress-header">
+                    <span class="modal-progress-status running" id="modal-status">Initializing...</span>
+                    <span class="modal-epoch" id="modal-epoch">0/0</span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="modal-progress-bar-track">
+                    <div class="modal-progress-bar-fill" id="modal-progress-bar"></div>
+                </div>
+
+                <!-- Metric Cards -->
+                <div class="modal-metrics-grid">
+                    <div class="modal-metric-card">
+                        <div class="modal-metric-value" id="modal-metric-train-loss">-</div>
+                        <div class="modal-metric-label">Train Loss</div>
+                    </div>
+                    <div class="modal-metric-card">
+                        <div class="modal-metric-value" id="modal-metric-val-loss">-</div>
+                        <div class="modal-metric-label">Val Loss</div>
+                    </div>
+                    <div class="modal-metric-card metric-regression">
+                        <div class="modal-metric-value" id="modal-metric-mae">-</div>
+                        <div class="modal-metric-label">MAE</div>
+                    </div>
+                    <div class="modal-metric-card metric-regression">
+                        <div class="modal-metric-value" id="modal-metric-smape">-</div>
+                        <div class="modal-metric-label">SMAPE</div>
+                    </div>
+                    <div class="modal-metric-card metric-regression">
+                        <div class="modal-metric-value" id="modal-metric-rmse">-</div>
+                        <div class="modal-metric-label">RMSE</div>
+                    </div>
+                    <div class="modal-metric-card">
+                        <div class="modal-metric-value" id="modal-metric-r2">-</div>
+                        <div class="modal-metric-label" id="modal-metric-r2-label">R&sup2;</div>
+                    </div>
+                    <div class="modal-metric-card metric-classification" style="display: none;">
+                        <div class="modal-metric-value" id="modal-metric-f1">-</div>
+                        <div class="modal-metric-label">F1 Score</div>
+                    </div>
+                    <div class="modal-metric-card metric-classification" style="display: none;">
+                        <div class="modal-metric-value" id="modal-metric-logloss">-</div>
+                        <div class="modal-metric-label">Log Loss</div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="modal-charts">
+                    <div class="modal-chart-box">
+                        <div class="modal-chart-title" id="modal-loss-chart-title">Loss Curve</div>
+                        <canvas id="modal-loss-chart"></canvas>
+                    </div>
+                    <div class="modal-chart-box">
+                        <div class="modal-chart-title" id="modal-perf-chart-title">R&sup2; Score</div>
+                        <canvas id="modal-perf-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Histogram Charts (NN only) -->
+                <div class="modal-histograms" id="modal-histogram-row" style="display: none;">
+                    <div class="modal-chart-box">
+                        <div class="modal-chart-title">Weight Distribution</div>
+                        <canvas id="modal-weight-hist"></canvas>
+                    </div>
+                    <div class="modal-chart-box">
+                        <div class="modal-chart-title">Bias Distribution</div>
+                        <canvas id="modal-bias-hist"></canvas>
+                    </div>
+                </div>
+
+                <!-- Log -->
+                <div class="modal-log" id="modal-progress-log"></div>
+
+                <!-- Stop Button -->
+                <div style="margin-top: 16px; text-align: center;">
+                    <button class="btn btn-danger" onclick="stopTraining()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12"/>
+                        </svg>
+                        Stop Training
+                    </button>
+                </div>
+            </div>
+
+            <!-- Phase B: Complete -->
+            <div id="modal-phase-complete" style="display: none;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--kepler-success)" stroke-width="2" style="margin-bottom: 8px;">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </div>
+
+                <div class="complete-metrics">
+                    <div class="complete-metric-card">
+                        <div class="metric-value" id="complete-metric-primary">-</div>
+                        <div class="metric-label" id="complete-metric-primary-label">Test R&sup2;</div>
+                    </div>
+                    <div class="complete-metric-card">
+                        <div class="metric-value" id="complete-metric-secondary">-</div>
+                        <div class="metric-label" id="complete-metric-secondary-label">Test MAE</div>
+                    </div>
+                    <div class="complete-metric-card">
+                        <div class="metric-value" id="complete-metric-loss">-</div>
+                        <div class="metric-label">Test Loss</div>
+                    </div>
+                    <div class="complete-metric-card">
+                        <div class="metric-value" id="complete-metric-time">-</div>
+                        <div class="metric-label">Duration</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="modal-footer">
+            <button class="btn btn-primary" id="btn-view-on-map" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                </svg>
+                View Results on Map
+            </button>
+            <button class="btn btn-secondary" onclick="hideTrainingModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='js/shared-utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/training-config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/training-stream.js') }}"></script>
+<script src="{{ url_for('static', filename='js/experiment-catalog.js') }}"></script>
+<script>
+    // Initialize everything when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        initTrainingConfig();
+        initExperimentCatalog();
+    });
+</script>
+{% endblock %}

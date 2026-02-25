@@ -1,0 +1,95 @@
+column_name,description,pct_missing,n_unique,data_type
+date,Month of the record (YYYY-MM-DD format),0.0,47,String
+id_gbase,Internal site identifier (primary key in monthly data),0.0,57675,String
+month,Month,0.0,12,Int64
+year,Year,0.0,4,Int64
+monthly_impressions,Monthly advertising impressions delivered,9.16,34131,Int64
+monthly_nvis,Monthly network video impressions,10.43,31797,Int64
+avg_daily_impressions,Avg Daily Impressions,9.16,1767,Int64
+avg_daily_nvis,Avg Daily Nvis,10.43,1728,Int64
+avg_latency,Avg Latency,81.69,228550,String
+screen_count,Number of media screens at the site,0.23,39,Int64
+revenue,Monthly gross revenue from advertising,0.0,147964,Float64
+site_activated_date,Date the site was first activated,0.35,3758,String
+network,"Hardware network provider (Gilbarco, Wayne, Dover, etc)",0.0,4,String
+state,US state where the site is located,0.0,51,String
+gtvid,Public-facing site identifier (GSTV ID),0.0,57675,String
+county,US county where the site is located,0.0,1742,String
+latitude,Site latitude coordinate,0.0,57643,Float64
+longitude,Site longitude coordinate,0.0,57503,Float64
+zip,5-digit ZIP code of the site,0.0,16365,Int64
+zip_4,ZIP+4 extended postal code,0.0,44237,String
+dma,Designated Market Area name,0.0,209,String
+dma_rank,DMA ranking by TV household count (1=largest),0.0,209,Int64
+statuis,Site operational status (typo in source: Active/Inactive/etc),0.0,7,String
+program,GSTV program type the site belongs to,0.0,15,String
+experience_type,Type of media experience at the site,0.0,3,String
+hardware_type,Physical hardware model installed,0.11,18,String
+retailer,Fuel retailer brand operating the site,0.0,22275,String
+avg_household_income,Average household income in the ZIP code,0.15,14701,Int64
+median_age,Median age of population in the ZIP code,0.14,446,Float64
+index_african_american,Index African American,0.46,9451,Float64
+pct_african_american,Percent African American population in ZIP,0.65,4010,Float64
+index_asian,Index Asian,0.99,8014,Float64
+pct_asian,Percent Asian population in ZIP,1.17,1890,Float64
+index_female,Index Female,0.14,15965,Float64
+pct_female,Percent female population in ZIP,0.14,15965,Float64
+index_male,Index Male,0.14,15966,Float64
+pct_male,Percent male population in ZIP,0.14,15966,Float64
+index_hispanic,Index Hispanic,0.31,9310,Float64
+pct_hispanic,Percent Hispanic population in ZIP,0.39,4098,Float64
+schedule_site,Whether the site supports scheduled content,0.0,2,Boolean
+sellable_site,Whether the site is available for ad sales,0.0,2,Boolean
+gstv_fixed_fee_pct,Gstv Fixed Fee Pct,100.0,1,String
+gstv_fixed_fee_amt,Gstv Fixed Fee Amt,0.0,1,Int64
+ptd_fixed_fee_met,Ptd Fixed Fee Met,0.0,1,Boolean
+retailer_fixed_fee_pct,Retailer Fixed Fee Pct,100.0,1,String
+retailer_fixed_fee_amt,Retailer Fixed Fee Amt,0.0,1,Int64
+sellable_direct_plan,Sellable Direct Plan,0.0,2,Boolean
+sellable_direct_revision,Sellable Direct Revision,0.0,2,Boolean
+sellable_programmatic_plan,Sellable Programmatic Plan,0.0,2,Boolean
+sellable_programmatic_revision,Sellable Programmatic Revision,0.0,2,Boolean
+r_lottery,Advertising restriction: Lottery,0.0,2,Boolean
+r_government,Advertising restriction: Government,0.0,2,Boolean
+r_travel_and_tourism,Advertising restriction: Travel And Tourism,0.0,2,Boolean
+r_retail_car_wash,Advertising restriction: Retail Car Wash,0.0,2,Boolean
+r_cpg_beverage_beer_oof,Advertising restriction: Cpg Beverage Beer Oof,0.0,2,Boolean
+r_cpg_beverage_beer_vide,Advertising restriction: Cpg Beverage Beer Vide,0.0,2,Boolean
+r_cpg_beverage_wine_oof,Advertising restriction: Cpg Beverage Wine Oof,0.0,2,Boolean
+r_cpg_beverage_wine_video,Advertising restriction: Cpg Beverage Wine Video,0.0,2,Boolean
+r_finance_credit_cards,Advertising restriction: Finance Credit Cards,0.0,2,Boolean
+r_cpg_cbd_hemp_ingestibles_non_thc,Advertising restriction: Cpg Cbd Hemp Ingestibles Non Thc,0.0,2,Boolean
+r_cpg_non_food_beverage_cannabis_medical,Advertising restriction: Cpg Non Food Beverage Cannabis Medical,0.0,2,Boolean
+r_cpg_non_food_beverage_cannabis_recreational,Advertising restriction: Cpg Non Food Beverage Cannabis Recreational,0.0,2,Boolean
+r_cpg_non_food_beverage_cbd_hemp_non_thc,Advertising restriction: Cpg Non Food Beverage Cbd Hemp Non Thc,0.0,2,Boolean
+r_alcohol_drink_responsibly_message,Advertising restriction: Alcohol Drink Responsibly Message,0.0,1,Boolean
+r_alternative_transportation,Advertising restriction: Alternative Transportation,0.0,2,Boolean
+r_associations_and_npo_anti_smoking,Advertising restriction: Associations And Npo Anti Smoking,0.0,2,Boolean
+r_automotive_after_market_oil,Advertising restriction: Automotive After Market Oil,0.0,2,Boolean
+r_cpg_beverage_spirits_ooh,Advertising restriction: Cpg Beverage Spirits Ooh,0.0,2,Boolean
+r_cpg_beverage_spirits_video,Advertising restriction: Cpg Beverage Spirits Video,0.0,2,Boolean
+r_cpg_non_food_beverage_e_cigarette,Advertising restriction: Cpg Non Food Beverage E Cigarette,0.0,2,Boolean
+r_entertainment_casinos_and_gambling,Advertising restriction: Entertainment Casinos And Gambling,0.0,2,Boolean
+r_government_political,Advertising restriction: Government Political,0.0,2,Boolean
+r_automotive_electric,Advertising restriction: Automotive Electric,0.0,2,Boolean
+r_recruitment,Advertising restriction: Recruitment,0.0,2,Boolean
+r_restaurants_cdr,Advertising restriction: Restaurants Cdr,0.0,2,Boolean
+r_restaurants_qsr,Advertising restriction: Restaurants Qsr,0.0,2,Boolean
+r_retail_automotive_service,Advertising restriction: Retail Automotive Service,0.0,2,Boolean
+r_retail_grocery,Advertising restriction: Retail Grocery,0.0,2,Boolean
+r_retail_grocerty_with_fuel,Advertising restriction: Retail Grocerty With Fuel,0.0,2,Boolean
+c_emv_enabled,EMV chip payment terminal enabled,82.42,3,String
+c_nfc_enabled,NFC contactless payment enabled,12.23,3,String
+c_open_24_hours,Site operates 24 hours a day,0.0,2,String
+c_sells_beer,Site sells beer,0.21,3,String
+c_sells_diesel_fuel,Site sells diesel fuel,85.8,3,String
+c_sells_lottery,Site sells lottery tickets,0.36,3,String
+c_vistar_programmatic_enabled,Vistar programmatic ads enabled,0.0,2,Boolean
+c_walk_up_enabled,Walk-up customer interaction enabled,97.57,3,String
+c_sells_wine,Site sells wine,0.27,3,String
+brand_fuel,Fuel brand sold at the site,0.0,294,String
+brand_restaurant,Restaurant brand co-located at the site,95.36,335,String
+brand_c_store,Convenience store brand at the site,0.01,17682,String
+monthly_impressions_per_screen,Monthly impressions per screen,9.23,124558,Float64
+monthly_nvis_per_screen,Monthly NVIs per screen,10.5,120017,Float64
+monthly_revenue_per_screen,Monthly revenue per screen,0.23,349626,Float64

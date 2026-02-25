@@ -1,393 +1,463 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ dataset.id }} - Column Lineage</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --kepler-active: #1FBAD6;
-            --kepler-active-hover: #108188;
-            --kepler-primary-btn: #0F9668;
-            --kepler-error: #F9042C;
-            --kepler-warning: #FFC043;
-            --kepler-success: #47B275;
-            --kepler-info: #276EF1;
-            --kepler-bg-base: #242730;
-            --kepler-bg-panel: #29323C;
-            --kepler-bg-content: #292E36;
-            --kepler-bg-hover: #3A4552;
-            --kepler-text: #A0A7B4;
-            --kepler-text-highlight: #F0F0F0;
-            --kepler-text-title: #FFFFFF;
-            --kepler-text-label: #6A7485;
-            --kepler-border: #3A414C;
-            --kepler-shadow-dropdown: 0 8px 16px rgba(0,0,0,0.5);
-            --kepler-transition: 200ms ease;
-            --kepler-radius-sm: 2px;
-            --kepler-radius-md: 4px;
-            --kepler-radius-lg: 8px;
-        }
+{% extends "_base.html" %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}{{ dataset.id }} — Column Lineage{% endblock %}
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--kepler-bg-base);
-            color: var(--kepler-text);
-            min-height: 100vh;
-            line-height: 1.5;
-        }
+{% block page_styles %}
+<style>
+    /* ============ Page Layout ============ */
+    .page-container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 32px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 16px 20px;
-        }
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--kepler-border);
+        flex-shrink: 0;
+    }
 
-        /* ============ Header ============ */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            background: var(--kepler-bg-panel);
-            padding: 14px 18px;
-            border-radius: var(--kepler-radius-md);
-            border: 1px solid var(--kepler-border);
-            flex-wrap: wrap;
+    .page-header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .page-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--kepler-text-title);
+        letter-spacing: 0.5px;
+        text-decoration: none;
+    }
+
+    .page-logo span {
+        color: var(--kepler-active);
+    }
+
+    .page-nav {
+        display: flex;
+        gap: 4px;
+    }
+
+    .page-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: var(--kepler-radius-md);
+        color: var(--kepler-text-label);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all var(--kepler-transition);
+    }
+
+    .page-nav a:hover {
+        color: var(--kepler-text);
+        background: var(--kepler-bg-hover);
+    }
+
+    .page-nav a.active {
+        color: var(--kepler-active);
+        background: rgba(31, 186, 214, 0.1);
+    }
+
+    .page-nav a svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    /* ============ Content ============ */
+    .page-content {
+        flex: 1;
+        padding: 28px 0;
+    }
+
+    .page-title-block {
+        margin-bottom: 20px;
+    }
+
+    .page-title-block h1 {
+        font-family: var(--font-mono);
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--kepler-text-title);
+        letter-spacing: -0.01em;
+        margin-bottom: 4px;
+    }
+
+    .page-title-block .subtitle {
+        font-size: 0.85rem;
+        color: var(--kepler-text-label);
+    }
+
+    .breadcrumb {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        color: var(--kepler-text-label);
+        margin-bottom: 16px;
+    }
+
+    .breadcrumb a {
+        color: var(--kepler-active);
+        text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
+    /* ============ Info Card ============ */
+    .info-card {
+        background: var(--kepler-bg-panel);
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-lg);
+        padding: 18px 22px;
+        margin-bottom: 20px;
+    }
+
+    .info-card-desc {
+        font-size: 0.85rem;
+        color: var(--kepler-text);
+        margin-bottom: 12px;
+        line-height: 1.6;
+    }
+
+    .info-card-stats {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .info-stat {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: var(--kepler-text-label);
+    }
+
+    .info-stat-value {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        color: var(--kepler-text-highlight);
+        margin-left: 6px;
+    }
+
+    /* ============ Schema Section ============ */
+    .section {
+        background: var(--kepler-bg-panel);
+        border: 1px solid var(--kepler-border);
+        border-radius: var(--kepler-radius-lg);
+        padding: 18px;
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-family: var(--font-heading);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--kepler-text-title);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .section-title svg {
+        width: 18px;
+        height: 18px;
+        color: var(--kepler-active);
+    }
+
+    .schema-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 6px;
+    }
+
+    .schema-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: var(--kepler-radius-sm);
+        background: var(--kepler-bg-base);
+        border: 1px solid transparent;
+        transition: all var(--kepler-transition);
+    }
+
+    .schema-item:hover {
+        border-color: var(--kepler-border);
+    }
+
+    .schema-col {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--kepler-text-highlight);
+    }
+
+    .schema-type {
+        font-size: 0.625rem;
+        font-weight: 500;
+        color: var(--kepler-text-label);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 2px 6px;
+        background: var(--kepler-bg-content);
+        border-radius: var(--kepler-radius-sm);
+    }
+
+    /* ============ Tabs ============ */
+    .tabs {
+        display: flex;
+        gap: 3px;
+        background: var(--kepler-bg-base);
+        padding: 3px;
+        border-radius: var(--kepler-radius-md);
+        border: 1px solid var(--kepler-border);
+        margin-bottom: 14px;
+        width: fit-content;
+    }
+
+    .tab-btn {
+        padding: 7px 14px;
+        border: none;
+        background: transparent;
+        color: var(--kepler-text-label);
+        font-family: var(--font-body);
+        font-size: 0.7rem;
+        font-weight: 500;
+        cursor: pointer;
+        border-radius: var(--kepler-radius-sm);
+        transition: all var(--kepler-transition);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .tab-btn:hover {
+        color: var(--kepler-text);
+        background: var(--kepler-bg-hover);
+    }
+
+    .tab-btn.active {
+        background: var(--kepler-info);
+        color: #FFFFFF;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ============ Lineage Table ============ */
+    .table-wrapper {
+        overflow-x: auto;
+        border-radius: var(--kepler-radius-md);
+        border: 1px solid var(--kepler-border);
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .table-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
+    .table-wrapper::-webkit-scrollbar-track { background: var(--kepler-bg-base); }
+    .table-wrapper::-webkit-scrollbar-thumb {
+        background: #6A7485;
+        border-radius: 4px;
+    }
+    .table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: var(--kepler-active);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+
+    th {
+        background: var(--kepler-bg-base);
+        color: var(--kepler-text-label);
+        font-family: var(--font-heading);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.625rem;
+        letter-spacing: 0.5px;
+        padding: 10px 12px;
+        text-align: left;
+        position: sticky;
+        top: 0;
+        border-bottom: 2px solid var(--kepler-border);
+        z-index: 1;
+    }
+
+    td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--kepler-border);
+        color: var(--kepler-text);
+        vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr { transition: background var(--kepler-transition); }
+    tbody tr:hover td { background: rgba(31, 186, 214, 0.08); }
+    tbody tr:nth-child(even) td { background: rgba(41, 50, 60, 0.3); }
+    tbody tr:nth-child(even):hover td { background: rgba(31, 186, 214, 0.08); }
+
+    .col-name {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--kepler-text-highlight);
+        white-space: nowrap;
+    }
+
+    .transform-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .transform-list li {
+        position: relative;
+        padding-left: 16px;
+        margin-bottom: 3px;
+        font-size: 0.78rem;
+        line-height: 1.4;
+    }
+
+    .transform-list li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 7px;
+        width: 8px;
+        height: 1px;
+        background: var(--kepler-active);
+    }
+
+    .output-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        background: rgba(31, 186, 214, 0.12);
+        color: var(--kepler-active);
+        border-radius: 10px;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        margin: 1px 3px 1px 0;
+        border: 1px solid rgba(31, 186, 214, 0.2);
+    }
+
+    .note-box {
+        margin-top: 6px;
+        padding: 6px 10px;
+        border-left: 3px solid var(--kepler-info);
+        background: rgba(39, 110, 241, 0.06);
+        font-size: 0.7rem;
+        color: var(--kepler-text);
+        border-radius: 0 var(--kepler-radius-sm) var(--kepler-radius-sm) 0;
+        line-height: 1.4;
+    }
+
+    .reason-text {
+        font-size: 0.78rem;
+        color: var(--kepler-text);
+        line-height: 1.4;
+    }
+
+    /* ============ Responsive ============ */
+    @media (max-width: 1200px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
             gap: 12px;
         }
+    }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
+    @media (max-width: 768px) {
+        .page-container { padding: 0 16px; }
 
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--kepler-text);
-            text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: 500;
-            padding: 6px 10px;
-            border-radius: var(--kepler-radius-md);
-            transition: all var(--kepler-transition);
-            border: 1px solid var(--kepler-border);
-            background: var(--kepler-bg-content);
-        }
-
-        .back-link:hover {
-            color: var(--kepler-active);
-            background: var(--kepler-bg-hover);
-            border-color: var(--kepler-active);
-        }
-
-        .back-link svg { width: 16px; height: 16px; }
-
-        h1 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--kepler-text-title);
-            letter-spacing: -0.01em;
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .header-subtitle {
-            font-size: 0.75rem;
-            color: var(--kepler-text-label);
-            margin-top: 2px;
-            font-weight: 400;
-        }
-
-        /* ============ Info Card ============ */
-        .info-card {
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 16px 18px;
-            margin-bottom: 16px;
-        }
-
-        .info-card-desc {
-            font-size: 0.8125rem;
-            color: var(--kepler-text);
-            margin-bottom: 12px;
-            line-height: 1.6;
-        }
-
-        .info-card-stats {
-            display: flex;
-            gap: 20px;
+        .page-nav {
             flex-wrap: wrap;
+            gap: 2px;
         }
 
-        .info-stat {
-            font-size: 0.6875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            color: var(--kepler-text-label);
-        }
+        .schema-grid { grid-template-columns: 1fr; }
+        .page-title-block h1 { font-size: 1rem; }
+        .info-card-stats { flex-direction: column; gap: 6px; }
+    }
+</style>
+{% endblock %}
 
-        .info-stat-value {
-            font-family: 'Roboto Mono', monospace;
-            font-weight: 500;
-            color: var(--kepler-text-highlight);
-            margin-left: 6px;
-        }
+{% block content %}
+<div class="page-container">
 
-        /* ============ Schema Section ============ */
-        .section {
-            background: var(--kepler-bg-panel);
-            border: 1px solid var(--kepler-border);
-            border-radius: var(--kepler-radius-md);
-            padding: 16px;
-            margin-bottom: 16px;
-        }
+    <!-- Header -->
+    <header class="page-header">
+        <a href="/" class="page-logo">GSTV <span>Site Analysis</span></a>
+        <nav class="page-nav">
+            <a href="/datasets" class="active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                Datasets
+            </a>
+            <a href="/glossary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                Glossary
+            </a>
+            <a href="/training-details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Training Details
+            </a>
+            <a href="/shap-values">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                SHAP Values
+            </a>
+            <a href="/map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                    <line x1="8" y1="2" x2="8" y2="18"/>
+                    <line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                Map View
+            </a>
+        </nav>
+    </header>
 
-        .section-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--kepler-text-title);
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    <!-- Content -->
+    <div class="page-content">
+        <div class="breadcrumb">
+            <a href="/datasets">Datasets</a>
+            <span>&rarr;</span>
+            <span>{{ dataset.id }}</span>
+        </div>
 
-        .section-title svg {
-            width: 18px;
-            height: 18px;
-            color: var(--kepler-active);
-        }
-
-        .schema-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 6px;
-        }
-
-        .schema-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            border-radius: var(--kepler-radius-sm);
-            background: var(--kepler-bg-base);
-            border: 1px solid transparent;
-            transition: all var(--kepler-transition);
-        }
-
-        .schema-item:hover {
-            border-color: var(--kepler-border);
-        }
-
-        .schema-col {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--kepler-text-highlight);
-        }
-
-        .schema-type {
-            font-size: 0.625rem;
-            font-weight: 500;
-            color: var(--kepler-text-label);
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            padding: 2px 6px;
-            background: var(--kepler-bg-content);
-            border-radius: var(--kepler-radius-sm);
-        }
-
-        /* ============ Tabs ============ */
-        .tabs {
-            display: flex;
-            gap: 3px;
-            background: var(--kepler-bg-base);
-            padding: 3px;
-            border-radius: var(--kepler-radius-md);
-            border: 1px solid var(--kepler-border);
-            margin-bottom: 14px;
-            width: fit-content;
-        }
-
-        .tab-btn {
-            padding: 7px 14px;
-            border: none;
-            background: transparent;
-            color: var(--kepler-text-label);
-            font-size: 0.6875rem;
-            font-weight: 500;
-            cursor: pointer;
-            border-radius: var(--kepler-radius-sm);
-            transition: all var(--kepler-transition);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .tab-btn:hover {
-            color: var(--kepler-text);
-            background: var(--kepler-bg-hover);
-        }
-
-        .tab-btn.active {
-            background: var(--kepler-info);
-            color: #FFFFFF;
-        }
-
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* ============ Lineage Table ============ */
-        .table-wrapper {
-            overflow-x: auto;
-            border-radius: var(--kepler-radius-md);
-            border: 1px solid var(--kepler-border);
-            max-height: 600px;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--kepler-active) transparent;
-        }
-
-        .table-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
-        .table-wrapper::-webkit-scrollbar-track { background: var(--kepler-bg-base); }
-        .table-wrapper::-webkit-scrollbar-thumb {
-            background: #6A7485;
-            border-radius: 4px;
-        }
-        .table-wrapper::-webkit-scrollbar-thumb:hover {
-            background: var(--kepler-active);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.8125rem;
-        }
-
-        th {
-            background: var(--kepler-bg-base);
-            color: var(--kepler-text-label);
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.625rem;
-            letter-spacing: 0.5px;
-            padding: 10px 12px;
-            text-align: left;
-            position: sticky;
-            top: 0;
-            border-bottom: 2px solid var(--kepler-border);
-            z-index: 1;
-        }
-
-        td {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--kepler-border);
-            color: var(--kepler-text);
-            vertical-align: top;
-        }
-
-        tr:last-child td { border-bottom: none; }
-        tr { transition: background var(--kepler-transition); }
-        tbody tr:hover td { background: rgba(31, 186, 214, 0.08); }
-        tbody tr:nth-child(even) td { background: rgba(41, 50, 60, 0.3); }
-        tbody tr:nth-child(even):hover td { background: rgba(31, 186, 214, 0.08); }
-
-        .col-name {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--kepler-text-highlight);
-            white-space: nowrap;
-        }
-
-        .transform-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .transform-list li {
-            position: relative;
-            padding-left: 16px;
-            margin-bottom: 3px;
-            font-size: 0.75rem;
-            line-height: 1.4;
-        }
-
-        .transform-list li::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 7px;
-            width: 8px;
-            height: 1px;
-            background: var(--kepler-active);
-        }
-
-        .output-pill {
-            display: inline-block;
-            padding: 2px 8px;
-            background: rgba(31, 186, 214, 0.15);
-            color: var(--kepler-active);
-            border-radius: 10px;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.6875rem;
-            font-weight: 500;
-            margin: 1px 3px 1px 0;
-            border: 1px solid rgba(31, 186, 214, 0.25);
-        }
-
-        .note-box {
-            margin-top: 6px;
-            padding: 6px 10px;
-            border-left: 3px solid var(--kepler-info);
-            background: rgba(39, 110, 241, 0.06);
-            font-size: 0.6875rem;
-            color: var(--kepler-text);
-            border-radius: 0 var(--kepler-radius-sm) var(--kepler-radius-sm) 0;
-            line-height: 1.4;
-        }
-
-        .reason-text {
-            font-size: 0.75rem;
-            color: var(--kepler-text);
-            line-height: 1.4;
-        }
-
-        /* ============ Responsive ============ */
-        @media (max-width: 768px) {
-            .container { padding: 10px; }
-            header { flex-direction: column; gap: 10px; padding: 12px 14px; }
-            .header-left { flex-direction: column; gap: 8px; }
-            .schema-grid { grid-template-columns: 1fr; }
-            h1 { font-size: 1rem; }
-            .info-card-stats { flex-direction: column; gap: 6px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="header-left">
-                <a href="/datasets" class="back-link">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                    Datasets
-                </a>
-                <div>
-                    <h1>{{ dataset.id }}</h1>
-                    <div class="header-subtitle">Column Lineage &rarr; Training Dataset</div>
-                </div>
-            </div>
-        </header>
+        <div class="page-title-block">
+            <h1>{{ dataset.id }}</h1>
+            <div class="subtitle">Column Lineage &rarr; Training Dataset</div>
+        </div>
 
         <!-- Info Card -->
         <div class="info-card">
@@ -505,15 +575,17 @@
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+{% block page_scripts %}
+<script>
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
 
-            document.getElementById('tab-' + tabName).classList.add('active');
-            event.target.classList.add('active');
-        }
-    </script>
-</body>
-</html>
+        document.getElementById('tab-' + tabName).classList.add('active');
+        event.target.classList.add('active');
+    }
+</script>
+{% endblock %}

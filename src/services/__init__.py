@@ -4,8 +4,9 @@ Service modules for the geospatial application.
 Contains:
 - data_service: Data loading and caching
 - training_service: ML model training with GPU acceleration
-- nearest_site: Spatial indexing and nearest neighbor queries
-- epa_walkability: EPA walkability score lookups
+- shap_service: SHAP feature importance computation
+- lineage_service: Data ontology and lineage browser
+- fleet_analysis_service: Fleet-level explainability
 """
 
 from .data_service import (
@@ -25,4 +26,5 @@ from .training_service import (
     stop_training,
     get_training_status,
     stream_training_progress,
+    scan_experiment_folders,
 )
