@@ -1112,27 +1112,29 @@ def api_explain_batch():
         return jsonify({})
 
     components = load_explainability_components(SHAP_OUTPUT_DIR)
-    if components is None:
-        return jsonify({'error': 'Explainability pipeline not available'}), 404
 
-    calibrator = components.get('calibrator')
-    tier_classifier = components.get('tier_classifier')
+    calibrator = components.get('calibrator') if components else None
+    tier_classifier = components.get('tier_classifier') if components else None
 
-    if calibrator is None or tier_classifier is None:
-        return jsonify({'error': 'Missing calibrator or tier classifier'}), 404
+    # Always have a tier classifier — use default thresholds if none was fitted
+    if tier_classifier is None:
+        from site_scoring.explainability import TierClassifier
+        tier_classifier = TierClassifier()
 
     import numpy as np
+    is_calibrated = calibrator is not None
     results = {}
 
     for site_id, raw_prob in probabilities.items():
         try:
             raw_prob = float(raw_prob)
-            calibrated_prob = calibrator.calibrate(np.array([raw_prob]))[0]
+            calibrated_prob = float(calibrator.calibrate(np.array([raw_prob]))[0]) if is_calibrated else raw_prob
             tier_result = tier_classifier.classify(calibrated_prob)
 
             results[site_id] = {
                 'raw_probability': raw_prob,
-                'calibrated_probability': float(calibrated_prob),
+                'calibrated_probability': calibrated_prob,
+                'is_calibrated': is_calibrated,
                 'tier': tier_result.tier,
                 'tier_label': tier_result.label,
                 'tier_action': tier_result.action,
@@ -1174,20 +1176,21 @@ def api_tier_summary():
         })
 
     components = load_explainability_components(SHAP_OUTPUT_DIR)
-    if components is None:
-        return jsonify({'error': 'Explainability pipeline not available'}), 404
 
-    calibrator = components.get('calibrator')
-    tier_classifier = components.get('tier_classifier')
+    calibrator = components.get('calibrator') if components else None
+    tier_classifier = components.get('tier_classifier') if components else None
 
-    if calibrator is None or tier_classifier is None:
-        return jsonify({'error': 'Missing calibrator or tier classifier'}), 404
+    # Always have a tier classifier — use default thresholds if none was fitted
+    if tier_classifier is None:
+        from site_scoring.explainability import TierClassifier
+        tier_classifier = TierClassifier()
 
     import numpy as np
 
-    # Calibrate all probabilities
+    # Calibrate all probabilities (or use raw if no calibrator)
     raw_probs = np.array([float(p) for p in probabilities])
-    calibrated_probs = calibrator.calibrate(raw_probs)
+    is_calibrated = calibrator is not None
+    calibrated_probs = calibrator.calibrate(raw_probs) if is_calibrated else raw_probs
 
     # Get tier distribution
     from site_scoring.explainability.tiers import TIER_LABELS, TIER_COLORS
@@ -1210,7 +1213,7 @@ def api_tier_summary():
     return jsonify({
         'tier_distribution': tier_distribution,
         'total_sites': total,
-        'calibration_applied': True,
+        'calibration_applied': is_calibrated,
     })
 
 

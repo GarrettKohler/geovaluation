@@ -5886,19 +5886,23 @@
                 }
 
                 // Display tier classification with full details
-                badgeEl.style.background = data.color;
-                badgeEl.textContent = data.tier_label;
+                const tierColor = data.color || '#6b7280';
+                badgeEl.style.background = tierColor;
+                badgeEl.textContent = data.tier_label || 'Unclassified';
 
                 const calibratedPct = (data.calibrated_probability * 100).toFixed(0);
+                const scoreLabel = data.is_calibrated ? 'Calibrated Score' : 'Model Score';
                 const historicalAcc = data.historical_accuracy
                     ? `${(data.historical_accuracy * 100).toFixed(0)}%`
                     : 'N/A';
+                const confidenceText = data.confidence_statement || 'Train a lookalike model to generate confidence estimates.';
+                const actionText = data.tier_action || 'Assessment pending';
 
                 contentEl.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                         <div style="padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; text-align: center;">
-                            <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">Calibrated Score</div>
-                            <div style="font-size: 22px; font-weight: 700; color: ${data.color};">${calibratedPct}%</div>
+                            <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">${scoreLabel}</div>
+                            <div style="font-size: 22px; font-weight: 700; color: ${tierColor};">${calibratedPct}%</div>
                         </div>
                         <div style="padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; text-align: center;">
                             <div style="color: var(--text-muted); font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">Historical Accuracy</div>
@@ -5907,14 +5911,14 @@
                     </div>
                     <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
                         <div style="color: var(--text-secondary); font-size: 12px; line-height: 1.5;">
-                            ${data.confidence_statement}
+                            ${confidenceText}
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: ${data.color}15; border-radius: 6px; border-left: 3px solid ${data.color};">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${data.color}" stroke-width="2">
+                    <div style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: ${tierColor}15; border-radius: 6px; border-left: 3px solid ${tierColor};">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${tierColor}" stroke-width="2">
                             <path d="M9 18l6-6-6-6"/>
                         </svg>
-                        <span style="color: ${data.color}; font-size: 12px; font-weight: 500;">${data.tier_action}</span>
+                        <span style="color: ${tierColor}; font-size: 12px; font-weight: 500;">${actionText}</span>
                     </div>
                 `;
             } catch (error) {

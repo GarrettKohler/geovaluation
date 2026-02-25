@@ -2102,35 +2102,47 @@ def explain_prediction(probability: float, output_dir: Path) -> Dict:
     calibrator = components.get('calibrator')
     tier_classifier = components.get('tier_classifier')
 
-    result = {
-        'raw_probability': probability,
-        'calibrated_probability': probability,  # Default to raw if no calibrator
-        'tier': None,
-        'tier_label': None,
-        'tier_action': None,
-        'confidence_statement': None,
-    }
+    # Always have a tier classifier — use default thresholds if none was fitted
+    if tier_classifier is None:
+        tier_classifier = TierClassifier()
+
+    is_calibrated = calibrator is not None
+    calibrated_prob = probability  # Default to raw if no calibrator
 
     # Apply calibration if available
-    if calibrator is not None:
+    if is_calibrated:
         try:
             import numpy as np
-            calibrated = calibrator.calibrate(np.array([probability]))[0]
-            result['calibrated_probability'] = float(calibrated)
+            calibrated_prob = float(calibrator.calibrate(np.array([probability]))[0])
         except Exception as e:
             print(f"Warning: Calibration failed: {e}")
 
-    # Apply tier classification if available
-    if tier_classifier is not None:
-        try:
-            tier_result = tier_classifier.classify(result['calibrated_probability'])
-            result['tier'] = tier_result.tier
-            result['tier_label'] = tier_result.label
-            result['tier_action'] = tier_result.action
-            result['confidence_statement'] = tier_result.confidence_statement
-            result['historical_accuracy'] = tier_result.historical_accuracy
-            result['color'] = tier_result.color
-        except Exception as e:
-            print(f"Warning: Tier classification failed: {e}")
+    # Apply tier classification (always available now)
+    try:
+        tier_result = tier_classifier.classify(calibrated_prob)
+        result = {
+            'raw_probability': probability,
+            'calibrated_probability': calibrated_prob,
+            'is_calibrated': is_calibrated,
+            'tier': tier_result.tier,
+            'tier_label': tier_result.label,
+            'tier_action': tier_result.action,
+            'confidence_statement': tier_result.confidence_statement,
+            'historical_accuracy': tier_result.historical_accuracy,
+            'color': tier_result.color,
+        }
+    except Exception as e:
+        print(f"Warning: Tier classification failed: {e}")
+        result = {
+            'raw_probability': probability,
+            'calibrated_probability': calibrated_prob,
+            'is_calibrated': is_calibrated,
+            'tier': None,
+            'tier_label': None,
+            'tier_action': None,
+            'confidence_statement': None,
+            'historical_accuracy': None,
+            'color': '#6b7280',
+        }
 
     return result
