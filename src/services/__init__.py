@@ -5,7 +5,6 @@ Contains:
 - data_service: Data loading and caching
 - training_service: ML model training with GPU acceleration
 - shap_service: SHAP feature importance computation
-- lineage_service: Data ontology and lineage browser
 - fleet_analysis_service: Fleet-level explainability
 """
 

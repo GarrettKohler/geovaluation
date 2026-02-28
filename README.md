@@ -39,9 +39,7 @@ ML-powered site scoring and visualization platform for 60K+ gas station advertis
 - CSV and Excel export with site metadata, scores, rank, and percentile
 - Experiment catalog with side-by-side model comparison
 
-### Data Lineage & Documentation
-- Auto-generated data ontology (YAML) tracking 16 datasets
-- Interactive dataset browser with column-level lineage
+### Documentation
 - Glossary of all features and metrics
 
 ---
@@ -95,7 +93,6 @@ Open [http://localhost:8080](http://localhost:8080). The home page provides expe
 │   ├── training_service.py         # ML training orchestration & job management
 │   ├── shap_service.py             # SHAP computation & caching
 │   ├── fleet_analysis_service.py   # Fleet-wide intervention analysis
-│   └── lineage_service.py          # Data lineage & column provenance
 │
 ├── site_scoring/                   # ML pipeline
 │   ├── config.py                   # Model configuration & feature lists
@@ -123,8 +120,6 @@ Open [http://localhost:8080](http://localhost:8080). The home page provides expe
 │   ├── _base.html                  # Shared layout (dark theme, nav)
 │   ├── home.html                   # Experiment Hub — configure & launch training
 │   ├── index.html                  # Map View — interactive map + training sidebar
-│   ├── datasets_index.html         # Dataset browser
-│   ├── dataset_lineage.html        # Column-level data lineage
 │   ├── glossary.html               # Feature & metric glossary
 │   ├── training_details.html       # Training run details & metrics
 │   └── shap_values.html            # SHAP feature importance explorer
@@ -154,7 +149,6 @@ Open [http://localhost:8080](http://localhost:8080). The home page provides expe
 │
 └── docs/                           # Project documentation (25+ files)
     ├── knowledge-core.md           # Accumulated learnings & ADRs
-    ├── data_ontology.yaml          # Auto-generated dataset catalog
     ├── api.md                      # API reference
     ├── ARCHITECTURE.md             # System architecture overview
     ├── DATA_SOURCES.md             # Data source documentation
