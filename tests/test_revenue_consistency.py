@@ -399,6 +399,23 @@ class TestModelTrainingData:
             assert "avg_monthly_revenue" not in config.numeric_features, \
                 "avg_monthly_revenue is derived from target - data leakage!"
 
+    def test_no_data_leakage_avg_daily_revenue(self):
+        """When target is avg_daily_revenue, correlated revenue columns must be excluded."""
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from site_scoring.config import Config
+
+        config = Config(target="avg_daily_revenue")
+
+        assert "avg_daily_revenue" not in config.numeric_features, \
+            "avg_daily_revenue (target) found in numeric_features - data leakage!"
+        assert "total_revenue" not in config.numeric_features, \
+            "total_revenue is derived from target - data leakage!"
+        assert "log_total_revenue" not in config.numeric_features, \
+            "log_total_revenue is derived from target - data leakage!"
+        assert "avg_monthly_revenue" not in config.numeric_features, \
+            "avg_monthly_revenue is correlated with target - data leakage!"
+
 
 class TestEndToEndRevenueFlow:
     """End-to-end tests for revenue data flow from raw data to UI."""

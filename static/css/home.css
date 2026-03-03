@@ -551,6 +551,38 @@
     display: none;
 }
 
+/* Threshold mode toggle (percentile vs stddev) */
+.threshold-mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.threshold-mode-option {
+    flex: 1;
+    cursor: pointer;
+    margin: 0;
+}
+.threshold-mode-option input[type="radio"] {
+    display: none;
+}
+.threshold-mode-label {
+    display: block;
+    text-align: center;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--kepler-text-secondary);
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+}
+.threshold-mode-option input[type="radio"]:checked + .threshold-mode-label {
+    background: rgba(31,186,214,0.15);
+    color: #1fbad6;
+}
+
 /* Clustering config */
 .cluster-config {
     margin-top: 12px;

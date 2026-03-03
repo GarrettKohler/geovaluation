@@ -148,12 +148,13 @@ class TestTrainingSitesCsv:
     """Tests for training_sites.csv export."""
 
     def test_training_sites_csv_columns(self, run_export):
-        """Verify CSV has required columns: gtvid, avg_monthly_revenue, actual_label."""
+        """Verify CSV has required columns: gtvid, <target>, actual_label."""
         path = run_export / "training_sites.csv"
         assert path.exists(), "training_sites.csv was not created"
 
         with open(path) as f:
             reader = csv.DictReader(f)
+            # Header uses dynamic target column name (avg_monthly_revenue by default)
             assert set(reader.fieldnames) == {"gtvid", "avg_monthly_revenue", "actual_label"}
 
     def test_training_sites_includes_all_active(self, run_export, mock_processor):

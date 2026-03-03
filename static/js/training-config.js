@@ -314,13 +314,20 @@ function getTrainingConfig() {
 
     const lowerPercentile = parseInt(document.getElementById('hp-lower-percentile')?.value || '90', 10);
     const upperPercentile = parseInt(document.getElementById('hp-upper-percentile')?.value || '100', 10);
+
+    // Threshold mode (percentile vs stddev)
+    const thresholdMode = document.querySelector('input[name="hp-threshold-mode"]:checked')?.value || 'percentile';
+    const lowerSigma = parseFloat(document.getElementById('hp-lower-sigma')?.value || '1.0');
+    const upperSigmaVal = document.getElementById('hp-upper-sigma')?.value;
+    const upperSigma = (upperSigmaVal !== '' && upperSigmaVal != null) ? parseFloat(upperSigmaVal) : Infinity;
+
     const nClusters = parseInt(document.getElementById('hp-n-clusters')?.value || '5', 10);
     const clusterThreshold = parseFloat(document.getElementById('hp-cluster-threshold')?.value || '0.5');
 
     return {
         task_type: currentTaskType,
         model_type: currentModelType,
-        target: currentTaskType === 'lookalike' ? 'avg_monthly_revenue' : 'avg_monthly_revenue',
+        target: document.getElementById('target-variable')?.value || 'avg_daily_revenue',
         device: 'mps',
         apple_chip: 'auto',
         model_preset: 'model_a',
@@ -339,6 +346,9 @@ function getTrainingConfig() {
         track_gradients: false,
         lookalike_lower_percentile: lowerPercentile,
         lookalike_upper_percentile: upperPercentile,
+        lookalike_threshold_mode: thresholdMode,
+        lookalike_lower_sigma: lowerSigma,
+        lookalike_upper_sigma: upperSigma,
         n_clusters: nClusters,
         cluster_probability_threshold: clusterThreshold,
         network_filter: document.getElementById('hp-network-filter')?.value || null,
@@ -351,6 +361,25 @@ function getTrainingConfig() {
 
 function validatePercentileBounds() {
     if (currentTaskType !== 'lookalike') return { valid: true };
+
+    const mode = document.querySelector('input[name="hp-threshold-mode"]:checked')?.value || 'percentile';
+
+    if (mode === 'stddev') {
+        const lower = parseFloat(document.getElementById('hp-lower-sigma')?.value || '1.0');
+        const upperVal = document.getElementById('hp-upper-sigma')?.value;
+        const upper = (upperVal !== '' && upperVal != null) ? parseFloat(upperVal) : Infinity;
+
+        if (isNaN(lower) || lower < -3 || lower > 4) {
+            return { valid: false, error: 'Lower σ must be between -3 and 4' };
+        }
+        if (isFinite(upper) && (upper < -3 || upper > 4)) {
+            return { valid: false, error: 'Upper σ must be between -3 and 4, or empty for no limit' };
+        }
+        if (isFinite(upper) && upper <= lower) {
+            return { valid: false, error: 'Upper σ must be greater than lower σ' };
+        }
+        return { valid: true };
+    }
 
     const lower = parseInt(document.getElementById('hp-lower-percentile')?.value || '90', 10);
     const upper = parseInt(document.getElementById('hp-upper-percentile')?.value || '100', 10);
@@ -437,6 +466,58 @@ function updatePercentileHint() {
     }
 }
 
+function handleHpThresholdModeChange() {
+    const mode = document.querySelector('input[name="hp-threshold-mode"]:checked')?.value || 'percentile';
+    const percentileDiv = document.getElementById('hp-percentile-mode-inputs');
+    const stddevDiv = document.getElementById('hp-stddev-mode-inputs');
+    if (percentileDiv) percentileDiv.style.display = mode === 'percentile' ? 'block' : 'none';
+    if (stddevDiv) stddevDiv.style.display = mode === 'stddev' ? 'block' : 'none';
+}
+
+// Simple erf approximation for stddev hint
+function _erf(x) {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x));
+    const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    const result = 1 - poly * Math.exp(-x * x);
+    return x >= 0 ? result : -result;
+}
+
+function updateHpStdDevHint() {
+    const lowerInput = document.getElementById('hp-lower-sigma');
+    const upperInput = document.getElementById('hp-upper-sigma');
+    const hintEl = document.getElementById('hp-stddev-hint');
+    const errorEl = document.getElementById('hp-stddev-error');
+    if (!lowerInput || !hintEl || !errorEl) return;
+
+    const lower = parseFloat(lowerInput.value);
+    const upper = upperInput.value !== '' ? parseFloat(upperInput.value) : Infinity;
+
+    let error = '';
+    if (isNaN(lower) || lower < -3 || lower > 4) {
+        error = 'Lower σ must be between -3 and 4';
+    } else if (isFinite(upper) && (upper < -3 || upper > 4)) {
+        error = 'Upper σ must be between -3 and 4, or empty for no limit';
+    } else if (isFinite(upper) && upper <= lower) {
+        error = 'Upper σ must be greater than lower σ';
+    }
+
+    if (error) {
+        errorEl.textContent = error;
+        errorEl.style.display = 'block';
+        hintEl.style.display = 'none';
+    } else {
+        errorEl.style.display = 'none';
+        hintEl.style.display = 'block';
+        const pctAbove = `~${Math.round(100 * (1 - 0.5 * (1 + _erf(lower / Math.sqrt(2)))))}%`;
+        const sigmaLabel = (val) => val >= 0 ? `mean + ${val.toFixed(1)}σ` : `mean − ${Math.abs(val).toFixed(1)}σ`;
+        if (!isFinite(upper)) {
+            hintEl.textContent = `Sites above ${sigmaLabel(lower)} (${pctAbove}) labeled as top performers`;
+        } else {
+            hintEl.textContent = `Sites between ${sigmaLabel(lower)} and ${sigmaLabel(upper)} labeled as top performers`;
+        }
+    }
+}
+
 // ============================================================================
 // Page Initialization
 // ============================================================================
@@ -482,6 +563,21 @@ function initTrainingConfig() {
     if (upperInput) {
         upperInput.addEventListener('input', updatePercentileHint);
         upperInput.addEventListener('change', updatePercentileHint);
+    }
+
+    // Wire threshold mode toggle (percentile vs stddev)
+    document.querySelectorAll('input[name="hp-threshold-mode"]').forEach(radio => {
+        radio.addEventListener('change', handleHpThresholdModeChange);
+    });
+    const lowerSigmaInput = document.getElementById('hp-lower-sigma');
+    const upperSigmaInput = document.getElementById('hp-upper-sigma');
+    if (lowerSigmaInput) {
+        lowerSigmaInput.addEventListener('input', updateHpStdDevHint);
+        lowerSigmaInput.addEventListener('change', updateHpStdDevHint);
+    }
+    if (upperSigmaInput) {
+        upperSigmaInput.addEventListener('input', updateHpStdDevHint);
+        upperSigmaInput.addEventListener('change', updateHpStdDevHint);
     }
 
     // Wire cluster threshold slider

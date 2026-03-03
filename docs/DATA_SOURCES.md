@@ -1,59 +1,18 @@
-# Data Sources, Assumptions & Considerations
+# data
 
-> **GSTV Site Visualization & ML Pipeline**
-> *Comprehensive documentation of all datasets, their origins, processing assumptions, and unique considerations*
+GSTV Site Visualization & ML Pipeline — Data Sources Reference
 
----
+This system processes **57,675 unique DOOH advertising sites** across the United States, with **1.47M monthly performance records** spanning ~4 years of history.
 
-## Executive Summary
-
-This system processes **57,675 unique DOOH (Digital Out-of-Home) advertising sites** across the United States, with **1.47M monthly performance records** spanning ~4 years of history. The data pipeline transforms raw operational data into ML-ready features for revenue prediction and lookalike modeling.
-
-| Metric | Value |
-|--------|-------|
-| Total Sites | 57,675 |
-| Active Sites (Training) | 26,099 (45.3%) |
-| Monthly Records | 1,475,761 |
-| Total Revenue | $405.5M |
-| Time Span | ~47 months |
+- **Total Sites** – 57,675
+- **Active Sites (Training)** – 26,099 (45.3%)
+- **Monthly Records** – 1,475,761
+- **Total Revenue** – $405.5M
+- **Time Span** – ~47 months
 
 ---
 
-## Table of Contents
-
-1. [Data Architecture Overview](#1-data-architecture-overview)
-2. [Primary Data Sources](#2-primary-data-sources)
-3. [Geospatial Data Sources](#3-geospatial-data-sources)
-4. [Processed Datasets](#4-processed-datasets)
-5. [Feature Engineering](#5-feature-engineering)
-6. [Assumptions & Reasoning](#6-assumptions--reasoning)
-7. [Data Quality & Limitations](#7-data-quality--limitations)
-8. [Quick Reference](#8-quick-reference)
-
----
-
-## 1. Data Architecture Overview
-
-### Directory Structure
-
-```
-data/
-├── input/                              # Raw source data
-│   ├── Site Scores - Site Revenue...   # Primary operational data (927 MB)
-│   ├── Sites - Base Data Set.csv       # Static site metadata (17 MB)
-│   ├── Site Revenue - Salesforce.csv   # CRM revenue data (5.1 MB)
-│   ├── nearest_site_distances.csv      # Pre-computed site proximity (6.5 MB)
-│   └── site_interstate_distances.csv   # Highway distances (3.8 MB)
-│
-├── processed/                          # ML-ready datasets
-│   ├── site_aggregated_precleaned.*    # All sites, aggregated (57,675 rows)
-│   └── site_training_data.*            # Active sites only (26,099 rows)
-│
-└── shapefiles/                         # Geographic boundaries
-    └── US Interstate highway data (Census TIGER)
-```
-
-### Processing Pipeline
+## Processing Pipeline
 
 ```
 Raw Monthly Data (1.47M rows)
@@ -92,325 +51,327 @@ Raw Monthly Data (1.47M rows)
     ML Model Training
 ```
 
----
-
-## 2. Primary Data Sources
-
-### 2.1 Site Scores - Site Revenue, Impressions, and Diagnostics
-
-| Property | Value |
-|----------|-------|
-| **File** | `data/input/Site Scores - Site Revenue, Impressions, and Diagnostics.csv` |
-| **Size** | 927 MB |
-| **Rows** | 1,475,761 (monthly records) |
-| **Unique Sites** | 57,675 |
-| **Columns** | 94 |
-
-#### Purpose
-Primary operational data source containing monthly performance metrics for every GSTV site. Each row represents one site's performance for one month. This is from Salesforce Sites and Site Revenue data, and Vistar Revenue and Diagnostic Insights data.
-
-#### Schema Categories
-
-**Time & Identification (5 columns)**
-| Column | Type | Description |
-|--------|------|-------------|
-| `date` | Date | Month-year of record (YYYY-MM-DD) |
-| `month`, `year` | Int | Extracted time components |
-| `id_gbase` | String | Internal unique site hash |
-| `gtvid` | String | Public site ID (e.g., "DCW126") |
-
-**Location (7 columns)**
-| Column | Type | Description |
-|--------|------|-------------|
-| `latitude`, `longitude` | Float | WGS84 coordinates |
-| `state`, `county`, `zip` | String | Geographic identifiers |
-| `dma`, `dma_rank` | String/Int | Designated Market Area |
-
-**Performance Metrics (5 columns)**
-| Column | Type | Description |
-|--------|------|-------------|
-| `revenue` | Float | Monthly revenue in USD (nullable) |
-| `monthly_impressions` | Int | Total ad impressions |
-| `monthly_nvis` | Int | Network video impressions |
-| `monthly_impressions_per_screen` | Float | Impressions / screen_count |
-| `monthly_nvis_per_screen` | Float | NVIs / screen_count |
-
-**Site Configuration (9 columns)**
-| Column | Type | Description |
-|--------|------|-------------|
-| `network` | String | Retailer network (e.g., "Wayne", "Dover") |
-| `program` | String | Program type |
-| `experience_type` | String | Content type |
-| `hardware_type` | String | Hardware model |
-| `retailer` | String | Retailer brand (e.g., "Speedway") |
-| `screen_count` | Int | Physical screens at site |
-| `statuis` | String | Status (note: typo in source) |
-| `schedule_site`, `sellable_site` | String | Boolean flags ("Yes"/"No") |
-
-**Demographics (7 columns)**
-| Column | Type | Description |
-|--------|------|-------------|
-| `avg_household_income` | Float | Area median income |
-| `median_age` | Float | Area median age |
-| `pct_african_american`, `pct_asian`, `pct_hispanic` | Float | Racial/ethnic % |
-| `pct_female`, `pct_male` | Float | Gender breakdown |
-
-**Capability Flags (9 columns)** — Boolean as "Yes"/"No"/"Unknown"
-| Column | Description |
-|--------|-------------|
-| `c_emv_enabled` | EMV payment capable |
-| `c_nfc_enabled` | Contactless payment |
-| `c_open_24_hours` | 24/7 operation |
-| `c_sells_beer`, `c_sells_wine`, `c_sells_diesel_fuel` | Product availability |
-| `c_sells_lottery` | Lottery tickets |
-| `c_vistar_programmatic_enabled` | Programmatic ads |
-| `c_walk_up_enabled` | Pedestrian access |
-
-**Restriction Flags (31 columns)** — Content category restrictions
-| Prefix | Examples |
-|--------|----------|
-| `r_lottery`, `r_government` | Category-wide restrictions |
-| `r_cpg_beverage_beer_*` | Alcohol advertising |
-| `r_cpg_cbd_*`, `r_cpg_cannabis_*` | Cannabis-related |
-| `r_government_political` | Political ads (55.8% restricted) |
-
-**Brand Information (3 columns)**
-| Column | Description |
-|--------|-------------|
-| `brand_fuel` | Fuel brand (Shell, ExxonMobil, etc.) |
-| `brand_restaurant` | Restaurant brand |
-| `brand_c_store` | Convenience store brand |
-
-#### Unique Considerations
-
-1. **Monthly Granularity**: Data is reported monthly, not daily. Intra-month patterns are not captured.
-
-2. **Revenue Nullability**: Some months have null/zero revenue due to:
-   - New site ramp-up period
-   - Temporary deactivation
-   - Reporting delays
-
-3. **Column Typo**: The status column is named `statuis` (not `status`) in the source data.
-
-4. **Flag Encoding**: Boolean fields use strings ("Yes"/"No"/"Unknown"), not native booleans.
+```
+data/
+├── input/                              # Raw source data
+│   ├── Site Scores - Site Revenue...   # Primary operational data (927 MB)
+│   ├── Sites - Base Data Set.csv       # Static site metadata (17 MB)
+│   ├── Site Revenue - Salesforce.csv   # CRM revenue data (5.1 MB)
+│   ├── nearest_site_distances.csv      # Pre-computed site proximity (6.5 MB)
+│   └── site_interstate_distances.csv   # Highway distances (3.8 MB)
+│
+├── processed/                          # ML-ready datasets
+│   ├── site_aggregated_precleaned.*    # All sites, aggregated (57,675 rows)
+│   └── site_training_data.*            # Active sites only (26,099 rows)
+│
+└── shapefiles/                         # Geographic boundaries
+    └── US Interstate highway data (Census TIGER)
+```
 
 ---
 
-### 2.2 Site Revenue - Salesforce
+# Source Datasets
 
-| Property | Value |
-|----------|-------|
-| **File** | `data/input/Site Revenue - Salesforce.csv` |
-| **Size** | 5.1 MB |
-| **Rows** | 67,604 |
+## data.input.SiteScoresRevenue
 
-#### Purpose
-Alternative revenue source from Salesforce CRM. Used for cross-validation and reconciliation.
+```
+data/input/Site Scores - Site Revenue, Impressions, and Diagnostics.csv
+```
 
-#### Schema
-| Column | Type | Description |
-|--------|------|-------------|
-| `ID - Gbase` | String | Site identifier |
-| `Sellable` | Boolean | Can site be sold |
-| `Schedulable` | Boolean | Can ads be scheduled |
-| `Program`, `Network` | String | Site classification |
-| `Average Revenue` | Float | Average monthly revenue |
-| `Average DMA Rank` | Int | Market ranking |
+Primary operational data source containing monthly performance metrics for every GSTV site. Each row represents one site's performance for one month. Derived from Salesforce Sites/Revenue data and Vistar Revenue/Diagnostic Insights data.
 
-#### Unique Considerations
+**Properties:**
 
-1. **Different Aggregation**: Salesforce provides pre-aggregated averages, not monthly records.
+- **size** (*bytes*) – 927 MB
+- **rows** (*int*) – 1,475,761 (monthly records)
+- **unique_sites** (*int*) – 57,675
+- **columns** (*int*) – 94
 
-2. **Reconciliation Use**: Primarily used to validate Site Scores revenue data, not for ML training.
+### Attributes
+
+*Time & Identification (5 columns)*
+
+- **date** (*Date*) – Month-year of record (YYYY-MM-DD)
+- **month** (*int*) – Extracted month component
+- **year** (*int*) – Extracted year component
+- **id_gbase** (*str*) – Internal unique site hash
+- **gtvid** (*str*) – Public site ID (e.g., `"DCW126"`)
+
+*Location (7 columns)*
+
+- **latitude** (*float*) – WGS84 latitude
+- **longitude** (*float*) – WGS84 longitude
+- **state** (*str*) – US state
+- **county** (*str*) – County name
+- **zip** (*str*) – ZIP code
+- **dma** (*str*) – Designated Market Area
+- **dma_rank** (*int*) – DMA ranking
+
+*Performance Metrics (5 columns)*
+
+- **revenue** (*float, nullable*) – Monthly revenue in USD
+- **monthly_impressions** (*int*) – Total ad impressions
+- **monthly_nvis** (*int*) – Network video impressions
+- **monthly_impressions_per_screen** (*float*) – Impressions / screen_count
+- **monthly_nvis_per_screen** (*float*) – NVIs / screen_count
+
+*Site Configuration (9 columns)*
+
+- **network** (*str*) – Retailer network (e.g., `"Wayne"`, `"Dover"`)
+- **program** (*str*) – Program type
+- **experience_type** (*str*) – Content type
+- **hardware_type** (*str*) – Hardware model
+- **retailer** (*str*) – Retailer brand (e.g., `"Speedway"`)
+- **screen_count** (*int*) – Physical screens at site
+- **statuis** (*str*) – Status (see Note below)
+- **schedule_site** (*str*) – Whether site is schedulable (`"Yes"` / `"No"`)
+- **sellable_site** (*str*) – Whether site is sellable (`"Yes"` / `"No"`)
+
+*Demographics (7 columns)*
+
+- **avg_household_income** (*float*) – Area median income
+- **median_age** (*float*) – Area median age
+- **pct_african_american** (*float*) – Racial/ethnic percentage
+- **pct_asian** (*float*) – Racial/ethnic percentage
+- **pct_hispanic** (*float*) – Racial/ethnic percentage
+- **pct_female** (*float*) – Gender breakdown
+- **pct_male** (*float*) – Gender breakdown
+
+*Capability Flags (9 columns)* — Encoded as `"Yes"` / `"No"` / `"Unknown"`
+
+- **c_emv_enabled** – EMV payment capable
+- **c_nfc_enabled** – Contactless payment
+- **c_open_24_hours** – 24/7 operation
+- **c_sells_beer** – Beer availability
+- **c_sells_wine** – Wine availability
+- **c_sells_diesel_fuel** – Diesel fuel availability
+- **c_sells_lottery** – Lottery tickets
+- **c_vistar_programmatic_enabled** – Programmatic ads
+- **c_walk_up_enabled** – Pedestrian access
+
+*Restriction Flags (31 columns)* — Content category advertising restrictions
+
+- **r_lottery**, **r_government** – Category-wide restrictions
+- **r_cpg_beverage_beer_\*** – Alcohol advertising (multiple sub-flags)
+- **r_cpg_cbd_\***, **r_cpg_cannabis_\*** – Cannabis-related (multiple sub-flags)
+- **r_government_political** – Political ads (55.8% restricted)
+
+*Brand Information (3 columns)*
+
+- **brand_fuel** (*str*) – Fuel brand (Shell, ExxonMobil, etc.)
+- **brand_restaurant** (*str*) – Restaurant brand
+- **brand_c_store** (*str*) – Convenience store brand
+
+> **Note**
+> The status column is named `statuis` (not `status`) in the source data. The `DataRegistry` handles both spellings, but be aware when writing raw queries.
+
+> **Warning**
+> Revenue values may be null due to new site ramp-up, temporary deactivation, or reporting delays. Boolean flags use strings (`"Yes"` / `"No"` / `"Unknown"`), not native booleans.
 
 ---
 
-### 2.3 Sites - Base Data Set
+## data.input.SiteRevenueSalesforce
 
-| Property | Value |
-|----------|-------|
-| **File** | `data/input/Sites - Base Data Set.csv` |
-| **Size** | 17 MB |
-| **Rows** | 67,650 |
+```
+data/input/Site Revenue - Salesforce.csv
+```
 
-#### Purpose
+Alternative revenue source from Salesforce CRM. Used for cross-validation and reconciliation, not for ML training.
+
+**Properties:**
+
+- **size** (*bytes*) – 5.1 MB
+- **rows** (*int*) – 67,604
+
+### Attributes
+
+- **ID - Gbase** (*str*) – Site identifier
+- **Sellable** (*bool*) – Can site be sold
+- **Schedulable** (*bool*) – Can ads be scheduled
+- **Program** (*str*) – Site classification
+- **Network** (*str*) – Network affiliation
+- **Average Revenue** (*float*) – Average monthly revenue
+- **Average DMA Rank** (*int*) – Market ranking
+
+> **Note**
+> Provides pre-aggregated averages, not monthly records. Primarily used to validate Site Scores revenue data.
+
+---
+
+## data.input.SitesBaseDataSet
+
+```
+data/input/Sites - Base Data Set.csv
+```
+
 Static site metadata with different source/coverage than Site Scores. Used in early preprocessing stages.
 
-#### Unique Considerations
+**Properties:**
 
-1. **Higher Row Count**: Contains 67,650 sites vs. 57,675 in Site Scores (includes historical/removed sites).
+- **size** (*bytes*) – 17 MB
+- **rows** (*int*) – 67,650
 
-2. **Metadata Focus**: Emphasizes site configuration over performance metrics.
+> **Note**
+> Contains 67,650 sites vs. 57,675 in Site Scores (includes historical/removed sites). Emphasizes site configuration over performance metrics.
 
 ---
 
-## 3. Geospatial Data Sources
+# Geospatial Datasets
 
-### 3.1 Nearest Site Distances
+## data.input.NearestSiteDistances
 
-| Property | Value |
-|----------|-------|
-| **File** | `data/input/nearest_site_distances.csv` |
-| **Size** | 6.5 MB |
-| **Rows** | 67,644 |
+```
+data/input/nearest_site_distances.csv
+```
 
-#### Purpose
 Pre-computed distances to the nearest neighboring GSTV site for competitive density analysis.
 
-#### Schema
-| Column | Type | Description |
-|--------|------|-------------|
-| `GTVID` | String | Site identifier |
-| `Latitude`, `Longitude` | Float | Site coordinates |
-| `nearest_site` | String | GTVID of nearest neighbor |
-| `nearest_site_lat`, `nearest_site_lon` | Float | Neighbor coordinates |
-| `nearest_site_distance_m` | Float | Distance in meters |
-| `nearest_site_distance_mi` | Float | Distance in miles |
+**Properties:**
 
-#### Calculation Method
-- **Algorithm**: KDTree spatial search (O(n log n) complexity)
-- **Metric**: Haversine (great circle) distance on WGS84 ellipsoid
-- **Accuracy**: ~0.1% error vs. true geodesic distance
+- **size** (*bytes*) – 6.5 MB
+- **rows** (*int*) – 67,644
+- **algorithm** (*str*) – KDTree spatial search (O(n log n))
+- **metric** (*str*) – Haversine (great circle) distance on WGS84 ellipsoid
+- **accuracy** (*float*) – ~0.1% error vs. true geodesic distance
 
-#### Reasoning
-**Why include nearest site distance?**
-- Sites in dense urban areas compete for advertiser attention
-- Isolated rural sites may have different revenue characteristics
-- Proxy for market saturation and local competition
+### Attributes
 
-#### Unique Considerations
+- **GTVID** (*str*) – Site identifier
+- **Latitude** (*float*) – Site latitude
+- **Longitude** (*float*) – Site longitude
+- **nearest_site** (*str*) – GTVID of nearest neighbor
+- **nearest_site_lat** (*float*) – Neighbor latitude
+- **nearest_site_lon** (*float*) – Neighbor longitude
+- **nearest_site_distance_m** (*float*) – Distance in meters
+- **nearest_site_distance_mi** (*float*) – Distance in miles
 
-1. **Self-Exclusion**: Each site's distance is to a *different* site (not itself).
+### Derived Feature
 
-2. **Log Transformation**: Converted to `log_nearest_site_distance_mi` for ML:
-   - Range: 0.0 to 3.92 (log miles)
-   - Median: 0.59 (~1.8 miles)
+- **log_nearest_site_distance_mi** (*float*) – `sign(x) * log(1 + |x|)` of distance in miles. Range: 0.0–3.92, median: 0.59 (~1.8 miles).
 
-3. **Coverage**: 99.96% of sites have distance data (24 sites missing).
+### Reasoning
+
+Sites in dense urban areas compete for advertiser attention. Isolated rural sites have different revenue characteristics. This feature serves as a proxy for market saturation and local competition.
+
+> **Note**
+> Each site's distance is to a *different* site (self-excluded). Coverage: 99.96% of sites have distance data (24 sites missing).
 
 ---
 
-### 3.2 Interstate Highway Distances
+## data.input.InterstateDistances
 
-| Property | Value |
-|----------|-------|
-| **File** | `data/input/site_interstate_distances.csv` |
-| **Size** | 3.8 MB |
-| **Rows** | 70,300 |
+```
+data/input/site_interstate_distances.csv
+```
 
-#### Purpose
 Distance from each site to the nearest US Interstate highway. Highway proximity correlates with traffic volume and visibility.
 
-#### Schema
-| Column | Type | Description |
-|--------|------|-------------|
-| `GTVID` | String | Site identifier |
-| `Latitude`, `Longitude` | Float | Site coordinates |
-| `nearest_interstate` | String | Highway ID (e.g., "I-280") |
-| `distance_to_interstate_mi` | Float | Distance in miles |
+**Properties:**
 
-#### Data Source
-- **Highway Geometry**: US Census Bureau TIGER/Line Primary Roads shapefile
-- **Calculation**: Point-to-polyline minimum distance using projected coordinates
+- **size** (*bytes*) – 3.8 MB
+- **rows** (*int*) – 70,300
+- **source** (*str*) – US Census Bureau TIGER/Line Primary Roads shapefile
+- **method** (*str*) – Point-to-polyline minimum distance using projected coordinates
 
-#### Reasoning
-**Why include interstate distance?**
-- Highway-adjacent sites capture commuter and long-haul trucker traffic
-- Travel centers near interstates have different revenue profiles
-- Proxy for site accessibility and traffic volume
+### Attributes
 
-#### Unique Considerations
+- **GTVID** (*str*) – Site identifier
+- **Latitude** (*float*) – Site latitude
+- **Longitude** (*float*) – Site longitude
+- **nearest_interstate** (*str*) – Highway ID (e.g., `"I-280"`)
+- **distance_to_interstate_mi** (*float*) – Distance in miles
 
-1. **Multiple Entries**: Some sites have multiple rows (one per nearby interstate). Aggregation takes the minimum distance.
+### Derived Feature
 
-2. **Categorical Feature**: `nearest_interstate` is also used as a categorical feature (which highway is closest).
+- **log_min_distance_to_interstate_mi** (*float*) – `sign(x) * log(1 + |x|)` of minimum distance. Range: 0.0–7.27. Zero means directly on interstate exit ramp.
 
-3. **Log Transformation**: Converted to `log_min_distance_to_interstate_mi`:
-   - Range: 0.0 to 7.27 (log miles)
-   - Sites at 0 are directly on interstate exit ramps
+### Reasoning
 
-4. **Row Count Mismatch**: 70,300 rows > 57,675 sites due to multiple-interstate proximity.
+Highway-adjacent sites capture commuter and long-haul trucker traffic. Travel centers near interstates have different revenue profiles. Proxy for site accessibility and traffic volume.
+
+> **Note**
+> Some sites have multiple rows (one per nearby interstate). Aggregation takes the minimum distance. Row count (70,300) exceeds site count (57,675) due to this. `nearest_interstate` is also used as a categorical feature.
 
 ---
 
-### 3.3 Census TIGER Shapefiles
+## data.input.CensusTIGERShapefiles
 
-| Property | Value |
-|----------|-------|
-| **Directory** | `data/shapefiles/` |
-| **Source** | US Census Bureau TIGER/Line |
+```
+data/shapefiles/
+```
 
-#### Purpose
-Geographic boundary files for highway network analysis.
+Geographic boundary files for highway network analysis from the US Census Bureau TIGER/Line dataset.
 
-#### Contents
-- Primary and Secondary Roads (US Interstates, US Routes)
-- State boundaries for clipping
-- Road attribute metadata (route number, road class)
+**Properties:**
 
-#### Unique Considerations
+- **contents** – Primary and Secondary Roads (US Interstates, US Routes), State boundaries, Road attribute metadata (route number, road class)
+- **coordinate_system** – NAD83 (EPSG:4269), converted to WGS84 for distance calculations
 
-1. **Coordinate System**: NAD83 (EPSG:4269), converted to WGS84 for distance calculations.
-
-2. **Vintage**: Should match the time period of site data for accuracy.
+> **Note**
+> Shapefile vintage should match the time period of site data for accuracy.
 
 ---
 
-## 4. Processed Datasets
+# Processed Datasets
 
-### 4.1 Site Aggregated Precleaned
+## data.processed.SiteAggregatedPrecleaned
 
-| Property | Value |
-|----------|-------|
-| **Files** | `site_aggregated_precleaned.parquet`, `.csv` |
-| **Size** | 8.5 MB (parquet), 41 MB (csv) |
-| **Rows** | 57,675 (one per site) |
-| **Columns** | 90 |
+```
+data/processed/site_aggregated_precleaned.parquet
+```
 
-#### Purpose
-Intermediate dataset with all sites aggregated from monthly to site-level, before training filters.
+Intermediate dataset with all sites aggregated from monthly to site-level, before training filters are applied. This is the dataset used by `get_all_sites_for_prediction()` to score all 57K sites.
 
-#### Transformations Applied
+**Properties:**
 
-1. **Temporal Aggregation**
-   - **Sums**: `total_revenue`, `total_monthly_impressions`, `total_monthly_nvis`
-   - **Averages**: `avg_monthly_revenue`, `avg_monthly_impressions`
-   - **Counts**: `active_months` (number of months with data)
-   - **Last Values**: Metadata fields (network, retailer, status)
+- **size** (*bytes*) – 8.5 MB (parquet), 41 MB (csv)
+- **rows** (*int*) – 57,675 (one per site)
+- **columns** (*int*) – 90
 
-2. **Relative Strength Indicators** (see Section 5.1)
+### Transformations Applied
 
-3. **Geospatial Joins** (nearest site + interstate distances)
+1. **Temporal Aggregation** – Sums: `total_revenue`, `total_monthly_impressions`, `total_monthly_nvis`. Averages: `avg_monthly_revenue`, `avg_monthly_impressions`. Counts: `active_months`. Last values: metadata fields (network, retailer, status).
+2. **Relative Strength Indicators** – See [Feature Engineering](#feature-engineering).
+3. **Geospatial Joins** – Nearest site + interstate distances merged.
+4. **Log Transformations** – Applied to revenue, impressions, distances.
+5. **One-Hot Encoding** – Boolean flags converted to 0/1.
 
-4. **Log Transformations** (see Section 5.2)
+### Site Status Distribution
 
-5. **One-Hot Encoding** (see Section 5.3)
+- **Active** (*int*) – 26,101 (45.3%)
+- **Temporarily Deactivated** (*int*) – 23,374 (40.5%)
+- **Awaiting Installation** (*int*) – 4,417 (7.7%)
+- **Deactivated** (*int*) – 3,094 (5.4%)
+- **Awaiting Reactivation** (*int*) – 627 (1.1%)
+- **Cancelled** (*int*) – 60 (0.1%)
 
-#### Site Status Distribution
-| Status | Count | Percentage |
-|--------|-------|------------|
-| Active | 26,101 | 45.3% |
-| Temporarily Deactivated | 23,374 | 40.5% |
-| Awaiting Installation | 4,417 | 7.7% |
-| Deactivated | 3,094 | 5.4% |
-| Awaiting Reactivation | 627 | 1.1% |
-| Cancelled | 60 | 0.1% |
+**Example:**
+
+```python
+import polars as pl
+df = pl.read_parquet("data/processed/site_aggregated_precleaned.parquet")
+print(df.shape)  # (57675, 90)
+```
+
+See also: [`data.processed.SiteTrainingData`](#dataprocessedsitetrainingdata)
 
 ---
 
-### 4.2 Site Training Data
+## data.processed.SiteTrainingData
 
-| Property | Value |
-|----------|-------|
-| **Files** | `site_training_data.parquet`, `.csv` |
-| **Size** | 5.6 MB (parquet), 19 MB (csv) |
-| **Rows** | 26,099 (Active sites only) |
-| **Columns** | 94 |
+```
+data/processed/site_training_data.parquet
+```
 
-#### Purpose
-Final ML-ready dataset with only Active sites and sufficient history for training.
+Final ML-ready dataset with only Active sites and sufficient history for training. Created by `prepare_training_dataset(active_only=True)`.
 
-#### Filters Applied
+**Properties:**
+
+- **size** (*bytes*) – 5.6 MB (parquet), 19 MB (csv)
+- **rows** (*int*) – 26,099 (Active sites only)
+- **columns** (*int*) – 94
+
+### Filters Applied
 
 ```python
 # Filter 1: Active status only
@@ -423,47 +384,61 @@ df = df.filter(total_revenue >= 0)
 df = df.filter(active_months > 11)  # >1 year of data
 ```
 
-#### Feature Categories
+### Feature Categories
 
-**Numeric Features (12)**
+*Numeric Features (12)*
+
+- **rs_Impressions**, **rs_NVIs**, **rs_Revenue**, **rs_RevenuePerScreen** – Momentum indicators
+- **avg_monthly_revenue**, **log_total_revenue** – Revenue metrics
+- **log_nearest_site_distance_mi**, **log_min_distance_to_interstate_mi** – Geospatial
+- **avg_household_income**, **median_age**, **pct_female**, **pct_male** – Demographics
+
+*Categorical Features (8)*
+
+- **network**, **program**, **experience_type**, **hardware_type**, **retailer** – Site config
+- **brand_fuel**, **brand_restaurant**, **brand_c_store** – Brand information
+
+*Boolean Features (40)*
+
+- **c_\*_encoded** – 9 capability flags
+- **r_\*_encoded** – 29 restriction flags
+- **schedule_site_encoded**, **sellable_site_encoded** – Sales flags
+
+### Reasoning
+
+1. **Active-only filter** – We predict revenue for operational sites, not historical/deactivated ones.
+2. **Data quality** – Deactivated sites often have incomplete recent data.
+3. **Business relevance** – Lookalike models should identify sites similar to *current* top performers.
+
+**Example:**
+
+```python
+from site_scoring.data_loader import create_data_loaders
+from site_scoring.config import Config
+
+config = Config()
+train_loader, val_loader, test_loader, processor = create_data_loaders(config)
+
+for numeric, categorical, boolean, target in train_loader:
+    # numeric.shape    → [batch_size, 12]
+    # categorical.shape → [batch_size, 8]
+    # boolean.shape    → [batch_size, 40]
+    # target.shape     → [batch_size, 1]
+    break
 ```
-rs_Impressions, rs_NVIs, rs_Revenue, rs_RevenuePerScreen  # Momentum
-avg_monthly_revenue, log_total_revenue                     # Revenue
-log_nearest_site_distance_mi, log_min_distance_to_interstate_mi  # Geospatial
-avg_household_income, median_age, pct_female, pct_male     # Demographics
-```
 
-**Categorical Features (8)**
-```
-network, program, experience_type, hardware_type, retailer
-brand_fuel, brand_restaurant, brand_c_store, nearest_interstate
-```
-
-**Boolean Features (40)**
-```
-c_*_encoded (9 capability flags)
-r_*_encoded (29 restriction flags)
-schedule_site_encoded, sellable_site_encoded
-```
-
-#### Reasoning for Active-Only Filter
-
-1. **Prediction Target**: We predict revenue for operational sites, not historical/deactivated ones.
-
-2. **Data Quality**: Deactivated sites often have incomplete recent data.
-
-3. **Business Relevance**: Lookalike models should identify sites similar to *current* top performers.
+See also: [`data.processed.SiteAggregatedPrecleaned`](#dataprocessedsiteaggregatedprecleaned)
 
 ---
 
-## 5. Feature Engineering
+# Feature Engineering
 
-### 5.1 Relative Strength Indicators
+## features.RelativeStrength
 
-#### Definition
 Momentum indicators comparing recent performance to historical baseline.
 
-#### Formula
+**Formula:**
+
 ```
 RS = (30-day average + ε) / (90-day average + ε)
 
@@ -474,68 +449,62 @@ Where:
 - ε = 1.0 (smoothing constant)
 ```
 
-#### Features Created
-| Feature | Source Metric | Interpretation |
-|---------|---------------|----------------|
-| `rs_Impressions` | `monthly_impressions` | Impression volume trend |
-| `rs_NVIs` | `monthly_nvis` | Network video impression trend |
-| `rs_Revenue` | `revenue` | Revenue trend |
-| `rs_RevenuePerScreen` | `revenue / screen_count` | Per-screen efficiency trend |
+### Attributes
 
-#### Reasoning
+- **rs_Impressions** (*float*) – Impression volume trend. Source: `monthly_impressions`
+- **rs_NVIs** (*float*) – Network video impression trend. Source: `monthly_nvis`
+- **rs_Revenue** (*float*) – Revenue trend. Source: `revenue`
+- **rs_RevenuePerScreen** (*float*) – Per-screen efficiency trend. Source: `revenue / screen_count`
 
-1. **Why momentum matters**: A site trending upward may outperform its historical average in future months.
+### Reasoning
 
-2. **Why 30/90 day windows**: 30 days captures recent changes; 90 days provides stable baseline.
+1. **Why momentum matters** – A site trending upward may outperform its historical average in future months.
+2. **Why 30/90 day windows** – 30 days captures recent changes; 90 days provides stable baseline.
+3. **Why smoothing (ε=1.0)** – Prevents division by zero for new sites with limited history.
 
-3. **Why smoothing (ε=1.0)**: Prevents division by zero for new sites with limited history.
+### Assumptions
 
-#### Assumptions
-
-- **Missing data**: Filled with 1.0 (neutral trend) if insufficient history
-- **Stationarity**: Assumes trends persist into the future
-- **Seasonality**: Not explicitly modeled (30/90 day comparison may capture some)
+- **Missing data** – Filled with 1.0 (neutral trend) if insufficient history.
+- **Stationarity** – Assumes trends persist into the future.
+- **Seasonality** – Not explicitly modeled (30/90 day comparison may capture some).
 
 ---
 
-### 5.2 Log Transformations
+## features.LogTransforms
 
-#### Formula
+Signed log transformation applied to right-skewed distributions.
+
+**Formula:**
+
 ```python
 log_value = sign(x) * log(1 + |x|)
 ```
 
-#### Features Transformed
-| Original Column | Log Column | Range (log units) |
-|-----------------|------------|-------------------|
-| `total_revenue` | `log_total_revenue` | 0.0 - 12.14 |
-| `total_monthly_impressions` | `log_total_monthly_impressions` | 0.0 - 14.76 |
-| `nearest_site_distance_mi` | `log_nearest_site_distance_mi` | 0.0 - 3.92 |
-| `min_distance_to_interstate_mi` | `log_min_distance_to_interstate_mi` | 0.0 - 7.27 |
+### Attributes
 
-#### Reasoning
+- **log_total_revenue** (*float*) – Range: 0.0–12.14. Source: `total_revenue`
+- **log_total_monthly_impressions** (*float*) – Range: 0.0–14.76. Source: `total_monthly_impressions`
+- **log_nearest_site_distance_mi** (*float*) – Range: 0.0–3.92. Source: `nearest_site_distance_mi`
+- **log_min_distance_to_interstate_mi** (*float*) – Range: 0.0–7.27. Source: `min_distance_to_interstate_mi`
 
-1. **Right-skewed distributions**: Revenue and impressions follow power-law distributions with long right tails.
+### Reasoning
 
-2. **Variance stabilization**: Log transform makes variance more uniform across the range.
+1. **Right-skewed distributions** – Revenue and impressions follow power-law distributions with long right tails.
+2. **Variance stabilization** – Log transform makes variance more uniform across the range.
+3. **Outlier reduction** – Extreme values (very high-revenue sites) have less impact on gradients.
+4. **Interpretability** – Coefficients represent multiplicative effects.
 
-3. **Outlier reduction**: Extreme values (very high-revenue sites) have less impact on gradients.
-
-4. **Interpretability**: Coefficients represent multiplicative effects (e.g., "2x distance → Y% revenue change").
-
-#### Assumptions
-
-- **Non-negativity**: All transformed values are ≥ 0 (distances, revenue)
-- **Zero handling**: `log(1 + x)` ensures `log(0) = 0`, not undefined
+> **Note**
+> Zero handling: `log(1 + x)` ensures `log(0) = 0`, not undefined. All transformed values are ≥ 0.
 
 ---
 
-### 5.3 One-Hot Encoding of Boolean Flags
+## features.BooleanEncoding
 
-#### Input Format
-Source data stores booleans as strings: `"Yes"`, `"No"`, `"Unknown"`
+One-hot encoding of string boolean flags to numeric 0/1 values.
 
-#### Encoding Logic
+**Encoding Logic:**
+
 ```python
 "Yes"     → 1
 "No"      → 0
@@ -543,49 +512,38 @@ Source data stores booleans as strings: `"Yes"`, `"No"`, `"Unknown"`
 NULL      → 0
 ```
 
-#### Output Columns
-| Category | Count | Examples |
-|----------|-------|----------|
-| Capability (`c_*`) | 9 | `c_emv_enabled_encoded`, `c_nfc_enabled_encoded` |
-| Restriction (`r_*`) | 29 | `r_lottery_encoded`, `r_government_political_encoded` |
-| Sales | 2 | `schedule_site_encoded`, `sellable_site_encoded` |
-| **Total** | **40** | |
+### Attributes
 
-#### Reasoning
+- **Capability flags (c_\*)** (*int*, 9 columns) – `c_emv_enabled_encoded`, `c_nfc_enabled_encoded`, etc.
+- **Restriction flags (r_\*)** (*int*, 29 columns) – `r_lottery_encoded`, `r_government_political_encoded`, etc.
+- **Sales flags** (*int*, 2 columns) – `schedule_site_encoded`, `sellable_site_encoded`
 
-1. **Neural network compatibility**: NNs require numeric inputs; strings must be encoded.
+### Assumptions
 
-2. **Unknown → 0**: Conservative assumption that missing capability = no capability.
-
-3. **Separate from categoricals**: Boolean features get direct 0/1 encoding, not embedding.
-
-#### Assumptions
-
-- **Static flags**: Capabilities and restrictions are assumed constant over time (using most recent snapshot)
-- **Unknown handling**: "Unknown" treated same as "No" (may undercount some capabilities)
+- **Static flags** – Capabilities and restrictions are assumed constant over time (using most recent snapshot).
+- **Unknown → 0** – Conservative assumption that missing capability = no capability. Separate from categoricals: boolean features get direct 0/1 encoding, not embedding.
 
 ---
 
-### 5.4 Missing Value Handling
+## features.MissingValueHandling
 
 | Data Type | Strategy | Rationale |
 |-----------|----------|-----------|
-| **Numeric** | Fill with 0 | Neutral after standardization |
-| **Categorical** | Fill with `"__MISSING__"` | Creates explicit "unknown" category |
-| **Boolean** | Fill with 0 | Assumes missing = False |
-| **Target** | Fill with median | Preserves target distribution |
+| Numeric | Fill with 0 | Neutral after standardization |
+| Categorical | Fill with `"__MISSING__"` | Creates explicit "unknown" category |
+| Boolean | Fill with 0 | Assumes missing = False |
+| Target | Fill with median | Preserves target distribution |
 
-#### High-Missing Columns
-| Column | Missing % | Reason |
-|--------|-----------|--------|
-| `c_emv_enabled_encoded` | 91.7% | Legacy feature, not tracked historically |
-| `c_walk_up_enabled_encoded` | 98.1% | Rare capability, seldom recorded |
+### High-Missing Columns
+
+- **c_emv_enabled_encoded** – 91.7% missing. Legacy feature, not tracked historically.
+- **c_walk_up_enabled_encoded** – 98.1% missing. Rare capability, seldom recorded.
 
 ---
 
-### 5.5 Outlier Treatment
+## features.OutlierTreatment
 
-#### Method: Percentile Clipping (Winsorization)
+Percentile clipping (Winsorization) applied during `DataProcessor._process_numeric()`.
 
 ```python
 # Step 1: Clip to 1st-99th percentile
@@ -598,155 +556,134 @@ numeric_scaled = StandardScaler().fit_transform(numeric_array)
 numeric_scaled = np.clip(numeric_scaled, -10, 10)
 ```
 
-#### Reasoning
+### Reasoning
 
-1. **Preserves information**: Unlike removal, clipping keeps extreme cases in training.
-
-2. **Gradient stability**: Prevents extreme values from dominating loss gradients.
-
-3. **Conservative bounds**: ±10σ is generous; true outliers are ~0.01% of data.
+1. **Preserves information** – Unlike removal, clipping keeps extreme cases in training.
+2. **Gradient stability** – Prevents extreme values from dominating loss gradients.
+3. **Conservative bounds** – ±10σ is generous; true outliers are ~0.01% of data.
 
 ---
 
-## 6. Assumptions & Reasoning
+# Assumptions & Reasoning
 
-### 6.1 Data Aggregation Assumptions
+## Data Aggregation
 
-| Assumption | Reasoning | Risk |
-|------------|-----------|------|
-| **Most Recent Metadata** | Sites rarely change network/retailer | May miss recent transitions |
-| **Revenue Summing** | Monthly revenues are independent | May include test periods |
-| **Active Months = Row Count** | Proxy for site tenure | Doesn't capture partial months |
-| **GTVID Uniqueness** | IDs are stable over time | Some sites may have ID changes |
+- **Most Recent Metadata** – Sites rarely change network/retailer. Risk: may miss recent transitions.
+- **Revenue Summing** – Monthly revenues are independent. Risk: may include test periods.
+- **Active Months = Row Count** – Proxy for site tenure. Risk: doesn't capture partial months.
+- **GTVID Uniqueness** – IDs are stable over time. Risk: some sites may have ID changes.
 
-### 6.2 Feature Engineering Assumptions
+## Feature Engineering
 
-| Feature | Assumption | Risk |
-|---------|------------|------|
-| **Relative Strength** | 30/90 day windows capture trends | May miss longer cycles |
-| **Log Distances** | All sites have valid coordinates | 0.04% missing |
-| **Demographics** | Census block group ≈ site location | ~500m radius approximation |
-| **Capabilities** | Static over time | Sites may add EMV/NFC |
+- **Relative Strength** – 30/90 day windows capture trends. Risk: may miss longer cycles.
+- **Log Distances** – All sites have valid coordinates. Risk: 0.04% missing.
+- **Demographics** – Census block group ≈ site location. Risk: ~500m radius approximation.
+- **Capabilities** – Static over time. Risk: sites may add EMV/NFC.
 
-### 6.3 Model Training Assumptions
+## Model Training
 
-| Assumption | Implementation | Reasoning |
-|------------|----------------|-----------|
-| **Data Leakage Prevention** | Exclude target-derived features | `avg_monthly_revenue` target → exclude `total_revenue` |
-| **Sufficient History** | Filter to `active_months > 11` | Ensures >1 year of data |
-| **Active Sites Only** | Filter to `status == 'Active'` | Predict for operational sites |
-| **Class Balance** | `pos_weight=9.0` for lookalike | Compensates for 90/10 imbalance |
+- **Data Leakage Prevention** – Exclude target-derived features. `avg_monthly_revenue` target → exclude `total_revenue`.
+- **Sufficient History** – Filter to `active_months > 11` ensures >1 year of data.
+- **Active Sites Only** – Filter to `status == 'Active'`. Predict for operational sites.
+- **Class Balance** – `pos_weight=9.0` for lookalike. Compensates for ~90/10 imbalance.
 
-### 6.4 Why These Specific Features?
+### Feature Selection Rationale
 
-**Included:**
-- **Momentum (RS) features**: Capture trajectory, not just level
-- **Log distances**: Normalize skewed distributions
-- **Demographics**: Area-level proxies for customer base
-- **Capabilities**: Direct business relevance (payment types, products)
+*Included:*
 
-**Excluded (in Model B preset):**
-- **`retailer`**: High cardinality, may overfit to specific chains
-- **`pct_male`**: Collinear with `pct_female` (always sum to ~100%)
-- **`nearest_interstate`**: Categorical with 200+ values, may not generalize
+- **Momentum (RS) features** – Capture trajectory, not just level.
+- **Log distances** – Normalize skewed distributions.
+- **Demographics** – Area-level proxies for customer base.
+- **Capabilities** – Direct business relevance (payment types, products).
+
+*Excluded:*
+
+- **retailer** – High cardinality, may overfit to specific chains.
+- **pct_male** – Collinear with `pct_female` (always sum to ~100%).
+- **nearest_interstate** – Categorical with 200+ values, may not generalize.
 
 ---
 
-## 7. Data Quality & Limitations
+# Data Quality & Limitations
 
-### 7.1 Coverage Statistics
+## Coverage
 
-| Metric | Value |
-|--------|-------|
-| Sites with nearest_site_distance | 99.96% (57,651 / 57,675) |
-| Sites with interstate_distance | 99.96% |
-| Active sites in training | 45.3% (26,099 / 57,675) |
-| Months per site | 1-47 (median: 28) |
+- **Sites with nearest_site_distance** – 99.96% (57,651 / 57,675)
+- **Sites with interstate_distance** – 99.96%
+- **Active sites in training** – 45.3% (26,099 / 57,675)
+- **Months per site** – 1–47 (median: 28)
 
-### 7.2 Known Issues
+## Known Issues
 
-1. **Column Typo**: Source data has `statuis` instead of `status`
+1. **Column Typo** – Source data has `statuis` instead of `status`.
+2. **Boolean Strings** – Flags stored as `"Yes"` / `"No"` strings, not native booleans.
+3. **EMV/Walk-up Sparsity** – >90% missing values for these capabilities.
+4. **Deactivated Sites** – 40.5% of sites are "Temporarily Deactivated" and excluded from training.
 
-2. **Boolean Strings**: Flags stored as "Yes"/"No" strings, not native booleans
+## Temporal Limitations
 
-3. **EMV/Walk-up Sparsity**: >90% missing values for these capabilities
+1. **No Intra-Month Data** – Daily patterns not captured in monthly aggregates.
+2. **Seasonality** – Not explicitly modeled; 30/90 day RS may partially capture.
+3. **COVID Impact** – Data likely spans pre/during/post-COVID periods with different patterns.
 
-4. **Deactivated Sites**: 40.5% of sites are "Temporarily Deactivated" and excluded from training
+## Geographic Limitations
 
-### 7.3 Temporal Limitations
-
-1. **No Intra-Month Data**: Daily patterns not captured in monthly aggregates
-
-2. **Seasonality**: Not explicitly modeled; 30/90 day RS may partially capture
-
-3. **COVID Impact**: Data likely spans pre/during/post-COVID periods with different patterns
-
-### 7.4 Geographic Limitations
-
-1. **US Only**: All sites are in the United States
-
-2. **Census Data Vintage**: Demographics may lag current population
-
-3. **Highway Network Changes**: New interstates not reflected if shapefiles are outdated
+1. **US Only** – All sites are in the United States.
+2. **Census Data Vintage** – Demographics may lag current population.
+3. **Highway Network Changes** – New interstates not reflected if shapefiles are outdated.
 
 ---
 
-## 8. Quick Reference
+# Quick Reference
 
-### Key Files
+## Key Files
 
-| File | Purpose | Rows |
-|------|---------|------|
-| `Site Scores - ...Diagnostics.csv` | Primary source (monthly) | 1.47M |
-| `site_training_data.parquet` | ML-ready (Active only) | 26,099 |
-| `site_aggregated_precleaned.parquet` | Intermediate (all sites) | 57,675 |
-| `nearest_site_distances.csv` | Geospatial feature | 67,644 |
-| `site_interstate_distances.csv` | Highway distances | 70,300 |
+- **`Site Scores - ...Diagnostics.csv`** (*1.47M rows*) – Primary source (monthly)
+- **`site_training_data.parquet`** (*26,099 rows*) – ML-ready (Active only)
+- **`site_aggregated_precleaned.parquet`** (*57,675 rows*) – Intermediate (all sites)
+- **`nearest_site_distances.csv`** (*67,644 rows*) – Geospatial feature
+- **`site_interstate_distances.csv`** (*70,300 rows*) – Highway distances
 
-### Key Code Files
+## Key Code
 
-| File | Purpose |
-|------|---------|
-| `src/services/data_service.py` | Data loading API |
-| `site_scoring/data_transform.py` | ETL pipeline |
-| `site_scoring/data_loader.py` | PyTorch data preparation |
-| `site_scoring/config.py` | Feature definitions & model presets |
+- **`src/services/data_service.py`** – Data loading API
+- **`site_scoring/data_transform.py`** – ETL pipeline
+- **`site_scoring/data_loader.py`** – PyTorch data preparation
+- **`site_scoring/config.py`** – Feature definitions & model configuration
 
-### Feature Counts by Type
+## Feature Counts
 
-| Type | Count | Examples |
-|------|-------|----------|
-| Numeric | 12 | `rs_Revenue`, `avg_household_income` |
-| Categorical | 8 | `network`, `retailer`, `nearest_interstate` |
-| Boolean | 40 | `c_nfc_enabled_encoded`, `r_lottery_encoded` |
-| **Total** | **60** | |
+- **Numeric** (*int*, 12) – `rs_Revenue`, `avg_household_income`, etc.
+- **Categorical** (*int*, 8) – `network`, `retailer`, `nearest_interstate`, etc.
+- **Boolean** (*int*, 40) – `c_nfc_enabled_encoded`, `r_lottery_encoded`, etc.
+- **Total** – 60
 
-### Target Variable Options
+## Target Variables
 
-| Target | Task | Metric |
-|--------|------|--------|
-| `avg_monthly_revenue` | Regression | MAE, SMAPE, R² |
-| `total_revenue` | Regression | MAE, RMSE |
-| Top 10% (binary) | Classification (Lookalike) | AUC, Accuracy |
+- **avg_monthly_revenue** – Regression task. Metrics: MAE, SMAPE, R²
+- **total_revenue** – Regression task. Metrics: MAE, RMSE
+- **Top percentile (binary)** – Classification (Lookalike) task. Metrics: AUC, F1
 
 ---
 
-## Appendix: Data Provenance
+# Data Provenance
 
-### Internal Sources
-- **Site Scores CSV**: GSTV operations database (monthly snapshots)
-- **Salesforce Revenue**: Sales CRM system
+## Internal Sources
 
-### External Sources
-- **Census TIGER/Line**: US Census Bureau (highway shapefiles)
-- **Demographics**: US Census Bureau (block group data)
+- **Site Scores CSV** – GSTV operations database (monthly snapshots)
+- **Salesforce Revenue** – Sales CRM system
 
-### Computed Features
-- **Nearest Site Distance**: KDTree spatial search (haversine metric)
-- **Interstate Distance**: Point-to-polyline geodesic distance
-- **Relative Strength**: Rolling window calculations (30/90 days)
+## External Sources
+
+- **Census TIGER/Line** – US Census Bureau (highway shapefiles)
+- **Demographics** – US Census Bureau (block group data)
+
+## Computed Features
+
+- **Nearest Site Distance** – KDTree spatial search (haversine metric)
+- **Interstate Distance** – Point-to-polyline geodesic distance
+- **Relative Strength** – Rolling window calculations (30/90 days)
 
 ---
 
-*Document generated: 2026-01-28*
-*Data vintage: ~47 months of operational history*
+*Document generated: 2026-01-28 | Data vintage: ~47 months of operational history*

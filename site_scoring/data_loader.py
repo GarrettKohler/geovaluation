@@ -222,33 +222,61 @@ class DataProcessor:
         target_data = np.clip(target_data, p1, p99)
 
         if self.config.task_type == "lookalike":
-            # Classification: binarize sites within percentile bounds as "top performers"
-            lower_pct = getattr(self.config, 'lookalike_lower_percentile', 90)
-            upper_pct = getattr(self.config, 'lookalike_upper_percentile', 100)
+            threshold_mode = getattr(self.config, 'lookalike_threshold_mode', 'percentile')
 
-            # Calculate thresholds
-            lower_threshold = float(np.percentile(target_data, lower_pct))
-            upper_threshold = float(np.percentile(target_data, upper_pct)) if upper_pct < 100 else float('inf')
+            if threshold_mode == "stddev":
+                # Standard deviation mode: sites above mean + sigma * std
+                lower_sigma = getattr(self.config, 'lookalike_lower_sigma', 1.0)
+                upper_sigma = getattr(self.config, 'lookalike_upper_sigma', float('inf'))
 
-            self.top_performer_threshold = lower_threshold
-            self.top_performer_upper_threshold = upper_threshold
+                mean_val = float(np.mean(target_data))
+                std_val = float(np.std(target_data))
 
-            # Sites between lower and upper thresholds are labeled as top performers (1)
-            # Sites below lower threshold are labeled as non-performers (0)
-            if upper_pct >= 100:
-                # Include all sites at or above the lower threshold
-                binary_labels = (target_data >= lower_threshold).astype(np.float32)
+                lower_threshold = mean_val + lower_sigma * std_val
+                upper_threshold = (mean_val + upper_sigma * std_val) if np.isfinite(upper_sigma) else float('inf')
+
+                self.top_performer_threshold = lower_threshold
+                self.top_performer_upper_threshold = upper_threshold
+
+                if np.isfinite(upper_threshold):
+                    binary_labels = ((target_data >= lower_threshold) & (target_data <= upper_threshold)).astype(np.float32)
+                else:
+                    binary_labels = (target_data >= lower_threshold).astype(np.float32)
+
+                n_positive = int(binary_labels.sum())
+                pct_positive = n_positive / len(binary_labels) * 100
+                sigma_label = lambda s: f"mean + {s:.1f}\u03c3" if s >= 0 else f"mean \u2212 {abs(s):.1f}\u03c3"
+                upper_label = f"{upper_sigma:.1f}\u03c3" if np.isfinite(upper_sigma) else "\u221e\u03c3"
+                print(f"Classification: std dev mode [{lower_sigma:+.1f}\u03c3 - {upper_label}]")
+                print(f"  Mean: ${mean_val:,.0f}, Std: ${std_val:,.0f}")
+                print(f"  Lower threshold: ${lower_threshold:,.0f} ({sigma_label(lower_sigma)})")
+                if np.isfinite(upper_threshold):
+                    print(f"  Upper threshold: ${upper_threshold:,.0f} ({sigma_label(upper_sigma)})")
+                print(f"  Top performers: {n_positive}/{len(binary_labels)} sites ({pct_positive:.1f}%)")
             else:
-                # Include only sites within the percentile range
-                binary_labels = ((target_data >= lower_threshold) & (target_data <= upper_threshold)).astype(np.float32)
+                # Percentile mode (default): binarize sites within percentile bounds
+                lower_pct = getattr(self.config, 'lookalike_lower_percentile', 90)
+                upper_pct = getattr(self.config, 'lookalike_upper_percentile', 100)
 
-            n_positive = int(binary_labels.sum())
-            pct_positive = n_positive / len(binary_labels) * 100
-            print(f"Classification: revenue range p{lower_pct}-p{upper_pct}")
-            print(f"  Lower threshold: ${lower_threshold:,.0f} (p{lower_pct})")
-            if upper_pct < 100:
-                print(f"  Upper threshold: ${upper_threshold:,.0f} (p{upper_pct})")
-            print(f"  Top performers: {n_positive}/{len(binary_labels)} sites ({pct_positive:.1f}%)")
+                lower_threshold = float(np.percentile(target_data, lower_pct))
+                upper_threshold = float(np.percentile(target_data, upper_pct)) if upper_pct < 100 else float('inf')
+
+                self.top_performer_threshold = lower_threshold
+                self.top_performer_upper_threshold = upper_threshold
+
+                if upper_pct >= 100:
+                    binary_labels = (target_data >= lower_threshold).astype(np.float32)
+                else:
+                    binary_labels = ((target_data >= lower_threshold) & (target_data <= upper_threshold)).astype(np.float32)
+
+                n_positive = int(binary_labels.sum())
+                pct_positive = n_positive / len(binary_labels) * 100
+                print(f"Classification: revenue range p{lower_pct}-p{upper_pct}")
+                print(f"  Lower threshold: ${lower_threshold:,.0f} (p{lower_pct})")
+                if upper_pct < 100:
+                    print(f"  Upper threshold: ${upper_threshold:,.0f} (p{upper_pct})")
+                print(f"  Top performers: {n_positive}/{len(binary_labels)} sites ({pct_positive:.1f}%)")
+
             self.target_scaler = None  # No inverse transform for binary labels
             return torch.from_numpy(np.ascontiguousarray(binary_labels, dtype=np.float32))
         else:

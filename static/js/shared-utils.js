@@ -12,6 +12,7 @@ const featureDisplayNames = {
     'rs_NVIs': 'NVI Momentum',
     'rs_Revenue': 'Revenue Momentum',
     'avg_monthly_revenue': 'Avg Monthly Revenue',
+    'avg_daily_revenue': 'Avg Daily Revenue',
     'log_total_revenue': 'Log Total Revenue',
     'log_nearest_site_distance_mi': 'Nearest Site Distance',
     'log_min_distance_to_interstate_mi': 'Log Min Distance to Interstate (miles)',

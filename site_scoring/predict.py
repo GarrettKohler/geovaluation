@@ -328,7 +328,7 @@ class BatchPredictor:
         metadata_cols = [
             "gtvid", "state", "county", "zip", "dma", "dma_rank",
             "network", "status", "retailer", "latitude", "longitude",
-            "avg_monthly_revenue",
+            "avg_monthly_revenue", "avg_daily_revenue",
         ]
 
         if parquet_path.exists():
@@ -346,7 +346,7 @@ class BatchPredictor:
             return pl.DataFrame({"gtvid": []})
 
         fallback_cols = ["gtvid"]
-        for col in ["network", "status", "statuis", "avg_monthly_revenue"]:
+        for col in ["network", "status", "statuis", "avg_monthly_revenue", "avg_daily_revenue"]:
             if col in prediction_df.columns:
                 fallback_cols.append(col)
 

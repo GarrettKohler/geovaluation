@@ -73,6 +73,143 @@ def load_auxiliary_data(data_path: Path) -> tuple[pl.DataFrame, pl.DataFrame, pl
     return nearest, interstate_agg, kroger, mcdonalds, walmart, target
 
 
+def load_daily_transactions(data_path: Path) -> pl.DataFrame:
+    """Load daily transaction counts per site."""
+    print("Loading daily transactions data...")
+    df = pl.read_csv(
+        data_path / "site_transactions_daily.csv",
+        infer_schema_length=10000,
+    )
+    df = df.rename({
+        "ID - Gbase": "id_gbase",
+        "Date": "date",
+        "Daily Transactions": "daily_transactions",
+        "GTVID": "gtvid",
+    })
+    raw_count = len(df)
+    # Deduplicate: some sites have exact duplicate rows per day
+    df = df.group_by(["id_gbase", "date"]).agg(
+        pl.col("daily_transactions").first(),
+        pl.col("gtvid").first(),
+    )
+    deduped = raw_count - len(df)
+    date_min = df["date"].min()
+    date_max = df["date"].max()
+    print(f"  Loaded {raw_count:,} rows, deduped {deduped:,} → {len(df):,} rows, {df['id_gbase'].n_unique():,} sites, dates {date_min} to {date_max}")
+    return df
+
+
+def load_daily_status(data_path: Path) -> pl.DataFrame:
+    """Load daily status snapshots per site."""
+    print("Loading daily status data...")
+    df = pl.read_csv(
+        data_path / "site_status_daily.csv",
+        infer_schema_length=10000,
+    )
+    df = df.rename({
+        "Date": "date",
+        "Status": "status",
+        "GTVID": "gtvid",
+        "ID - Gbase": "id_gbase",
+    })
+    date_min = df["date"].min()
+    date_max = df["date"].max()
+    print(f"  Loaded {len(df):,} rows, {df['id_gbase'].n_unique():,} sites, dates {date_min} to {date_max}")
+    return df
+
+
+def load_active_days(data_path: Path) -> pl.DataFrame:
+    """Load active days per month per site for daily revenue calculation."""
+    print("Loading active days per month...")
+    df = pl.read_csv(data_path / "active_days_per_month.csv", infer_schema_length=10000)
+    df = df.rename({
+        "ID - Gbase": "id_gbase",
+        "Month": "date",
+        "Active Days": "active_days",
+    })
+    df = df.select(["id_gbase", "date", "active_days"])
+    # Deduplicate: source has per-GTVID rows alongside site-level rows for
+    # the same (id_gbase, date). Take max to get the site-level active days.
+    before = len(df)
+    df = df.group_by(["id_gbase", "date"]).agg(pl.col("active_days").max())
+    print(f"  Loaded {before:,} rows, deduped to {len(df):,}, {df['id_gbase'].n_unique():,} sites")
+    return df
+
+
+def build_monthly_site_activity(
+    input_path: Path = DEFAULT_INPUT_PATH,
+    output_path: Path = DEFAULT_OUTPUT_PATH,
+) -> pl.DataFrame:
+    """
+    Merge daily transactions and status data, then aggregate to monthly site activity.
+
+    Produces one row per site per month with:
+    - active_days: days with Status == "Active"
+    - transaction_days: days with Daily Transactions > 0
+    - total_days_in_data: total day-rows (coverage indicator)
+
+    Output: data/processed/site_monthly_activity.parquet
+    """
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Load both daily sources
+    txn = load_daily_transactions(input_path)
+    status = load_daily_status(input_path)
+
+    # Parse dates and derive year_month
+    txn = txn.with_columns(pl.col("date").str.to_date().alias("date_parsed"))
+    status = status.with_columns(pl.col("date").str.to_date().alias("date_parsed"))
+
+    # Rename gtvid to avoid collision on join
+    txn = txn.rename({"gtvid": "gtvid_txn"})
+    status = status.rename({"gtvid": "gtvid_status"})
+
+    # Full outer join on (id_gbase, date_parsed) — keeps all rows from both sources
+    merged = txn.join(
+        status,
+        on=["id_gbase", "date_parsed"],
+        how="full",
+        coalesce=True,
+    )
+
+    # Coalesce gtvid from txn side first, then status
+    merged = merged.with_columns(
+        pl.coalesce(["gtvid_txn", "gtvid_status"]).alias("gtvid"),
+        pl.col("date_parsed").dt.strftime("%Y-%m").alias("year_month"),
+    )
+
+    # Compute boolean flags (null status ≠ Active, null transactions ≠ >0)
+    merged = merged.with_columns(
+        (pl.col("status") == "Active").fill_null(False).alias("is_active"),
+        (pl.col("daily_transactions") > 0).fill_null(False).alias("has_transactions"),
+    )
+
+    print(f"  Merged: {len(merged):,} day-rows across {merged['id_gbase'].n_unique():,} sites")
+
+    # Group by (id_gbase, year_month) → monthly summary
+    monthly = (
+        merged
+        .group_by(["id_gbase", "year_month"])
+        .agg(
+            pl.col("gtvid").first().alias("gtvid"),
+            pl.col("is_active").sum().cast(pl.UInt16).alias("active_days"),
+            pl.col("has_transactions").sum().cast(pl.UInt16).alias("transaction_days"),
+            pl.len().cast(pl.UInt16).alias("total_days_in_data"),
+        )
+        .sort(["id_gbase", "year_month"])
+    )
+
+    print(f"  Monthly activity: {len(monthly):,} site-months")
+    print(f"  Columns: {monthly.columns}")
+
+    # Save
+    out_file = output_path / "site_monthly_activity.parquet"
+    monthly.write_parquet(out_file)
+    print(f"  Saved to: {out_file}")
+
+    return monthly
+
+
 def calculate_relative_strength(
     df: pl.DataFrame,
     metric_col: str,
@@ -262,13 +399,14 @@ def calculate_all_relative_strength_features(
     return result
 
 
-def aggregate_site_metrics(df: pl.DataFrame) -> pl.DataFrame:
+def aggregate_site_metrics(df: pl.DataFrame, active_days_df: pl.DataFrame = None) -> pl.DataFrame:
     """
     Aggregate monthly records to one row per site with:
     - Total revenue and auction metrics
     - Average per active month
     - Site metadata (most recent values)
     - rs_Impressions (relative strength indicator)
+    - avg_daily_revenue from actual active days (when active_days_df provided)
     """
     print("Aggregating site metrics...")
 
@@ -368,6 +506,32 @@ def aggregate_site_metrics(df: pl.DataFrame) -> pl.DataFrame:
         if col in df.columns:
             agg_exprs.append(pl.col(col).sum().alias(f'total_{col}'))
 
+    # Join active days for per-month daily revenue calculation
+    if active_days_df is not None:
+        df = df.join(
+            active_days_df,
+            on=['id_gbase', 'date'],
+            how='left'
+        )
+        # Per-month daily revenue: 0 when active_days is 0, null only when unmatched
+        df = df.with_columns(
+            pl.when(pl.col('active_days').is_null())
+            .then(None)
+            .when(pl.col('active_days') == 0)
+            .then(pl.lit(0.0))
+            .otherwise(pl.col('revenue') / pl.col('active_days'))
+            .alias('daily_revenue')
+        )
+    else:
+        df = df.with_columns(
+            pl.lit(None).cast(pl.Float64).alias('daily_revenue'),
+            pl.lit(None).cast(pl.Int64).alias('active_days'),
+        )
+
+    # Daily revenue aggregation (from active_days join)
+    agg_exprs.append(pl.col('daily_revenue').mean().alias('avg_daily_revenue'))
+    agg_exprs.append(pl.col('active_days').sum().alias('total_active_days'))
+
     # Aggregate by site
     df_sorted = df.sort(['id_gbase', 'date'])
     site_agg = df_sorted.group_by('id_gbase').agg(agg_exprs)
@@ -379,6 +543,14 @@ def aggregate_site_metrics(df: pl.DataFrame) -> pl.DataFrame:
             site_agg = site_agg.with_columns(
                 (pl.col(total_col) / pl.col('active_months')).alias(f'avg_monthly_{col}')
             )
+
+    # Fallback for sites without active_days data: use crude estimate
+    site_agg = site_agg.with_columns(
+        pl.when(pl.col('avg_daily_revenue').is_null())
+        .then(pl.col('total_revenue') / (pl.col('active_months') * 30))
+        .otherwise(pl.col('avg_daily_revenue'))
+        .alias('avg_daily_revenue')
+    )
 
     # Calculate and join all relative strength features (momentum indicators)
     # Multi-horizon RS: captures short, medium, and long-term momentum
@@ -491,6 +663,8 @@ def add_log_transformations(df: pl.DataFrame) -> pl.DataFrame:
         'total_revenue', 'total_monthly_impressions', 'total_monthly_nvis',
         'total_monthly_impressions_per_screen', 'total_monthly_nvis_per_screen',
         'total_monthly_revenue_per_screen',
+        # Daily averages
+        'avg_daily_revenue',
         # Geospatial distances (all use min_distance_to_X_mi naming convention)
         'min_distance_to_nearest_site_mi', 'min_distance_to_interstate_mi',
         'min_distance_to_kroger_mi', 'min_distance_to_mcdonalds_mi',
@@ -637,9 +811,13 @@ def prepare_training_dataset(
         df = df.filter(pl.col('status') == 'Active')
         print(f"  Filtered to Active sites: {len(df):,} (from {original_count:,})")
 
-    # Remove negative revenue records
+    # Remove negative revenue records (total AND daily)
+    # total_revenue < 0: lifetime chargebacks exceed earnings
+    # avg_daily_revenue < 0: extreme negative months amplified by few active days
     before_count = len(df)
-    df = df.filter(pl.col('total_revenue') >= 0)
+    df = df.filter(
+        (pl.col('total_revenue') >= 0) & (pl.col('avg_daily_revenue') >= 0)
+    )
     removed = before_count - len(df)
     print(f"  Removed {removed:,} negative revenue records: {len(df):,} remaining")
 
@@ -773,7 +951,7 @@ def generate_summary_report(site_df: pl.DataFrame, totals: dict) -> str:
     report.append("SAMPLE DATA (5 rows)")
     report.append("-" * 40)
     sample_cols = ['id_gbase', 'gtvid', 'status', 'active_months',
-                   'total_revenue', 'avg_monthly_revenue',
+                   'total_revenue', 'avg_monthly_revenue', 'avg_daily_revenue',
                    'total_monthly_impressions', 'avg_monthly_monthly_impressions']
     available_cols = [c for c in sample_cols if c in site_df.columns]
     report.append(str(site_df.select(available_cols).head(5)))
@@ -836,7 +1014,7 @@ def generate_training_report(df: pl.DataFrame) -> str:
     report.append("-" * 40)
     key_cols = ['id_gbase', 'gtvid', 'active_months',
                 'total_revenue', 'log_total_revenue',
-                'avg_monthly_revenue', 'log_avg_monthly_revenue']
+                'avg_monthly_revenue', 'avg_daily_revenue', 'log_avg_daily_revenue']
     available = [c for c in key_cols if c in df.columns]
     report.append(str(df.select(available).head(3)))
 
@@ -860,9 +1038,10 @@ def transform_data(
     # Load all data
     site_scores = load_site_scores(input_path)
     nearest, interstate, kroger, mcdonalds, walmart, target = load_auxiliary_data(input_path)
+    active_days = load_active_days(input_path)
 
     # Aggregate to one row per site
-    site_agg = aggregate_site_metrics(site_scores)
+    site_agg = aggregate_site_metrics(site_scores, active_days_df=active_days)
 
     # Join geospatial features
     site_final = join_geospatial_features(site_agg, nearest, interstate, kroger, mcdonalds, walmart, target)

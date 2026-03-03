@@ -1046,7 +1046,7 @@ MODEL CONFIGURATION
 ================================================================================
 Task Type:          ${taskDescription}
 Model Type:         ${modelTypeDisplay}
-Target Variable:    ${taskType === 'lookalike' ? 'Top Performer Classification' : taskType === 'clustering' ? 'Cluster Assignment' : 'Average Monthly Revenue'}
+Target Variable:    ${taskType === 'lookalike' ? 'Top Performer Classification' : taskType === 'clustering' ? 'Cluster Assignment' : ({'avg_monthly_revenue': 'Average Monthly Revenue', 'avg_daily_revenue': 'Average Daily Revenue', 'total_revenue': 'Total Revenue'}[config.target] || config.target || 'Average Monthly Revenue')}
 
 ${hyperparamsSection}
 ${featureSection}

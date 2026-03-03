@@ -292,18 +292,49 @@
 
                         <!-- Lookalike Percentile Config (shown when task=lookalike) -->
                         <div id="percentile-config" style="display: none;">
-                            <div class="param-row">
-                                <div class="param-group">
-                                    <label for="hp-lower-percentile">Lower Percentile</label>
-                                    <input type="number" id="hp-lower-percentile" value="90" min="1" max="99" step="1">
-                                </div>
-                                <div class="param-group">
-                                    <label for="hp-upper-percentile">Upper Percentile</label>
-                                    <input type="number" id="hp-upper-percentile" value="100" min="1" max="100" step="1">
-                                </div>
+                            <!-- Threshold Mode Toggle -->
+                            <div class="threshold-mode-toggle">
+                                <label class="threshold-mode-option">
+                                    <input type="radio" name="hp-threshold-mode" value="percentile" checked>
+                                    <span class="threshold-mode-label">Percentile</span>
+                                </label>
+                                <label class="threshold-mode-option">
+                                    <input type="radio" name="hp-threshold-mode" value="stddev">
+                                    <span class="threshold-mode-label">Std Dev (&sigma;)</span>
+                                </label>
                             </div>
-                            <div class="param-hint" id="percentile-hint-text">Top 10% of sites by revenue will be labeled as top performers</div>
-                            <div class="percentile-error" id="percentile-error-text"></div>
+
+                            <!-- Percentile Mode Inputs -->
+                            <div id="hp-percentile-mode-inputs">
+                                <div class="param-row">
+                                    <div class="param-group">
+                                        <label for="hp-lower-percentile">Lower Percentile</label>
+                                        <input type="number" id="hp-lower-percentile" value="90" min="1" max="99" step="1">
+                                    </div>
+                                    <div class="param-group">
+                                        <label for="hp-upper-percentile">Upper Percentile</label>
+                                        <input type="number" id="hp-upper-percentile" value="100" min="1" max="100" step="1">
+                                    </div>
+                                </div>
+                                <div class="param-hint" id="percentile-hint-text">Top 10% of sites by revenue will be labeled as top performers</div>
+                                <div class="percentile-error" id="percentile-error-text"></div>
+                            </div>
+
+                            <!-- Std Dev Mode Inputs -->
+                            <div id="hp-stddev-mode-inputs" style="display: none;">
+                                <div class="param-row">
+                                    <div class="param-group">
+                                        <label for="hp-lower-sigma">Lower &sigma;</label>
+                                        <input type="number" id="hp-lower-sigma" value="1.0" min="-3" max="4" step="0.1">
+                                    </div>
+                                    <div class="param-group">
+                                        <label for="hp-upper-sigma">Upper &sigma;</label>
+                                        <input type="number" id="hp-upper-sigma" placeholder="∞ (no limit)" min="-3" max="4" step="0.1">
+                                    </div>
+                                </div>
+                                <div class="param-hint" id="hp-stddev-hint">Sites above mean + 1.0&sigma; (~top 16%) labeled as top performers</div>
+                                <div class="percentile-error" id="hp-stddev-error"></div>
+                            </div>
                         </div>
 
                         <!-- Clustering Config (shown when task=clustering) -->

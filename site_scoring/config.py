@@ -33,8 +33,8 @@ class Config:
     network_filter: Optional[str] = None
 
     # Target variable - aggregated metrics
-    # Options: avg_monthly_revenue (recommended), total_revenue, total_monthly_impressions
-    target: str = "avg_monthly_revenue"
+    # Options: avg_daily_revenue (recommended), avg_monthly_revenue, total_revenue, total_monthly_impressions
+    target: str = "avg_daily_revenue"
 
     # Task type: "regression" (predict revenue) or "lookalike" (classify top performers)
     task_type: str = "regression"
@@ -44,6 +44,11 @@ class Config:
     # All other sites (below lower_percentile) are labeled as "non-performers" (0)
     lookalike_lower_percentile: int = 90  # Default: top 10% (90th percentile and above)
     lookalike_upper_percentile: int = 100  # Default: include all above lower bound
+
+    # Standard deviation threshold mode (alternative to percentile)
+    lookalike_threshold_mode: str = "percentile"  # "percentile" | "stddev"
+    lookalike_lower_sigma: float = 1.0  # Sites above mean + lower_sigma * std
+    lookalike_upper_sigma: float = float('inf')  # Upper bound (inf = no limit)
 
     # Clustering configuration (Deep Embedded Clustering)
     # Used to segment top performers identified by lookalike classifier
@@ -156,9 +161,11 @@ class Config:
         # Remove target and derived columns from features to prevent data leakage
         leakage_columns = {self.target}
         if self.target == "total_revenue":
-            leakage_columns.update(["log_total_revenue", "avg_monthly_revenue"])
+            leakage_columns.update(["log_total_revenue", "avg_monthly_revenue", "avg_daily_revenue", "log_avg_daily_revenue"])
         elif self.target == "avg_monthly_revenue":
-            leakage_columns.update(["total_revenue", "log_total_revenue"])
+            leakage_columns.update(["total_revenue", "log_total_revenue", "avg_daily_revenue", "log_avg_daily_revenue"])
+        elif self.target == "avg_daily_revenue":
+            leakage_columns.update(["total_revenue", "log_total_revenue", "avg_monthly_revenue", "log_avg_daily_revenue"])
 
         self.numeric_features = [f for f in self.numeric_features if f not in leakage_columns]
 

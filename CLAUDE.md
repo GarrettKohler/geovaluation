@@ -57,6 +57,16 @@ processor.save("processor.pkl")
 
 Source data has `statuis` (not `status`). The DataRegistry handles both, but be aware when writing raw queries.
 
+### Datasets
+
+| File | Rows | Columns | Description |
+|------|------|---------|-------------|
+| `site_scores_revenue_and_diagnostics.csv` | 1.4M | 94 | Primary source — one row per site-month with revenue, diagnostics, and metadata |
+| `site_transactions_daily.csv` | 1M | 4 | Daily transaction counts per site (`ID - Gbase`, `Date`, `Daily Transactions`, `GTVID`). Covers ~31.5K unique GTVIDs, date range 2022-01-01 to 2022-02-03 |
+| `site_status_daily.csv` | 1M | 4 | Daily status snapshots per site (`Date`, `Status`, `GTVID`, `ID - Gbase`). Covers ~53.4K unique GTVIDs, date range 2022-01-01 to 2022-01-19. Statuses: Active, Deactivated, Temporarily Deactivated, Awaiting Deactivation, Awaiting Installation, Cancelled, Contract Signed |
+| `site_aggregated_precleaned.parquet` | 57,675 | 106 | ETL output — one row per site, aggregated from primary source |
+| `site_training_data.parquet` | 26,099 | 106 | Active sites with 12+ months history, used for model training |
+
 ## Development
 
 ### Run App

@@ -1816,6 +1816,38 @@
             margin-top: 4px;
         }
 
+        /* Threshold mode toggle (percentile vs stddev) */
+        .threshold-mode-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .threshold-mode-option {
+            flex: 1;
+            cursor: pointer;
+            margin: 0;
+        }
+        .threshold-mode-option input[type="radio"] {
+            display: none;
+        }
+        .threshold-mode-label {
+            display: block;
+            text-align: center;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--kepler-text-label);
+            background: transparent;
+            transition: background 0.15s, color 0.15s;
+        }
+        .threshold-mode-option input[type="radio"]:checked + .threshold-mode-label {
+            background: rgba(31,186,214,0.15);
+            color: #1fbad6;
+        }
+
         /* Hyperparameter tooltip styles */
         .training-form-label {
             position: relative;
@@ -3777,7 +3809,6 @@
                 <div class="training-section-header">Model Configuration</div>
 
                 <!-- Hidden inputs for backward compatibility -->
-                <input type="hidden" id="target-variable" value="avg_monthly_revenue">
                 <input type="hidden" id="task-type" value="regression">
                 <input type="hidden" id="model-type" value="xgboost">
 
@@ -3790,6 +3821,15 @@
                         <option value="clustering" id="clustering-option" disabled>Cluster Top Performers</option>
                     </select>
                     <div class="training-form-hint" id="prediction-task-hint">Estimate monthly revenue for each site</div>
+                </div>
+
+                <div class="training-form-group" style="margin-top: 12px;">
+                    <label class="training-form-label" data-tooltip="Which revenue metric to predict. Monthly is the standard; daily divides by estimated active days.">Target Variable</label>
+                    <select class="training-form-select" id="target-variable">
+                        <option value="avg_daily_revenue" selected>Avg Daily Revenue (Recommended)</option>
+                        <option value="avg_monthly_revenue">Avg Monthly Revenue</option>
+                    </select>
+                    <div class="training-form-hint" id="target-variable-hint">Revenue averaged per active day (from actual active day counts)</div>
                 </div>
 
                 <div class="training-form-group" style="margin-top: 12px;">
@@ -3821,18 +3861,49 @@
 
                 <!-- Lookalike Percentile Bounds (visible only for lookalike task) -->
                 <div id="lookalike-percentile-config" style="display: none;">
-                    <div class="training-form-row">
-                        <div class="training-form-group">
-                            <label class="training-form-label" data-tooltip="Lower revenue percentile bound (inclusive). Sites at or above this percentile are considered 'top performers'. Must be between 1-99.">Lower Percentile</label>
-                            <input type="number" class="training-form-input" id="lookalike-lower-percentile" value="90" min="1" max="99" step="1">
-                        </div>
-                        <div class="training-form-group">
-                            <label class="training-form-label" data-tooltip="Upper revenue percentile bound (inclusive). Sites at or below this percentile are included. Use 100 to include all sites above the lower bound. Must be between 1-100 and greater than lower bound.">Upper Percentile</label>
-                            <input type="number" class="training-form-input" id="lookalike-upper-percentile" value="100" min="1" max="100" step="1">
-                        </div>
+                    <!-- Threshold Mode Toggle -->
+                    <div class="threshold-mode-toggle">
+                        <label class="threshold-mode-option">
+                            <input type="radio" name="threshold-mode" value="percentile" checked>
+                            <span class="threshold-mode-label">Percentile</span>
+                        </label>
+                        <label class="threshold-mode-option">
+                            <input type="radio" name="threshold-mode" value="stddev">
+                            <span class="threshold-mode-label">Std Dev (&sigma;)</span>
+                        </label>
                     </div>
-                    <div class="training-form-hint" id="percentile-hint">Top 10% of sites by revenue will be labeled as top performers</div>
-                    <div class="training-form-hint" id="percentile-error" style="color: #e74c3c; display: none;"></div>
+
+                    <!-- Percentile Mode Inputs -->
+                    <div id="percentile-mode-inputs">
+                        <div class="training-form-row">
+                            <div class="training-form-group">
+                                <label class="training-form-label" data-tooltip="Lower revenue percentile bound (inclusive). Sites at or above this percentile are considered 'top performers'. Must be between 1-99.">Lower Percentile</label>
+                                <input type="number" class="training-form-input" id="lookalike-lower-percentile" value="90" min="1" max="99" step="1">
+                            </div>
+                            <div class="training-form-group">
+                                <label class="training-form-label" data-tooltip="Upper revenue percentile bound (inclusive). Sites at or below this percentile are included. Use 100 to include all sites above the lower bound. Must be between 1-100 and greater than lower bound.">Upper Percentile</label>
+                                <input type="number" class="training-form-input" id="lookalike-upper-percentile" value="100" min="1" max="100" step="1">
+                            </div>
+                        </div>
+                        <div class="training-form-hint" id="percentile-hint">Top 10% of sites by revenue will be labeled as top performers</div>
+                        <div class="training-form-hint" id="percentile-error" style="color: #e74c3c; display: none;"></div>
+                    </div>
+
+                    <!-- Std Dev Mode Inputs -->
+                    <div id="stddev-mode-inputs" style="display: none;">
+                        <div class="training-form-row">
+                            <div class="training-form-group">
+                                <label class="training-form-label" data-tooltip="Lower sigma bound. Sites with revenue above mean + (sigma × std) are labeled as top performers. Range: -3 to 4. Negative values select below the mean.">Lower &sigma;</label>
+                                <input type="number" class="training-form-input" id="lookalike-lower-sigma" value="1.0" min="-3" max="4" step="0.1">
+                            </div>
+                            <div class="training-form-group">
+                                <label class="training-form-label" data-tooltip="Upper sigma bound. Leave empty for no upper limit (include all sites above lower bound). Range: -3 to 4 or empty.">Upper &sigma;</label>
+                                <input type="number" class="training-form-input" id="lookalike-upper-sigma" placeholder="∞ (no limit)" min="-3" max="4" step="0.1">
+                            </div>
+                        </div>
+                        <div class="training-form-hint" id="stddev-hint">Sites above mean + 1.0&sigma; (~top 16%) labeled as top performers</div>
+                        <div class="training-form-hint" id="stddev-error" style="color: #e74c3c; display: none;"></div>
+                    </div>
                 </div>
 
                 <!-- Clustering Configuration (visible only for clustering task) -->
@@ -7068,6 +7139,21 @@
                 upperPercentileInput.addEventListener('change', updatePercentileHint);
             }
 
+            // Threshold mode toggle (percentile vs stddev)
+            document.querySelectorAll('input[name="threshold-mode"]').forEach(radio => {
+                radio.addEventListener('change', handleThresholdModeChange);
+            });
+            const lowerSigmaInput = document.getElementById('lookalike-lower-sigma');
+            const upperSigmaInput = document.getElementById('lookalike-upper-sigma');
+            if (lowerSigmaInput) {
+                lowerSigmaInput.addEventListener('input', updateStdDevHint);
+                lowerSigmaInput.addEventListener('change', updateStdDevHint);
+            }
+            if (upperSigmaInput) {
+                upperSigmaInput.addEventListener('input', updateStdDevHint);
+                upperSigmaInput.addEventListener('change', updateStdDevHint);
+            }
+
             // Feature selection is now fixed to 'none' (use all features)
 
             // === NEW UI IMPROVEMENTS ===
@@ -7152,6 +7238,19 @@
             }
             if (modelAlgorithmSelect) {
                 modelAlgorithmSelect.addEventListener('change', syncTrainingDropdowns);
+            }
+
+            // Target variable hint update
+            const targetVariableSelect = document.getElementById('target-variable');
+            const targetVariableHint = document.getElementById('target-variable-hint');
+            if (targetVariableSelect && targetVariableHint) {
+                targetVariableSelect.addEventListener('change', function() {
+                    const hints = {
+                        'avg_monthly_revenue': 'Revenue averaged per active month',
+                        'avg_daily_revenue': 'Revenue averaged per active day (from actual active day counts)',
+                    };
+                    targetVariableHint.textContent = hints[this.value] || '';
+                });
             }
 
             // Cluster threshold slider
@@ -7446,6 +7545,62 @@
             }
         }
 
+        function handleThresholdModeChange() {
+            const mode = document.querySelector('input[name="threshold-mode"]:checked')?.value || 'percentile';
+            const percentileDiv = document.getElementById('percentile-mode-inputs');
+            const stddevDiv = document.getElementById('stddev-mode-inputs');
+            if (percentileDiv) percentileDiv.style.display = mode === 'percentile' ? 'block' : 'none';
+            if (stddevDiv) stddevDiv.style.display = mode === 'stddev' ? 'block' : 'none';
+        }
+
+        function updateStdDevHint() {
+            const lowerInput = document.getElementById('lookalike-lower-sigma');
+            const upperInput = document.getElementById('lookalike-upper-sigma');
+            const hintEl = document.getElementById('stddev-hint');
+            const errorEl = document.getElementById('stddev-error');
+            if (!lowerInput || !hintEl || !errorEl) return;
+
+            const lower = parseFloat(lowerInput.value);
+            const upper = upperInput.value !== '' ? parseFloat(upperInput.value) : Infinity;
+
+            // Approximate % of sites above mean + Nσ (normal distribution)
+            const sigmaApprox = {0: '~50%', 0.5: '~31%', 1.0: '~16%', 1.5: '~7%', 2.0: '~2.3%', 2.5: '~0.6%', 3.0: '~0.1%'};
+
+            let error = '';
+            if (isNaN(lower) || lower < -3 || lower > 4) {
+                error = 'Lower σ must be between -3 and 4';
+            } else if (isFinite(upper) && (upper < -3 || upper > 4)) {
+                error = 'Upper σ must be between -3 and 4, or empty for no limit';
+            } else if (isFinite(upper) && upper <= lower) {
+                error = 'Upper σ must be greater than lower σ';
+            }
+
+            if (error) {
+                errorEl.textContent = error;
+                errorEl.style.display = 'block';
+                hintEl.style.display = 'none';
+            } else {
+                errorEl.style.display = 'none';
+                hintEl.style.display = 'block';
+                // Compute % of sites above this sigma using normal CDF
+                const pctAbove = `~${Math.round(100 * (1 - 0.5 * (1 + erf(lower / Math.sqrt(2)))))}%`;
+                const sigmaLabel = (val) => val >= 0 ? `mean + ${val.toFixed(1)}σ` : `mean − ${Math.abs(val).toFixed(1)}σ`;
+                if (!isFinite(upper)) {
+                    hintEl.textContent = `Sites above ${sigmaLabel(lower)} (${pctAbove}) labeled as top performers`;
+                } else {
+                    hintEl.textContent = `Sites between ${sigmaLabel(lower)} and ${sigmaLabel(upper)} labeled as top performers`;
+                }
+            }
+        }
+
+        // Simple erf approximation for stddev hint
+        function erf(x) {
+            const t = 1 / (1 + 0.3275911 * Math.abs(x));
+            const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+            const result = 1 - poly * Math.exp(-x * x);
+            return x >= 0 ? result : -result;
+        }
+
         function handleFeatureSelectionMethodChange() {
             const method = document.getElementById('feature-selection-method').value;
             const hintEl = document.getElementById('fs-method-hint');
@@ -7606,6 +7761,7 @@
             'rs_NVIs': 'NVI Momentum',
             'rs_Revenue': 'Revenue Momentum',
             'avg_monthly_revenue': 'Avg Monthly Revenue',
+            'avg_daily_revenue': 'Avg Daily Revenue',
             'log_total_revenue': 'Log Total Revenue',
             'log_nearest_site_distance_mi': 'Nearest Site Distance',
             'log_min_distance_to_interstate_mi': 'Log Min Distance to Interstate (miles)',
@@ -7834,6 +7990,7 @@
                 // Target and task info
                 const targetDisplay = {
                     'avg_monthly_revenue': 'Avg Monthly Revenue',
+                    'avg_daily_revenue': 'Avg Daily Revenue',
                     'total_revenue': 'Total Revenue',
                     'total_monthly_impressions': 'Total Impressions',
                 };
@@ -7928,6 +8085,12 @@
             const lowerPercentile = parseInt(document.getElementById('lookalike-lower-percentile')?.value || '90', 10);
             const upperPercentile = parseInt(document.getElementById('lookalike-upper-percentile')?.value || '100', 10);
 
+            // Lookalike threshold mode (percentile vs stddev)
+            const thresholdMode = document.querySelector('input[name="threshold-mode"]:checked')?.value || 'percentile';
+            const lowerSigma = parseFloat(document.getElementById('lookalike-lower-sigma')?.value || '1.0');
+            const upperSigmaVal = document.getElementById('lookalike-upper-sigma')?.value;
+            const upperSigma = (upperSigmaVal !== '' && upperSigmaVal != null) ? parseFloat(upperSigmaVal) : Infinity;
+
             // Clustering parameters
             const nClusters = parseInt(document.getElementById('n-clusters')?.value || '5', 10);
             const clusterThreshold = parseFloat(document.getElementById('cluster-threshold')?.value || '0.5');
@@ -7935,7 +8098,7 @@
             return {
                 task_type: taskType,
                 model_type: document.getElementById('model-type').value,
-                target: taskType === 'lookalike' ? 'avg_monthly_revenue' : document.getElementById('target-variable').value,
+                target: taskType === 'lookalike' ? 'avg_daily_revenue' : document.getElementById('target-variable').value,
                 device: document.getElementById('training-device').value,
                 apple_chip: chipSelection,
                 model_preset: document.getElementById('model-preset').value,
@@ -7954,9 +8117,12 @@
                 stg_sigma: parseFloat(document.getElementById('stg-sigma')?.value || '0.5'),
                 run_shap_validation: runShapValidation,
                 track_gradients: trackGradients,
-                // Lookalike classifier percentile bounds
+                // Lookalike classifier thresholding
                 lookalike_lower_percentile: lowerPercentile,
                 lookalike_upper_percentile: upperPercentile,
+                lookalike_threshold_mode: thresholdMode,
+                lookalike_lower_sigma: lowerSigma,
+                lookalike_upper_sigma: upperSigma,
                 // Clustering parameters
                 n_clusters: nClusters,
                 cluster_probability_threshold: clusterThreshold,
@@ -7968,6 +8134,25 @@
         function validatePercentileBounds() {
             const taskType = document.getElementById('task-type').value;
             if (taskType !== 'lookalike') {
+                return { valid: true };
+            }
+
+            const mode = document.querySelector('input[name="threshold-mode"]:checked')?.value || 'percentile';
+
+            if (mode === 'stddev') {
+                const lower = parseFloat(document.getElementById('lookalike-lower-sigma')?.value || '1.0');
+                const upperVal = document.getElementById('lookalike-upper-sigma')?.value;
+                const upper = (upperVal !== '' && upperVal != null) ? parseFloat(upperVal) : Infinity;
+
+                if (isNaN(lower) || lower < -3 || lower > 4) {
+                    return { valid: false, error: 'Lower σ must be between -3 and 4' };
+                }
+                if (isFinite(upper) && (upper < -3 || upper > 4)) {
+                    return { valid: false, error: 'Upper σ must be between -3 and 4, or empty for no limit' };
+                }
+                if (isFinite(upper) && upper <= lower) {
+                    return { valid: false, error: 'Upper σ must be greater than lower σ' };
+                }
                 return { valid: true };
             }
 

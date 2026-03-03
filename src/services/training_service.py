@@ -68,7 +68,7 @@ class TrainingConfig:
     task_type: str = "regression"
 
     # Target variable
-    target: str = "avg_monthly_revenue"  # avg_monthly_revenue (recommended), total_revenue
+    target: str = "avg_daily_revenue"  # avg_daily_revenue (recommended), avg_monthly_revenue, total_revenue
 
     # Training hyperparameters
     epochs: int = 50
@@ -116,6 +116,11 @@ class TrainingConfig:
     # Lookalike classifier percentile bounds
     lookalike_lower_percentile: int = 90  # Lower bound (inclusive), 1-99
     lookalike_upper_percentile: int = 100  # Upper bound (inclusive), 1-100
+
+    # Standard deviation threshold mode (alternative to percentile)
+    lookalike_threshold_mode: str = "percentile"  # "percentile" | "stddev"
+    lookalike_lower_sigma: float = 1.0  # Sites above mean + lower_sigma * std
+    lookalike_upper_sigma: float = float('inf')  # Upper bound (inf = no limit)
 
     # Clustering configuration (for clustering task type)
     n_clusters: int = 5  # Number of clusters to discover
@@ -741,7 +746,7 @@ def _export_classification_results(job, processor, test_predictions, test_target
         training_sites_path = experiment_dir / "training_sites.csv"
         with open(training_sites_path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["gtvid", "avg_monthly_revenue", "actual_label"])
+            writer.writerow(["gtvid", job.config.target, "actual_label"])
             for gtvid, revenue in zip(processor.source_gtvids, processor.source_revenues):
                 label = 1 if (threshold is not None and revenue >= threshold) else 0
                 writer.writerow([gtvid, revenue, label])
@@ -786,7 +791,7 @@ def _export_classification_results(job, processor, test_predictions, test_target
             scores = predictor.predict(non_active_df)
 
             threshold = getattr(processor, 'top_performer_threshold', None)
-            target_col = job.config.target if hasattr(job.config, 'target') else 'avg_monthly_revenue'
+            target_col = job.config.target if hasattr(job.config, 'target') else 'avg_daily_revenue'
 
             # Build rows sorted by predicted_probability descending
             gtvids_list = non_active_df['gtvid'].to_list()
@@ -1245,6 +1250,9 @@ def run_training_logic(job: TrainingJob, report_callback):
     # Lookalike classifier percentile bounds
     pytorch_config.lookalike_lower_percentile = config.lookalike_lower_percentile
     pytorch_config.lookalike_upper_percentile = config.lookalike_upper_percentile
+    pytorch_config.lookalike_threshold_mode = config.lookalike_threshold_mode
+    pytorch_config.lookalike_lower_sigma = config.lookalike_lower_sigma
+    pytorch_config.lookalike_upper_sigma = config.lookalike_upper_sigma
 
     # Network subset filter
     pytorch_config.network_filter = config.network_filter
@@ -1280,7 +1288,7 @@ def run_training_logic(job: TrainingJob, report_callback):
             'categorical': pytorch_config.categorical_features,
             'boolean': pytorch_config.boolean_features,
         }
-        json.dump(cfg_dict, f, indent=2)
+        json.dump(_sanitize_for_json(cfg_dict), f, indent=2)
 
     # Load data
     train_loader, val_loader, test_loader, processor = create_data_loaders(pytorch_config)
@@ -1813,15 +1821,20 @@ def start_training(config_dict: Dict) -> Tuple[bool, str]:
         config = TrainingConfig(
             model_type=config_dict.get("model_type", "neural_network"),
             task_type=config_dict.get("task_type", "regression"),
-            target=config_dict.get("target", "avg_monthly_revenue"),
+            target=config_dict.get("target", "avg_daily_revenue"),
             epochs=int(config_dict.get("epochs", 50)),
-            # ... map other fields ...
             batch_size=int(config_dict.get("batch_size", 4096)),
             learning_rate=float(config_dict.get("learning_rate", 1e-4)),
             device=config_dict.get("device", "mps"),
             model_preset=config_dict.get("model_preset", "model_b"),
             selected_features=config_dict.get("selected_features"),
             network_filter=config_dict.get("network_filter"),
+            # Lookalike thresholding (BUG FIX: percentile values were missing, always used defaults)
+            lookalike_lower_percentile=int(config_dict.get("lookalike_lower_percentile", 90)),
+            lookalike_upper_percentile=int(config_dict.get("lookalike_upper_percentile", 100)),
+            lookalike_threshold_mode=config_dict.get("lookalike_threshold_mode", "percentile"),
+            lookalike_lower_sigma=float(config_dict.get("lookalike_lower_sigma", 1.0)),
+            lookalike_upper_sigma=float(config_dict.get("lookalike_upper_sigma") or float('inf')),
             # Clustering parameters
             n_clusters=int(config_dict.get("n_clusters", 5)),
             cluster_probability_threshold=float(config_dict.get("cluster_probability_threshold", 0.5)),
