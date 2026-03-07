@@ -287,3 +287,4 @@ pytest tests/ -v --ignore=tests/slow
 | Leaflet.js | Interactive map (via CDN) |
 | Chart.js | Training visualizations (via CDN) |
 # git-demo-GK-MADS
+# git-demo-GK-MADS
