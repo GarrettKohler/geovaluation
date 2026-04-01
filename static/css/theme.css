@@ -1,101 +1,102 @@
 /* ============================================
-   GSTV Design System — Kepler.gl Dark Theme
+   GSTV Design System — Anthropic Light Theme
+   Inspired by anthropic.com/economic-index
    Shared across all pages (home, map, etc.)
    ============================================ */
 
-/* Fonts: DM Sans (headings/body) + JetBrains Mono (metrics/values) */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fonts: Inter (headings/body) + JetBrains Mono (metrics/values) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-    /* Kepler.gl Core Colors */
-    --kepler-active: #1FBAD6;
-    --kepler-active-hover: #108188;
-    --kepler-primary-btn: #0F9668;
-    --kepler-primary-btn-hover: #13B17B;
-    --kepler-error: #F9042C;
-    --kepler-warning: #FFC043;
-    --kepler-success: #47B275;
-    --kepler-info: #276EF1;
+    /* Core Accent Colors */
+    --kepler-active: #1a7457;
+    --kepler-active-hover: #135c44;
+    --kepler-primary-btn: #1a7457;
+    --kepler-primary-btn-hover: #228b63;
+    --kepler-error: #d9363e;
+    --kepler-warning: #c48a1a;
+    --kepler-success: #1a7457;
+    --kepler-info: #2563eb;
 
-    /* Kepler.gl Background Colors */
-    --kepler-bg-base: #242730;
-    --kepler-bg-panel: #29323C;
-    --kepler-bg-content: #292E36;
-    --kepler-bg-hover: #3A4552;
-    --kepler-bg-input: #29323C;
-    --kepler-bg-input-hover: #3A414C;
+    /* Background Colors */
+    --kepler-bg-base: #faf9f5;
+    --kepler-bg-panel: #ffffff;
+    --kepler-bg-content: #f5f3ee;
+    --kepler-bg-hover: #eceae3;
+    --kepler-bg-input: #ffffff;
+    --kepler-bg-input-hover: #f5f3ee;
 
-    /* Kepler.gl Text Colors */
-    --kepler-text: #A0A7B4;
-    --kepler-text-highlight: #F0F0F0;
-    --kepler-text-title: #FFFFFF;
-    --kepler-text-label: #6A7485;
-    --kepler-text-subtext: #6A7485;
+    /* Text Colors */
+    --kepler-text: #4a4a48;
+    --kepler-text-highlight: #191918;
+    --kepler-text-title: #191918;
+    --kepler-text-label: #8b8985;
+    --kepler-text-subtext: #8b8985;
 
-    /* Kepler.gl Border Colors */
-    --kepler-border: #3A414C;
-    --kepler-border-light: #3A414C;
+    /* Border Colors */
+    --kepler-border: #e8e5de;
+    --kepler-border-light: #e8e5de;
 
-    /* Kepler.gl Button Colors */
-    --kepler-btn-secondary: #6A7485;
-    --kepler-btn-secondary-hover: #A0A7B4;
-    --kepler-btn-floating: #29323C;
-    --kepler-btn-floating-hover: #3A4552;
+    /* Button Colors */
+    --kepler-btn-secondary: #8b8985;
+    --kepler-btn-secondary-hover: #4a4a48;
+    --kepler-btn-floating: #ffffff;
+    --kepler-btn-floating-hover: #f5f3ee;
 
-    /* Kepler.gl Slider/Switch */
-    --kepler-slider-bar: #6A7485;
-    --kepler-slider-handle: #D3D8E0;
+    /* Slider/Switch */
+    --kepler-slider-bar: #c4c1ba;
+    --kepler-slider-handle: #1a7457;
 
     /* Shadows */
-    --kepler-shadow-1: 0 2px 4px rgba(0,0,0,0.3);
-    --kepler-shadow-2: 0 4px 8px rgba(0,0,0,0.4);
-    --kepler-shadow-dropdown: 0 8px 16px rgba(0,0,0,0.5);
+    --kepler-shadow-1: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --kepler-shadow-2: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+    --kepler-shadow-dropdown: 0 8px 24px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
 
     /* Motion */
     --kepler-transition: 200ms ease;
 
     /* Shape */
-    --kepler-radius-sm: 2px;
-    --kepler-radius-md: 4px;
-    --kepler-radius-lg: 8px;
+    --kepler-radius-sm: 4px;
+    --kepler-radius-md: 8px;
+    --kepler-radius-lg: 12px;
 
     /* Legacy mappings for backward compatibility */
-    --primary: #1FBAD6;
-    --primary-dark: #108188;
-    --primary-light: #3DD0E7;
-    --secondary: #FFC043;
-    --secondary-coral: #F9042C;
-    --accent-yellow: #FFC043;
-    --accent-blue: #276EF1;
-    --background: #242730;
-    --card-bg: #29323C;
-    --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    --card-shadow-hover: 0 4px 8px rgba(0,0,0,0.4);
-    --border-light: #3A414C;
-    --border-medium: #3A414C;
-    --text-primary: #F0F0F0;
-    --text-secondary: #A0A7B4;
-    --text-muted: #6A7485;
-    --success: #47B275;
-    --error: #F9042C;
-    --warning: #FFC043;
-    --gstv-green: #1FBAD6;
-    --gstv-green-dark: #108188;
-    --gstv-blue: #276EF1;
-    --gstv-blue-dark: #1E5BC6;
-    --gstv-teal: #1FBAD6;
-    --gstv-black: #242730;
-    --gstv-dark: #29323C;
-    --gstv-darker: #242730;
-    --gstv-gray: #3A414C;
-    --gstv-gray-light: #3A4552;
-    --gstv-text: #F0F0F0;
-    --gstv-text-muted: #6A7485;
-    --gstv-error: #F9042C;
+    --primary: #1a7457;
+    --primary-dark: #135c44;
+    --primary-light: #439e80;
+    --secondary: #c48a1a;
+    --secondary-coral: #d9363e;
+    --accent-yellow: #c48a1a;
+    --accent-blue: #2563eb;
+    --background: #faf9f5;
+    --card-bg: #ffffff;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.06);
+    --border-light: #e8e5de;
+    --border-medium: #e8e5de;
+    --text-primary: #191918;
+    --text-secondary: #4a4a48;
+    --text-muted: #8b8985;
+    --success: #1a7457;
+    --error: #d9363e;
+    --warning: #c48a1a;
+    --gstv-green: #1a7457;
+    --gstv-green-dark: #135c44;
+    --gstv-blue: #2563eb;
+    --gstv-blue-dark: #1d4ed8;
+    --gstv-teal: #1a7457;
+    --gstv-black: #191918;
+    --gstv-dark: #ffffff;
+    --gstv-darker: #faf9f5;
+    --gstv-gray: #e8e5de;
+    --gstv-gray-light: #eceae3;
+    --gstv-text: #191918;
+    --gstv-text-muted: #8b8985;
+    --gstv-error: #d9363e;
 
     /* Font families */
-    --font-heading: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
 }
 
@@ -152,28 +153,28 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-primary:hover {
     background: var(--kepler-primary-btn-hover);
-    box-shadow: 0 0 20px rgba(15, 150, 104, 0.3);
+    box-shadow: 0 2px 12px rgba(26, 116, 87, 0.25);
 }
 
 .btn-secondary {
-    background: var(--kepler-bg-hover);
+    background: var(--kepler-bg-content);
     color: var(--kepler-text);
     border: 1px solid var(--kepler-border);
 }
 
 .btn-secondary:hover {
-    background: var(--kepler-bg-input-hover);
+    background: var(--kepler-bg-hover);
     color: var(--kepler-text-highlight);
 }
 
 .btn-danger {
-    background: rgba(249, 4, 44, 0.15);
+    background: rgba(217, 54, 62, 0.08);
     color: var(--kepler-error);
-    border: 1px solid rgba(249, 4, 44, 0.3);
+    border: 1px solid rgba(217, 54, 62, 0.2);
 }
 
 .btn-danger:hover {
-    background: rgba(249, 4, 44, 0.25);
+    background: rgba(217, 54, 62, 0.14);
 }
 
 .btn:disabled {
@@ -224,7 +225,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--kepler-bg-hover);
+    background: #c4c1ba;
 }
 
 /* ============================================

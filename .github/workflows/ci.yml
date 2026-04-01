@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    # Informational only — pre-existing issues exist.
+    # Remove continue-on-error once codebase lint is clean.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: check
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: format --check
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --tb=short \
+            --ignore=tests/slow \
+            -k "unit or Unit or export or catalog" \
+            --no-header
+        # Runs: test_training_service_unit, test_data_service_unit,
+        #        test_classification_exports, test_training_details_unit,
+        #        test_experiment_catalog
+        # Skips: tests requiring real CSV data files (test_data_loading,
+        #         test_revenue_consistency, test_frontend_data, etc.)

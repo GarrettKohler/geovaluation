@@ -167,8 +167,8 @@
 
 .selection-card.selected {
     border-color: var(--kepler-active);
-    background: rgba(31, 186, 214, 0.08);
-    box-shadow: 0 0 16px rgba(31, 186, 214, 0.15);
+    background: rgba(26, 116, 87, 0.06);
+    box-shadow: 0 0 16px rgba(26, 116, 87, 0.1);
 }
 
 .selection-card.disabled {
@@ -248,7 +248,7 @@
 .config-select:focus {
     outline: none;
     border-color: var(--kepler-active);
-    box-shadow: 0 0 0 2px rgba(31, 186, 214, 0.15);
+    box-shadow: 0 0 0 2px rgba(26, 116, 87, 0.12);
 }
 
 .config-select option {
@@ -579,8 +579,8 @@
     transition: background 0.15s, color 0.15s;
 }
 .threshold-mode-option input[type="radio"]:checked + .threshold-mode-label {
-    background: rgba(31,186,214,0.15);
-    color: #1fbad6;
+    background: rgba(26, 116, 87, 0.1);
+    color: #1a7457;
 }
 
 /* Clustering config */
@@ -621,7 +621,7 @@
 
 .btn-train:hover {
     background: var(--kepler-primary-btn-hover);
-    box-shadow: 0 0 24px rgba(15, 150, 104, 0.3);
+    box-shadow: 0 2px 12px rgba(26, 116, 87, 0.25);
     transform: translateY(-1px);
 }
 
@@ -728,7 +728,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(31, 186, 214, 0.1);
+    background: rgba(26, 116, 87, 0.08);
     border-radius: 50%;
     color: var(--kepler-active);
 }
@@ -798,17 +798,17 @@
 
 .modal-progress-status.running {
     color: var(--kepler-active);
-    background: rgba(31, 186, 214, 0.12);
+    background: rgba(26, 116, 87, 0.08);
 }
 
 .modal-progress-status.completed {
     color: var(--kepler-success);
-    background: rgba(71, 178, 117, 0.12);
+    background: rgba(26, 116, 87, 0.08);
 }
 
 .modal-progress-status.error {
     color: var(--kepler-error);
-    background: rgba(249, 4, 44, 0.12);
+    background: rgba(217, 54, 62, 0.08);
 }
 
 .modal-epoch {
@@ -827,7 +827,7 @@
 
 .modal-progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--kepler-active), var(--kepler-primary-btn));
+    background: linear-gradient(90deg, var(--kepler-active), #439e80);
     border-radius: 3px;
     width: 0%;
     transition: width 0.5s ease;
@@ -1053,37 +1053,37 @@
 }
 
 .exp-badge-nn {
-    background: rgba(39, 110, 241, 0.15);
-    color: #5B9CF6;
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb;
 }
 
 .exp-badge-xgb {
-    background: rgba(15, 150, 104, 0.15);
-    color: #3BB078;
+    background: rgba(26, 116, 87, 0.08);
+    color: #1a7457;
 }
 
 .exp-badge-cluster {
-    background: rgba(255, 192, 67, 0.15);
-    color: #E8A930;
+    background: rgba(196, 138, 26, 0.1);
+    color: #c48a1a;
 }
 
 .exp-badge-regression {
-    background: rgba(160, 167, 180, 0.1);
+    background: rgba(75, 74, 72, 0.06);
     color: var(--kepler-text);
 }
 
 .exp-badge-lookalike {
-    background: rgba(31, 186, 214, 0.1);
+    background: rgba(26, 116, 87, 0.06);
     color: var(--kepler-active);
 }
 
 .exp-badge-clustering {
-    background: rgba(255, 192, 67, 0.1);
+    background: rgba(196, 138, 26, 0.06);
     color: var(--kepler-warning);
 }
 
 .exp-badge-artifact {
-    background: rgba(160, 167, 180, 0.08);
+    background: rgba(75, 74, 72, 0.05);
     color: var(--kepler-text-label);
 }
 

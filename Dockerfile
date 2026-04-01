@@ -37,6 +37,9 @@ ENV FLASK_ENV=production
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
 # Default: start gunicorn directly (no blob download needed if data is mounted)
 # Override with startup.sh to download from Azure Blob Storage:
 #   CMD ["./startup.sh"]

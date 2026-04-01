@@ -298,6 +298,9 @@ class BatchPredictor:
         ])
 
         # For classification: add actual labels and category
+        # "TRAINING" = positive-class sites (label=1, above threshold)
+        # "ACTIVE"   = negative-class training sites (label=0, below threshold)
+        # "NON_ACTIVE" = sites not in the training set
         if training_labels is not None:
             training_gtvids = set(training_labels.keys())
             result = result.with_columns([
@@ -305,7 +308,9 @@ class BatchPredictor:
                     lambda g: training_labels.get(g), return_dtype=pl.Int32
                 ).alias("actual_label"),
                 pl.col("gtvid").map_elements(
-                    lambda g: "TRAINING" if g in training_gtvids else "NON_ACTIVE",
+                    lambda g: ("TRAINING" if training_labels.get(g) == 1
+                               else "ACTIVE" if g in training_gtvids
+                               else "NON_ACTIVE"),
                     return_dtype=pl.Utf8
                 ).alias("category"),
             ])

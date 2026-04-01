@@ -663,6 +663,16 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         except Exception as e:
             print(f"Warning: Classification export failed: {e}")
 
+    # Phase 2: Revenue prediction (lookalike tasks only)
+    revenue_metrics = {}
+    if config.task_type == "lookalike":
+        revenue_metrics = _run_revenue_prediction_phase(
+            job=job,
+            pytorch_config=pytorch_config,
+            report_callback=report_callback,
+            start_time=start_time,
+        )
+
     # Step 8: Report completion
     job.final_metrics = {
         "test_loss": float(test_loss),
@@ -678,6 +688,8 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         "val_mae": 0.0,
         "shap_available": shap_success,
         "experiment_dir": str(job.output_dir.name),
+        # Revenue prediction metrics (Phase 2, lookalike only)
+        **revenue_metrics,
     }
 
     print(f"\n{'='*60}")
@@ -707,6 +719,208 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
         val_f1=float(test_f1), val_logloss=float(test_logloss),
         final_metrics=job.final_metrics,
     ))
+
+
+def _run_revenue_prediction_phase(job, pytorch_config, report_callback, start_time):
+    """
+    Phase 2: After lookalike classification, train a quick XGBoost regression model
+    to predict revenue for ALL sites, then export combined predictions.
+
+    Creates a regression/ subdirectory inside the experiment folder with its own
+    config.json, preprocessor.pkl, and model_wrapper.pkl so that BatchPredictor
+    can be reused for inference.
+
+    Note: pickle is used here intentionally to match the existing model serialization
+    pattern used throughout the codebase (preprocessor.pkl, model_wrapper.pkl).
+
+    Returns:
+        dict with regression metrics (reg_r2, reg_mae, reg_rmse) or empty dict on failure.
+    """
+    import pickle  # noqa: S403 — matches existing codebase pattern for model serialization
+    import csv
+    from site_scoring.predict import BatchPredictor
+    from site_scoring.data_transform import get_all_sites_for_prediction
+    import polars as pl
+
+    experiment_dir = job.output_dir
+    config = job.config
+
+    def _report(msg):
+        report_callback(TrainingProgress(
+            job_id=job.job_id, epoch=0, total_epochs=0,
+            train_loss=0, val_loss=0, val_mae=0, val_smape=0, val_rmse=0, val_r2=0,
+            learning_rate=0, elapsed_time=time.time() - start_time,
+            status="running", message=msg
+        ))
+
+    if not XGBOOST_AVAILABLE:
+        _report("Revenue prediction skipped: XGBoost not available")
+        return {}
+
+    _report("Phase 2: Training revenue prediction model...")
+
+    try:
+        # Create regression config (same features, regression task)
+        reg_config = Config()
+        reg_config.output_dir = experiment_dir
+        reg_config.target = config.target
+        reg_config.task_type = "regression"
+        reg_config.batch_size = pytorch_config.batch_size
+        reg_config.device = pytorch_config.device
+        reg_config.num_workers = pytorch_config.num_workers
+        reg_config.pin_memory = pytorch_config.pin_memory
+        reg_config.prefetch_factor = pytorch_config.prefetch_factor
+        reg_config.network_filter = getattr(pytorch_config, "network_filter", None)
+        reg_config.numeric_features = pytorch_config.numeric_features
+        reg_config.categorical_features = pytorch_config.categorical_features
+        reg_config.boolean_features = pytorch_config.boolean_features
+
+        # Load data with regression targets (continuous revenue, not binary)
+        _report("Loading data for regression model...")
+        reg_train_loader, reg_val_loader, reg_test_loader, reg_processor = create_data_loaders(reg_config)
+
+        # Convert to numpy for XGBoost
+        X_train, y_train, X_val, y_val, X_test, y_test, feature_names = _dataloaders_to_numpy(
+            reg_train_loader, reg_val_loader, reg_test_loader, reg_processor, reg_config
+        )
+
+        _report(f"Training XGBoost regressor on {X_train.shape[0]:,} sites...")
+
+        # Train XGBoost regression model (fast — typically <30 seconds)
+        model = create_model(
+            model_type="xgboost",
+            task_type="regression",
+            n_numeric=reg_processor.n_numeric_features,
+            n_boolean=reg_processor.n_boolean_features,
+            categorical_vocab_sizes=reg_processor.categorical_vocab_sizes,
+            feature_names=feature_names,
+            epochs=500,
+            learning_rate=0.03,
+            early_stopping_rounds=50,
+        )
+        model.fit(X_train, y_train, X_val=X_val, y_val=y_val, callbacks=[])
+
+        # Evaluate on test set
+        test_preds = model.predict(X_test)
+        errors = test_preds - y_test
+        ss_res = np.sum(errors**2)
+        ss_tot = np.sum((y_test - np.mean(y_test))**2)
+        reg_r2 = float(1 - (ss_res / ss_tot)) if ss_tot > 0 else 0.0
+        reg_mae = float(np.mean(np.abs(errors)))
+        reg_rmse = float(np.sqrt(np.mean(errors**2)))
+
+        _report(f"Revenue model: R²={reg_r2:.4f}, MAE=${reg_mae:,.0f}, RMSE=${reg_rmse:,.0f}")
+
+        # Save regression model artifacts in a subdirectory
+        reg_dir = experiment_dir / "regression"
+        reg_dir.mkdir(exist_ok=True)
+
+        # Save config.json for BatchPredictor compatibility
+        with open(reg_dir / "config.json", "w") as f:
+            json.dump({
+                "model_type": "xgboost",
+                "task_type": "regression",
+                "target": config.target,
+                "training_features": {
+                    "numeric": list(reg_config.numeric_features),
+                    "categorical": list(reg_config.categorical_features),
+                    "boolean": list(reg_config.boolean_features),
+                },
+            }, f, indent=2)
+
+        # Save preprocessor and model (pickle matches existing codebase pattern)
+        reg_processor.save(reg_dir / "preprocessor.pkl")
+        model.model.set_params(callbacks=None)
+        with open(reg_dir / "model_wrapper.pkl", "wb") as f:
+            pickle.dump(model, f)
+
+        # Score ALL sites with BOTH models
+        _report("Scoring all sites with classification + regression models...")
+        all_sites_df = get_all_sites_for_prediction()
+
+        # Classification probabilities
+        cls_predictor = BatchPredictor(experiment_dir)
+        cls_scores = cls_predictor.predict(all_sites_df)
+
+        # Revenue predictions via regression BatchPredictor
+        reg_predictor = BatchPredictor(reg_dir)
+        rev_scores = reg_predictor.predict(all_sites_df)
+
+        # Load site metadata for enrichment
+        metadata_df = BatchPredictor._load_site_metadata(all_sites_df)
+
+        # Build combined export
+        _report(f"Exporting combined predictions for {len(all_sites_df):,} sites...")
+        gtvids = all_sites_df["gtvid"].to_list()
+
+        # Build metadata lookup
+        meta_lookup = {}
+        if "gtvid" in metadata_df.columns:
+            for row in metadata_df.iter_rows(named=True):
+                meta_lookup[row["gtvid"]] = row
+
+        rows = []
+        for gtvid in gtvids:
+            cls_prob = cls_scores.get(gtvid, 0.0)
+            rev_pred = rev_scores.get(gtvid, 0.0)
+            meta = meta_lookup.get(gtvid, {})
+            rows.append({
+                "gtvid": gtvid,
+                "status": meta.get("status", ""),
+                "network": meta.get("network", ""),
+                "state": meta.get("state", ""),
+                "actual_revenue": meta.get("avg_monthly_revenue", ""),
+                "classification_probability": round(cls_prob, 6),
+                "predicted_revenue": round(rev_pred, 2),
+            })
+
+        # Sort by classification probability descending
+        rows.sort(key=lambda r: r["classification_probability"], reverse=True)
+
+        # Add ranks
+        for i, row in enumerate(rows, 1):
+            row["rank_by_probability"] = i
+        rev_sorted = sorted(range(len(rows)), key=lambda i: rows[i]["predicted_revenue"], reverse=True)
+        for rank, idx in enumerate(rev_sorted, 1):
+            rows[idx]["rank_by_revenue"] = rank
+
+        # Export CSV
+        output_path = experiment_dir / "all_sites_predictions.csv"
+        fieldnames = [
+            "gtvid", "status", "network", "state", "actual_revenue",
+            "classification_probability", "predicted_revenue",
+            "rank_by_probability", "rank_by_revenue",
+        ]
+        with open(output_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        _report(f"Exported {len(rows):,} site predictions → {output_path.name}")
+
+        reg_metrics = {
+            "revenue_r2": reg_r2,
+            "revenue_mae": reg_mae,
+            "revenue_rmse": reg_rmse,
+            "revenue_sites_scored": len(rows),
+            "has_revenue_predictions": True,
+        }
+
+        print(f"\n{'='*60}")
+        print(f"[PHASE 2] REVENUE PREDICTION METRICS")
+        print(f"  R²:   {reg_r2:.6f}")
+        print(f"  MAE:  ${reg_mae:,.2f}")
+        print(f"  RMSE: ${reg_rmse:,.2f}")
+        print(f"  Sites scored: {len(rows):,}")
+        print(f"{'='*60}\n")
+
+        return reg_metrics
+
+    except Exception as e:
+        print(f"Warning: Revenue prediction phase failed: {e}")
+        traceback.print_exc()
+        _report(f"Revenue prediction failed: {e}")
+        return {"has_revenue_predictions": False}
 
 
 def _export_classification_results(job, processor, test_predictions, test_targets, test_roc_auc, report_callback=None):
@@ -740,17 +954,22 @@ def _export_classification_results(job, processor, test_predictions, test_target
             ))
 
     # ── Export 1: Training Sites CSV ─────────────────────────────────────
+    # Only include the actual training split (not val/test) so that the
+    # export category column accurately reflects what the model saw.
     _report("Exporting classification results: training sites...")
     if processor.source_gtvids and processor.source_revenues:
         threshold = getattr(processor, 'top_performer_threshold', None)
+        train_indices = set(getattr(processor, 'train_indices', []))
         training_sites_path = experiment_dir / "training_sites.csv"
         with open(training_sites_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["gtvid", job.config.target, "actual_label"])
-            for gtvid, revenue in zip(processor.source_gtvids, processor.source_revenues):
-                label = 1 if (threshold is not None and revenue >= threshold) else 0
-                writer.writerow([gtvid, revenue, label])
-        print(f"  Exported {len(processor.source_gtvids)} training sites → {training_sites_path.name}")
+            for i, (gtvid, revenue) in enumerate(zip(processor.source_gtvids, processor.source_revenues)):
+                if not train_indices or i in train_indices:
+                    label = 1 if (threshold is not None and revenue >= threshold) else 0
+                    writer.writerow([gtvid, revenue, label])
+        n_written = len(train_indices) if train_indices else len(processor.source_gtvids)
+        print(f"  Exported {n_written} training sites → {training_sites_path.name}")
 
     # ── Export 2: Test Predictions CSV ───────────────────────────────────
     _report("Exporting classification results: test predictions...")
@@ -1704,6 +1923,16 @@ def run_training_logic(job: TrainingJob, report_callback):
             with open(job.output_dir / "shap_importance.json", "w") as f:
                 json.dump(shap_importance, f, indent=2)
 
+    # Phase 2: Revenue prediction (lookalike tasks only)
+    revenue_metrics = {}
+    if config.task_type == "lookalike":
+        revenue_metrics = _run_revenue_prediction_phase(
+            job=job,
+            pytorch_config=pytorch_config,
+            report_callback=report_callback,
+            start_time=start_time,
+        )
+
     job.final_metrics = {
         # Test set metrics (unbiased final evaluation)
         "test_loss": float(test_loss),
@@ -1721,6 +1950,8 @@ def run_training_logic(job: TrainingJob, report_callback):
         # Metadata
         "shap_available": shap_success,
         "experiment_dir": str(job.output_dir.name),
+        # Revenue prediction metrics (Phase 2, lookalike only)
+        **revenue_metrics,
     }
 
     # DEBUG: Print test vs validation metrics to verify they're different
@@ -1983,6 +2214,89 @@ def _parse_experiment_folder(exp_dir: Path) -> Optional[Dict]:
         "has_predictions": (exp_dir / "test_predictions.csv").exists(),
         "artifacts": artifacts,
     })
+
+
+def compute_site_counts(
+    threshold_mode: str = "percentile",
+    lower_percentile: int = 90,
+    upper_percentile: int = 100,
+    lower_sigma: float = 1.0,
+    upper_sigma: float = float('inf'),
+    network_filter: Optional[str] = None,
+    target: str = "avg_daily_revenue",
+) -> Dict:
+    """Compute how many training sites fall within a given percentile/sigma range.
+
+    Reads from site_training_data.parquet (same data the model trains on) and
+    applies the same thresholding logic as DataProcessor._process_target().
+
+    Returns:
+        Dict with total_sites, positive_count, positive_pct,
+        lower_threshold, upper_threshold (in dollar amounts),
+        mean, std (for sigma mode).
+    """
+    import polars as pl
+
+    data_path = Config().data_path
+    if not data_path.exists():
+        return {"error": f"Training data not found: {data_path}"}
+
+    df = pl.read_parquet(data_path)
+
+    # Apply network filter (same logic as DataProcessor)
+    if network_filter:
+        if network_filter == "Wayne/Dover":
+            df = df.filter(pl.col('network').is_in(['Wayne', 'Dover']))
+        else:
+            df = df.filter(pl.col('network') == network_filter)
+
+    total_sites = len(df)
+    if total_sites == 0:
+        return {"error": "No sites match the filter", "total_sites": 0}
+
+    # Get target values (same preprocessing as data_loader: clip to p1-p99)
+    target_data = df[target].fill_null(df[target].median()).fill_nan(df[target].median()).to_numpy().astype(np.float32)
+    p1, p99 = np.percentile(target_data, [1, 99])
+    target_data = np.clip(target_data, p1, p99)
+
+    if threshold_mode == "stddev":
+        mean_val = float(np.mean(target_data))
+        std_val = float(np.std(target_data))
+        lower_threshold = mean_val + lower_sigma * std_val
+        upper_threshold = (mean_val + upper_sigma * std_val) if np.isfinite(upper_sigma) else float('inf')
+
+        if np.isfinite(upper_threshold):
+            positive_mask = (target_data >= lower_threshold) & (target_data <= upper_threshold)
+        else:
+            positive_mask = target_data >= lower_threshold
+
+        return {
+            "total_sites": total_sites,
+            "positive_count": int(positive_mask.sum()),
+            "positive_pct": round(float(positive_mask.sum()) / total_sites * 100, 1),
+            "lower_threshold": round(float(lower_threshold), 2),
+            "upper_threshold": round(float(upper_threshold), 2) if np.isfinite(upper_threshold) else None,
+            "mean": round(mean_val, 2),
+            "std": round(std_val, 2),
+            "threshold_mode": "stddev",
+        }
+    else:
+        lower_threshold = float(np.percentile(target_data, lower_percentile))
+        upper_threshold = float(np.percentile(target_data, upper_percentile)) if upper_percentile < 100 else float('inf')
+
+        if upper_percentile >= 100:
+            positive_mask = target_data >= lower_threshold
+        else:
+            positive_mask = (target_data >= lower_threshold) & (target_data <= upper_threshold)
+
+        return {
+            "total_sites": total_sites,
+            "positive_count": int(positive_mask.sum()),
+            "positive_pct": round(float(positive_mask.sum()) / total_sites * 100, 1),
+            "lower_threshold": round(float(lower_threshold), 2),
+            "upper_threshold": round(float(upper_threshold), 2) if np.isfinite(upper_threshold) else None,
+            "threshold_mode": "percentile",
+        }
 
 
 def scan_experiment_folders() -> List[Dict]:

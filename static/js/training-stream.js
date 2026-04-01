@@ -265,12 +265,12 @@ function initializeTrainingCharts() {
             legend: {
                 display: true,
                 position: 'top',
-                labels: { color: '#A0A7B4', font: { size: 10 }, boxWidth: 12, padding: 8 }
+                labels: { color: '#4a4a48', font: { size: 10 }, boxWidth: 12, padding: 8 }
             }
         },
         scales: {
-            x: { display: true, grid: { color: 'rgba(58, 65, 76, 0.5)' }, ticks: { color: '#6A7485', font: { size: 9 } } },
-            y: { display: true, grid: { color: 'rgba(58, 65, 76, 0.5)' }, ticks: { color: '#6A7485', font: { size: 9 } } }
+            x: { display: true, grid: { color: 'rgba(200, 197, 190, 0.5)' }, ticks: { color: '#8b8985', font: { size: 9 } } },
+            y: { display: true, grid: { color: 'rgba(200, 197, 190, 0.5)' }, ticks: { color: '#8b8985', font: { size: 9 } } }
         }
     };
 
@@ -288,8 +288,8 @@ function initializeTrainingCharts() {
             data: {
                 labels: [],
                 datasets: [
-                    { label: 'Train Loss', data: [], borderColor: '#1FBAD6', backgroundColor: 'rgba(31, 186, 214, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.3 },
-                    { label: 'Val Loss', data: [], borderColor: '#F9042C', backgroundColor: 'rgba(249, 4, 44, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.3 }
+                    { label: 'Train Loss', data: [], borderColor: '#1a7457', backgroundColor: 'rgba(26, 116, 87, 0.08)', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                    { label: 'Val Loss', data: [], borderColor: '#d9363e', backgroundColor: 'rgba(217, 54, 62, 0.08)', borderWidth: 2, pointRadius: 0, tension: 0.3 }
                 ]
             },
             options: chartDefaults
@@ -306,8 +306,8 @@ function initializeTrainingCharts() {
                 datasets: [{
                     label: isLookalike ? 'ROC-AUC' : 'R\u00B2',
                     data: [],
-                    borderColor: '#47B275',
-                    backgroundColor: 'rgba(71, 178, 117, 0.1)',
+                    borderColor: '#1a7457',
+                    backgroundColor: 'rgba(26, 116, 87, 0.08)',
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.3,
@@ -318,7 +318,7 @@ function initializeTrainingCharts() {
                 ...chartDefaults,
                 scales: {
                     ...chartDefaults.scales,
-                    y: { ...chartDefaults.scales.y, min: 0, max: 1, ticks: { color: '#6A7485', font: { size: 9 }, callback: v => v.toFixed(1) } }
+                    y: { ...chartDefaults.scales.y, min: 0, max: 1, ticks: { color: '#8b8985', font: { size: 9 }, callback: v => v.toFixed(1) } }
                 }
             }
         });
@@ -333,8 +333,8 @@ function initializeTrainingCharts() {
                 responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { display: true, grid: { color: 'rgba(58, 65, 76, 0.5)' }, ticks: { color: '#6A7485', font: { size: 8 }, maxTicksLimit: 5 } },
-                    y: { display: true, grid: { color: 'rgba(58, 65, 76, 0.5)' }, ticks: { color: '#6A7485', font: { size: 8 } } }
+                    x: { display: true, grid: { color: 'rgba(200, 197, 190, 0.5)' }, ticks: { color: '#8b8985', font: { size: 8 }, maxTicksLimit: 5 } },
+                    y: { display: true, grid: { color: 'rgba(200, 197, 190, 0.5)' }, ticks: { color: '#8b8985', font: { size: 8 } } }
                 }
             };
 
@@ -342,7 +342,7 @@ function initializeTrainingCharts() {
             if (wCtx) {
                 weightHistogramChart = new Chart(wCtx, {
                     type: 'bar',
-                    data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(99, 102, 241, 0.6)', borderColor: 'rgba(99, 102, 241, 1)', borderWidth: 1 }] },
+                    data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(37, 99, 235, 0.4)', borderColor: 'rgba(37, 99, 235, 0.8)', borderWidth: 1 }] },
                     options: histDefaults
                 });
             }
@@ -351,7 +351,7 @@ function initializeTrainingCharts() {
             if (bCtx) {
                 biasHistogramChart = new Chart(bCtx, {
                     type: 'bar',
-                    data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(245, 158, 11, 0.6)', borderColor: 'rgba(245, 158, 11, 1)', borderWidth: 1 }] },
+                    data: { labels: [], datasets: [{ data: [], backgroundColor: 'rgba(196, 138, 26, 0.4)', borderColor: 'rgba(196, 138, 26, 0.8)', borderWidth: 1 }] },
                     options: histDefaults
                 });
             }
@@ -487,6 +487,28 @@ function showTrainingComplete(data) {
         const minutes = Math.floor(elapsed / 60);
         const seconds = Math.round(elapsed % 60);
         setMetricText('complete-metric-time', minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`);
+    }
+
+    // Revenue Prediction metrics (Phase 2, lookalike tasks only)
+    const revResults = document.getElementById('revenue-prediction-results');
+    if (revResults) {
+        if (metrics.has_revenue_predictions) {
+            revResults.style.display = '';
+            if (metrics.revenue_r2 !== undefined) {
+                setMetricText('complete-revenue-r2', metrics.revenue_r2.toFixed(4));
+            }
+            if (metrics.revenue_mae) {
+                setMetricText('complete-revenue-mae', '$' + Math.round(metrics.revenue_mae).toLocaleString());
+            }
+            if (metrics.revenue_rmse) {
+                setMetricText('complete-revenue-rmse', '$' + Math.round(metrics.revenue_rmse).toLocaleString());
+            }
+            if (metrics.revenue_sites_scored) {
+                setMetricText('complete-revenue-sites', metrics.revenue_sites_scored.toLocaleString());
+            }
+        } else {
+            revResults.style.display = 'none';
+        }
     }
 
     // Show and wire "View on Map" button

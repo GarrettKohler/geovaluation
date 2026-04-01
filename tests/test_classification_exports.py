@@ -157,16 +157,18 @@ class TestTrainingSitesCsv:
             # Header uses dynamic target column name (avg_monthly_revenue by default)
             assert set(reader.fieldnames) == {"gtvid", "avg_monthly_revenue", "actual_label"}
 
-    def test_training_sites_includes_all_active(self, run_export, mock_processor):
-        """All source gtvids are present in the export."""
+    def test_training_sites_only_includes_train_split(self, run_export, mock_processor):
+        """Only training split gtvids are exported (not val/test)."""
         path = run_export / "training_sites.csv"
 
         with open(path) as f:
             reader = csv.DictReader(f)
             exported_gtvids = {row["gtvid"] for row in reader}
 
-        expected_gtvids = set(mock_processor.source_gtvids)
+        # Only train_indices (0-13) should be in the export, not val (14-16) or test (17-19)
+        expected_gtvids = {mock_processor.source_gtvids[i] for i in mock_processor.train_indices}
         assert exported_gtvids == expected_gtvids
+        assert len(exported_gtvids) == 14  # 14 train sites, not 20 total
 
     def test_actual_labels_are_binary_training(self, run_export):
         """actual_label is 0 or 1 in training_sites.csv."""

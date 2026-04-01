@@ -1,0 +1,25 @@
+# Ruff linter + formatter config
+# Start minimal: catch real errors only, don't disrupt existing style.
+
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import ordering)
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E501"]  # Allow long lines in tests (assertions, fixtures)
+
+[format]
+quote-style = "double"
+
+exclude = [
+    "notebooks/",
+    "data/",
+    "site_scoring/outputs/",
+    ".git/",
+]

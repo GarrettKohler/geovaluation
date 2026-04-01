@@ -10,6 +10,7 @@ from src.services.training_service import (
     get_training_status,
     stream_training_progress,
     scan_experiment_folders,
+    compute_site_counts,
 )
 from site_scoring.config import get_all_model_presets, get_all_available_features, DEFAULT_OUTPUT_DIR
 
@@ -25,6 +26,50 @@ def api_get_system_info():
         JSON with PyTorch version, CUDA/MPS availability, recommended device.
     """
     return jsonify(get_system_info())
+
+
+@training_bp.route('/training/site-counts')
+def api_get_site_counts():
+    """Get site counts for a given percentile/sigma range.
+
+    Query Params:
+        mode: "percentile" or "stddev"
+        lower: Lower bound (percentile 1-99, or sigma -3 to 4)
+        upper: Upper bound (percentile 1-100, or sigma -3 to 4, or empty for no limit)
+        network: Optional network filter
+        target: Optional target column (default: avg_daily_revenue)
+
+    Returns:
+        JSON with total_sites, positive_count, positive_pct,
+        lower_threshold, upper_threshold (revenue $).
+    """
+    mode = request.args.get('mode', 'percentile')
+    network = request.args.get('network') or None
+    target = request.args.get('target', 'avg_daily_revenue')
+
+    if mode == 'stddev':
+        lower = float(request.args.get('lower', 1.0))
+        upper_val = request.args.get('upper', '')
+        upper = float(upper_val) if upper_val not in ('', 'Infinity', 'null') else float('inf')
+        result = compute_site_counts(
+            threshold_mode='stddev',
+            lower_sigma=lower,
+            upper_sigma=upper,
+            network_filter=network,
+            target=target,
+        )
+    else:
+        lower = int(request.args.get('lower', 90))
+        upper = int(request.args.get('upper', 100))
+        result = compute_site_counts(
+            threshold_mode='percentile',
+            lower_percentile=lower,
+            upper_percentile=upper,
+            network_filter=network,
+            target=target,
+        )
+
+    return jsonify(_clean_nan_values(result))
 
 
 @training_bp.route('/training/presets')

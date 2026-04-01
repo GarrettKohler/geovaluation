@@ -1,8 +1,24 @@
-"""Page routes — template-rendering endpoints."""
+"""Page routes — template-rendering endpoints and health probes."""
 
-from flask import Blueprint, render_template
+from flask import Blueprint, jsonify, render_template
 
 pages_bp = Blueprint('pages', __name__)
+
+
+@pages_bp.route('/health')
+def health():
+    """Liveness probe — confirms the process is alive and Flask can serve."""
+    return jsonify({"status": "ok"})
+
+
+@pages_bp.route('/ready')
+def ready():
+    """Readiness probe — checks if data caches are populated."""
+    from src.services import data_service
+    data_loaded = data_service._sites_df is not None
+    if not data_loaded:
+        return jsonify({"status": "not_ready", "data_loaded": False}), 503
+    return jsonify({"status": "ready", "data_loaded": True})
 
 
 @pages_bp.route('/')

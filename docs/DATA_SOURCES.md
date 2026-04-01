@@ -54,15 +54,25 @@ Raw Monthly Data (1.47M rows)
 ```
 data/
 ├── input/                              # Raw source data
-│   ├── Site Scores - Site Revenue...   # Primary operational data (927 MB)
-│   ├── Sites - Base Data Set.csv       # Static site metadata (17 MB)
-│   ├── Site Revenue - Salesforce.csv   # CRM revenue data (5.1 MB)
+│   ├── site_scores_revenue_and_diagnostics.csv  # Primary operational data (927 MB)
+│   ├── sites_base_data_set.csv         # Static site metadata (17 MB)
+│   ├── salesforce_site_revenue.csv     # CRM revenue data (5.1 MB)
 │   ├── nearest_site_distances.csv      # Pre-computed site proximity (6.5 MB)
-│   └── site_interstate_distances.csv   # Highway distances (3.8 MB)
+│   ├── site_interstate_distances.csv   # Highway distances (3.8 MB)
+│   ├── site_kroger_distances.csv       # Nearest Kroger distance (2.7 MB)
+│   ├── site_mcdonalds_distances.csv    # Nearest McDonald's distance (2.8 MB)
+│   ├── site_walmart_distances.csv      # Nearest Walmart distance (2.7 MB)
+│   ├── site_target_distances.csv       # Nearest Target distance (2.7 MB)
+│   ├── site_transactions_daily.csv     # Daily transaction counts (45 MB)
+│   ├── site_status_daily.csv           # Daily status snapshots (54 MB)
+│   └── active_days_per_month.csv       # Monthly active day counts (114 MB)
 │
 ├── processed/                          # ML-ready datasets
 │   ├── site_aggregated_precleaned.*    # All sites, aggregated (57,675 rows)
-│   └── site_training_data.*            # Active sites only (26,099 rows)
+│   ├── site_training_data.*            # Active sites only (26,099 rows)
+│   ├── site_monthly_activity.parquet   # Monthly activity merge (83,874 rows)
+│   ├── precleaned_summary.txt          # ETL summary report (all sites)
+│   └── training_data_summary.txt       # ETL summary report (training sites)
 │
 └── shapefiles/                         # Geographic boundaries
     └── US Interstate highway data (Census TIGER)
@@ -294,6 +304,50 @@ Highway-adjacent sites capture commuter and long-haul trucker traffic. Travel ce
 
 ---
 
+## data.input.RetailerDistances
+
+```
+data/input/site_kroger_distances.csv
+data/input/site_mcdonalds_distances.csv
+data/input/site_walmart_distances.csv
+data/input/site_target_distances.csv
+```
+
+Pre-computed minimum distance from each GSTV site to the nearest location of four major retailers: Kroger, McDonald's, Walmart, and Target. Proximity to high-traffic retail anchors serves as a proxy for commercial area density and foot traffic potential.
+
+**Properties:**
+
+- **rows** (*int*) – 57,675 per file (one per site)
+- **columns** (*int*) – 4 per file
+- **sizes** (*bytes*) – Kroger: 2.7 MB, McDonald's: 2.8 MB, Walmart: 2.7 MB, Target: 2.7 MB
+- **algorithm** (*str*) – KDTree spatial search (haversine metric), same as nearest site distances
+
+### Attributes (identical schema across all four files)
+
+- **GTVID** (*str*) – Site identifier
+- **Latitude** (*float*) – Site latitude
+- **Longitude** (*float*) – Site longitude
+- **min_distance_to_{retailer}_mi** (*float*) – Distance in miles to nearest retailer location (e.g., `min_distance_to_kroger_mi`)
+
+### Derived Features
+
+- **log_min_distance_to_kroger_mi** (*float*) – `sign(x) * log(1 + |x|)` of Kroger distance
+- **log_min_distance_to_mcdonalds_mi** (*float*) – `sign(x) * log(1 + |x|)` of McDonald's distance
+- **log_min_distance_to_walmart_mi** (*float*) – `sign(x) * log(1 + |x|)` of Walmart distance
+- **log_min_distance_to_target_mi** (*float*) – `sign(x) * log(1 + |x|)` of Target distance
+
+### Reasoning
+
+1. **Foot traffic proxy** – Sites near major retailers benefit from shared customer traffic.
+2. **Commercial density indicator** – Proximity to multiple retail brands signals a developed commercial corridor.
+3. **Revenue correlation** – Preliminary analysis showed significant correlation between retailer proximity and site revenue, especially for McDonald's (fast-food adjacency) and Walmart (high daily visitor count).
+4. **Complementary to interstate distance** – Interstate distance captures highway traffic; retailer distance captures local commercial activity.
+
+> **Note**
+> Source geodata files for each retailer (e.g., `mcdonalds_geodata.csv`, `walmart_geodata.csv`) are also present in `data/input/` and contain the full location listings used to compute these distances.
+
+---
+
 ## data.input.CensusTIGERShapefiles
 
 ```
@@ -428,6 +482,72 @@ for numeric, categorical, boolean, target in train_loader:
 ```
 
 See also: [`data.processed.SiteAggregatedPrecleaned`](#dataprocessedsiteaggregatedprecleaned)
+
+---
+
+## data.processed.SiteMonthlyActivity
+
+```
+data/processed/site_monthly_activity.parquet
+```
+
+Intermediate dataset that merges daily transaction counts (`site_transactions_daily.csv`) and daily status snapshots (`site_status_daily.csv`) into monthly aggregates per site. Each row represents one site's activity summary for one month.
+
+**Properties:**
+
+- **size** (*bytes*) – 987 KB (parquet)
+- **rows** (*int*) – 83,874 (site-month combinations)
+- **columns** (*int*) – 6
+
+### Attributes
+
+- **id_gbase** (*str*) – Internal unique site hash
+- **year_month** (*str*) – Month period (e.g., `"2022-01"`)
+- **gtvid** (*str*) – Public site ID
+- **active_days** (*int*) – Number of days the site had Active status in that month
+- **transaction_days** (*int*) – Number of days the site recorded at least one transaction
+- **total_days_in_data** (*int*) – Total days of data coverage for that month
+
+### Reasoning
+
+1. **Operational consistency** – Sites that are active and transacting every day of the month are more reliable revenue generators than sites with intermittent activity.
+2. **Data quality signal** – Low `transaction_days` relative to `active_days` may indicate reporting gaps or hardware issues.
+3. **Deduplication** – Daily status data can have duplicate rows; the aggregation step handles deduplication before counting.
+
+> **Note**
+> This file is generated by the ETL pipeline and joined into the aggregated dataset. It is not used directly for model training.
+
+---
+
+## data.processed.ETLSummaryReports
+
+```
+data/processed/precleaned_summary.txt
+data/processed/training_data_summary.txt
+```
+
+Human-readable text reports generated by the ETL pipeline after each run. They provide a quick overview of dataset dimensions, status distributions, column breakdowns, and key statistics without needing to load the full parquet files.
+
+**Properties:**
+
+- **precleaned_summary.txt** – Covers all 57,675 sites (site_aggregated_precleaned output)
+- **training_data_summary.txt** – Covers 26,099 Active training sites (site_training_data output)
+
+### Contents
+
+Both reports include:
+
+- Dataset dimensions (rows, columns)
+- Site status distribution with counts and percentages
+- Column breakdown by type (log-transformed, one-hot encoded, metric, average)
+- Generation timestamp
+
+### Reasoning
+
+These reports serve as a quick sanity check after running the ETL pipeline. If the site count, status distribution, or column count changes unexpectedly, the reports make it immediately visible without writing ad-hoc queries.
+
+> **Note**
+> Regenerated on every ETL run (`python3 -m site_scoring.data_transform`). Not versioned — always reflects the latest pipeline output.
 
 ---
 
