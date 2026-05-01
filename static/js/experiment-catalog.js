@@ -148,7 +148,6 @@ function renderExperimentGalleryCard(exp) {
                 <span>${totalFeatures} features</span>
                 ${networkInfo}
                 ${artifactBadges}
-                <span class="exp-card-action">View on Map &rarr;</span>
             </div>
         </div>
     `;

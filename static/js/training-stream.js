@@ -511,12 +511,4 @@ function showTrainingComplete(data) {
         }
     }
 
-    // Show and wire "View on Map" button
-    const mapBtn = document.getElementById('btn-view-on-map');
-    if (mapBtn && currentJobId) {
-        mapBtn.style.display = '';
-        mapBtn.onclick = () => {
-            window.location.href = `/map/${currentJobId}`;
-        };
-    }
 }

@@ -12,6 +12,11 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <!-- Chart.js for training visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        // Pre-selected experiment from URL (set by /map/<job_id> route).
+        // Consumed once by the patched loadExperimentCatalog to auto-score on the map.
+        window.preselectedJobId = {{ job_id|tojson }};
+    </script>
     <!-- Google Fonts - Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -10281,6 +10286,18 @@ END OF FILE
         loadExperimentCatalog = async function() {
             await _origLoadExperimentCatalog();
             populateScoringDropdowns();
+
+            // If arrived via /map/<job_id>, auto-select that experiment and score it once.
+            if (window.preselectedJobId && !window._preselectionConsumed) {
+                const sel = document.getElementById('scoring-experiment-select');
+                if (sel && [...sel.options].some(o => o.value === window.preselectedJobId)) {
+                    sel.value = window.preselectedJobId;
+                    window._preselectionConsumed = true;
+                    if (typeof scoreSites === 'function') {
+                        scoreSites(false);
+                    }
+                }
+            }
         };
 
         // Toggle scoring section expand/collapse
