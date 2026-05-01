@@ -25,9 +25,105 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "input"
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "data" / "processed"
 
+_GLOSSARY_STAGES = {
+    "collection": {
+        "title": "1. Data Collection",
+        "question": "Where does our data come from and how do we gather it?",
+        "intro": "Data collection is where everything begins. Our pipeline pulls structured data from <strong>multiple CSV sources</strong> to build a complete picture of every site in our network. Two primary sources come from Salesforce (site attributes and revenue), supplemented by geographic proximity data computed from 3rd-party retailer locations.",
+        "analogy": "Imagine evaluating 67,000 gas stations for advertising potential. Salesforce hands you two spreadsheets: one describing each station (does it sell beer? what's the local median income?) and one showing ad revenue. Separately, a geography team measures how far each station is from the nearest highway, Walmart, McDonald's, and Target. Together these paint the full picture.",
+        "why": "We keep collection simple and auditable \u2014 CSV files loaded via Polars (10\u201320x faster than pandas). Raw files are preserved in <code>data/input/</code> so any team member can open them in Excel. Proximity features are reproducible via scripts \u2014 if a retailer dataset updates, we rerun the distance calculations.",
+    },
+    "cleaning": {
+        "title": "2. Data Cleaning",
+        "question": "How do we fix errors, standardize formats, and prepare data for modeling?",
+        "intro": "Before any modeling can happen, raw data needs to be <strong>cleaned, standardized, and transformed</strong>. Our ETL pipeline in <code>data_transform.py</code> takes ~1.4 million monthly records and transforms them into a clean, ML-ready dataset of active sites.",
+        "analogy": "Imagine you received a massive stack of monthly reports from 67,000 gas stations. Some reports have typos, some leave fields blank, some use \"Yes\" where others use \"true.\" Before you can analyze anything, you need to: standardize every form, consolidate monthly reports into one summary per station, toss out stations that are no longer active, and convert everything to numbers a computer can process.",
+        "why": "The full cleaning pipeline runs via <code>python3 -m site_scoring.data_transform</code> and outputs two files: <strong>site_aggregated_precleaned.parquet</strong> (all sites) as a checkpoint, and <strong>site_training_data.parquet</strong> (active sites only) as the final ML-ready dataset. Both are saved as Parquet for fast loading and as CSV for manual inspection.",
+    },
+    "combining": {
+        "title": "3. Data Combining",
+        "question": "How do we join data from different sources into one dataset?",
+        "intro": "Data combining is where isolated sources become a <strong>single, unified dataset</strong>. Our pipeline merges temporal data (monthly records into site summaries), momentum features (relative strength trends), and spatial data (6 geographic proximity files) \u2014 all keyed on unique site identifiers. The result: one rich row per site with ~102 columns.",
+        "analogy": "Imagine you're building a profile for each of 57,675 gas stations. You start with a giant ledger of monthly reports (1.4M rows) and condense it into one summary card per station. Then you staple on distance measurements \u2014 how far is this station from the nearest highway? Walmart? McDonald's? Finally, you add trend arrows showing whether each station is doing better or worse recently. The result is one comprehensive card per station.",
+        "why": "The combining stage uses <strong>two different join keys</strong>: <code>id_gbase</code> for temporal aggregation (collapsing monthly \u2192 site-level) and <code>gtvid</code> for geospatial joins (attaching distance files). Both uniquely identify a site, but different source systems use different ID formats. All joins are left joins \u2014 preserving every site even when distance data is missing \u2014 to avoid silently dropping sites from the training set.",
+    },
+}
+
+_GLOSSARY_SOURCES = [
+    {
+        "id": "sites_base",
+        "icon": "\u26fd",
+        "name": "Sites \u2013 Base Data Set",
+        "desc": "Site attributes, capabilities, ad eligibility, demographics",
+        "source": "Salesforce",
+        "format": "CSV",
+        "rows": "67,650",
+        "cols": 43,
+        "color": "accent",
+        "fields": ["ID - Gbase", "Avg Daily Impressions", "Avg Household Income", "Median Age", "C - Sells Beer", "C - NFC Enabled", "C - Open 24 Hours", "R - Restaurants - QSR"],
+        "sample": [["5fa964f8...", "121", "$87,841", "36.8", "Yes", "Unknown", "No", "false"], ["5fa965a5...", "83", "$58,509", "32.1", "No", "Yes", "No", "false"]],
+        "notes": "Exported from Salesforce. Each row is a gas station/convenience store identified by Gbase ID. 43 columns: site capabilities (C- prefix: sells beer, diesel, NFC, EMV, 24hrs), ad category eligibility (R- prefix: lottery, automotive, restaurant, CPG ads), and local demographics (household income, median age). Also includes Average Daily Impressions \u2014 estimated foot traffic.",
+    },
+    {
+        "id": "site_revenue",
+        "icon": "\ud83d\udcb0",
+        "name": "Site Revenue",
+        "desc": "Revenue, program, network, DMA rank per site",
+        "source": "Salesforce",
+        "format": "CSV",
+        "rows": "67,604",
+        "cols": 7,
+        "color": "cyan",
+        "fields": ["ID - Gbase", "Sellable", "Schedulable", "Program", "Network", "Average Revenue", "Average DMA Rank"],
+        "sample": [["57745759...", "true", "true", "IOTV2", "Wayne", "$136.13", "8"], ["57745759...", "true", "true", "Dover - IOTV2", "Dover", "$531.55", "8"]],
+        "notes": "From Salesforce. Revenue per site-program combination. A single site can appear on multiple rows for different programs (IOTV2, Dover - IOTV2, etc.). Average Revenue is the target variable our model predicts. Sellable/Schedulable flags indicate whether the site is active for ad placement.",
+    },
+    {
+        "id": "geo_prox",
+        "icon": "\ud83d\udccd",
+        "name": "Geographic Proximity Files",
+        "desc": "Distances to interstates, nearest sites, and major retailers",
+        "source": "Computed from geodata",
+        "format": "5 CSVs",
+        "rows": "~68K each",
+        "cols": 8,
+        "color": "green",
+        "fields": ["GTVID", "Latitude", "Longitude", "nearest_site_distance_mi", "distance_to_interstate_mi"],
+        "sample": [["5fa964f8...", "33.4484", "-112.074", "0.82 mi", "1.34 mi"], ["5fa965a5...", "40.7128", "-74.006", "0.15 mi", "3.21 mi"]],
+        "notes": "Five CSV files: <strong>nearest_site_distances.csv</strong>, <strong>site_interstate_distances.csv</strong>, <strong>site_walmart_distances.csv</strong>, <strong>site_mcdonalds_distances.csv</strong>, <strong>site_target_distances.csv</strong>. Each measures distance from every site to the nearest instance of that feature. Computed via haversine formula from raw lat/lon coordinates.",
+    },
+    {
+        "id": "retailer_geo",
+        "icon": "\ud83c\udfea",
+        "name": "Retailer Location Data",
+        "desc": "McDonald\u2019s, Walmart, Target store locations (reference data)",
+        "source": "3rd-party geodata",
+        "format": "CSV",
+        "rows": "13.5K / 9.7K / 1.9K",
+        "cols": 27,
+        "color": "orange",
+        "fields": ["dba", "store_number", "address", "city", "state", "zip_code", "latitude", "longitude"],
+        "sample": [["McDonald's", "12345", "123 Main St", "Phoenix", "AZ", "85001", "33.448", "-112.074"], ["Walmart", "4521", "456 Oak Ave", "Houston", "TX", "77001", "29.760", "-95.370"]],
+        "notes": "Three CSVs: <strong>mcdonalds_geodata.csv</strong> (13,589), <strong>walmart_geodata.csv</strong> (9,784), <strong>target_geo_data.csv</strong> (1,982). Not used directly as model features \u2014 they\u2019re reference points for computing the proximity distances above. Proximity to high-traffic retailers is a strong signal for advertising revenue potential.",
+    },
+]
+
 
 def load_site_scores(data_path: Path) -> pl.DataFrame:
-    """Load the main Site Scores CSV file."""
+    """Load the main Site Scores CSV file.
+
+    @glossary: cleaning/null-handling
+    @title: Null Value Handling
+    @step: 0
+    @color: accent
+    @sub: Empty strings, "NA", "null", and "Unknown" treated as missing on load
+    @analogy: Before analyzing any data, we declare what "missing" looks like. The source
+        data uses four different representations of emptiness. Standardizing them upfront
+        prevents the model from treating the word "Unknown" as meaningful data.
+    @detail[Schema inference]: Schema inference uses the first 10,000 rows to determine
+        column types. This catches most type issues early, but edge cases (like a column
+        that is numeric for 10K rows then has a string) are handled by Polars strict typing.
+    """
     print("Loading Site Scores data...")
     df = pl.read_csv(
         data_path / "site_scores_revenue_and_diagnostics.csv",
@@ -340,6 +436,22 @@ def calculate_all_relative_strength_features(
 
     Returns:
         DataFrame with all RS features per site (id_gbase as key)
+
+    @glossary: combining/rs-features
+    @title: Relative Strength Feature Join
+    @step: 2
+    @color: pink
+    @sub: 12 momentum features computed from monthly time-series, joined back onto site rows
+    @analogy: Think of momentum indicators in stock trading \u2014 is this site trending up
+        or down? We compare recent performance (3 months) against longer windows (6, 12,
+        24 months) to capture short, medium, and long-term trends.
+    @why: RS > 1.0 means trending up (recent average beats historical). RS < 1.0 means
+        trending down. RS = 1.0 is neutral (or insufficient data). Sites need at least
+        2 months in each window to get a real RS value.
+    @detail[Three time horizons]: Short-term: 95/185 days (3/6 months). Medium-term:
+        185/370 days (6/12 months). Long-term: 370/740 days (12/24 months). Each horizon
+        produces 4 features (Impressions, NVIs, Revenue, RevenuePerScreen) = 12 RS
+        columns total.
     """
     # Default to single horizon for backward compatibility
     if horizons is None:
@@ -407,6 +519,33 @@ def aggregate_site_metrics(df: pl.DataFrame, active_days_df: pl.DataFrame = None
     - Site metadata (most recent values)
     - rs_Impressions (relative strength indicator)
     - avg_daily_revenue from actual active days (when active_days_df provided)
+
+    @glossary: cleaning/aggregation
+    @title: Monthly to Site-Level Aggregation
+    @step: 1
+    @color: cyan
+    @sub: 1.4M monthly records consolidated into one row per unique site
+    @analogy: You have 47 monthly report cards per station. This step staples them into
+        one summary card with totals, averages, and the most recent status.
+    @why: Different column types require different aggregation strategies: revenue metrics
+        are summed then averaged, site metadata takes the most recent value, and temporal
+        columns count distinct months.
+    @detail[Relative strength features]: Also computes relative strength features \u2014
+        momentum indicators that compare recent performance (3-month) to longer windows
+        (6, 12, 24 months). These detect whether a site is trending up or down. Missing
+        values default to 1.0 (neutral trend).
+
+    @glossary: combining/temporal-aggregation
+    @title: Temporal Aggregation (Monthly to Site-Level)
+    @step: 1
+    @color: cyan
+    @sub: 1.4M monthly records collapsed into one row per site via group_by on id_gbase
+    @analogy: This is really a vertical combine \u2014 collapsing multiple time-series rows
+        into one summary row. We do not lose temporal signal because relative strength
+        features capture momentum trends from the time-series data.
+    @detail[Aggregation strategies]: Revenue and traffic metrics use sum totals plus
+        average per month. Site metadata uses the last value (most recent month). Temporal
+        columns count distinct months and track date ranges.
     """
     print("Aggregating site metrics...")
 
@@ -585,7 +724,33 @@ def join_geospatial_features(
     walmart_df: pl.DataFrame,
     target_df: pl.DataFrame
 ) -> pl.DataFrame:
-    """Join auxiliary geospatial data to site dataset."""
+    """Join auxiliary geospatial data to site dataset.
+
+    @glossary: cleaning/geo-joins
+    @title: Geospatial Feature Joining
+    @step: 2
+    @color: green
+    @sub: 6 distance files left-joined onto site data via GTVID
+    @why: All 6 are left joins \u2014 the site table drives the result, so no sites are
+        lost even if a distance file is missing that GTVID. The join key is gtvid (left)
+        to GTVID (right) with case difference between the aggregated data and the
+        distance files.
+    @detail[Pre-aggregation]: Interstate distances are pre-aggregated before joining:
+        some sites are near multiple interstates, so the pipeline takes the minimum
+        distance per site via group_by(GTVID).agg(min(distance)). Walmart and Target
+        distances are computed from raw geodata using the haversine formula in 10K-site
+        chunks to control memory.
+
+    @glossary: combining/geo-joins
+    @title: Geospatial Feature Joins (6 Left Joins)
+    @step: 3
+    @color: green
+    @sub: 6 distance CSVs joined sequentially via GTVID \u2014 nearest site, interstate,
+        Kroger, McDonald's, Walmart, Target
+    @why: Only selected columns are brought in to avoid polluting the dataset with
+        duplicate lat/lon columns. The join key uses gtvid (left) to GTVID (right) to
+        handle case differences between systems.
+    """
     print("Joining geospatial features...")
 
     # Join nearest site distances (rename to consistent naming convention)
@@ -655,7 +820,21 @@ def join_geospatial_features(
 
 
 def add_log_transformations(df: pl.DataFrame) -> pl.DataFrame:
-    """Add log transformations for numeric metrics."""
+    """Add log transformations for numeric metrics.
+
+    @glossary: cleaning/log-transforms
+    @title: Log Transformations
+    @step: 3
+    @color: orange
+    @sub: Right-skewed revenue and distance features transformed to normalize distributions
+    @analogy: Revenue and distances are like earthquake magnitudes \u2014 the difference
+        between $100 and $1,000 matters more than between $100,000 and $101,000. Log
+        compression makes the model treat differences proportionally.
+    @detail[Why sign-preserving?]: The formula uses sign(x) \u00d7 log(1+|x|) for signed
+        types and log(x+1) for unsigned integers. This handles rare negative revenue
+        records without losing sign information. The +1 ensures log(0) does not produce
+        negative infinity.
+    """
     print("Adding log transformations...")
 
     numeric_cols = [
@@ -699,7 +878,22 @@ def add_log_transformations(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def one_hot_encode_flags(df: pl.DataFrame) -> pl.DataFrame:
-    """One-hot encode capability (c_*) and restriction (r_*) flags."""
+    """One-hot encode capability (c_*) and restriction (r_*) flags.
+
+    @glossary: cleaning/flag-encoding
+    @title: Flag Encoding
+    @step: 4
+    @color: pink
+    @sub: Capability and restriction flags converted from mixed strings to numeric 0/1
+    @analogy: The source data is inconsistent \u2014 some flags say "Yes"/"No", others say
+        "true"/"false", others use actual booleans. This step normalizes all 51 flags so
+        the model sees clean 0/1 values.
+    @why: Original string columns are dropped after encoding. ~40 encoded flag columns
+        remain in the final dataset, with suffix _encoded.
+    @detail[Encoding strategy]: Boolean values cast to Int8 (0/1). Yes/No/Unknown strings
+        map to 1/0/null. Ad eligibility true/false strings are lowercased and cast.
+        Multi-category flags get one-hot per category.
+    """
     print("One-hot encoding capability and restriction flags...")
 
     # Identify flag columns
@@ -769,6 +963,18 @@ def bin_high_cardinality(
     """
     Bin a high-cardinality categorical column by keeping the top N most
     frequent values and replacing all others with 'Other'.
+
+    @glossary: cleaning/binning
+    @title: High-Cardinality Binning
+    @step: 5
+    @color: yellow
+    @sub: Retailer and brand names binned to top N + "Other" to prevent overfitting
+    @analogy: If your model learns that "Joe's Gas #47" means high revenue, it is
+        memorizing noise. By grouping rare retailer names into "Other", we force the
+        model to learn patterns from major chains while treating one-off names as generic.
+    @detail[Top N selection]: Top N is determined by frequency \u2014 the most common
+        30 retailer names are preserved, and all rare retailers are grouped into a single
+        "Other" category. brand_fuel uses top 10 since it has fewer unique values.
     """
     if column not in df.columns:
         return df
@@ -802,6 +1008,23 @@ def prepare_training_dataset(
         df: Pre-cleaned dataset
         active_only: If True, filter to only Active status sites
         drop_geo_ids: If True, drop state, county, dma, zip columns
+
+    @glossary: cleaning/training-filter
+    @title: Training Set Filtering
+    @step: 6
+    @color: red
+    @sub: All sites filtered down to active-only, ML-ready rows
+    @analogy: Not every gas station belongs in the training data. Deactivated sites would
+        teach the model about failure, not success. Negative revenue records are data
+        errors. Geographic IDs would let the model cheat by memorizing states instead of
+        learning real patterns.
+    @why: Geographic columns (state, county, DMA, zip) are dropped rather than filtered.
+        If the model learned that "Texas" means high revenue, it would fail on new states.
+        Instead, geographic signal comes through the proximity features (distance to
+        Walmart, etc.) which generalize better.
+    @detail[Three filters]: Active status only (removes ~31,500 deactivated sites).
+        Remove negative revenue (removes ~2 data errors). Drop geographic identifiers
+        (prevents model from memorizing state/county/zip).
     """
     print("Preparing training dataset...")
 
@@ -1031,6 +1254,16 @@ def transform_data(
     Main transformation function.
 
     Returns the pre-cleaned dataset for review before ML cleaning.
+
+    @glossary: combining/output
+    @title: Combined Output: Pre-Cleaned Dataset
+    @step: 4
+    @color: orange
+    @sub: All sites with all features saved as site_aggregated_precleaned.parquet
+    @why: Column count grows from 94 (raw CSV) to ~102 (precleaned) because aggregation
+        adds computed columns (totals, averages, RS features) and joins add distance
+        columns. It then jumps to ~111 in the training set because log transforms and
+        encoded flags add more columns while geo IDs are dropped.
     """
     # Create output directory
     output_path.mkdir(parents=True, exist_ok=True)
@@ -1133,6 +1366,31 @@ def get_all_sites_for_prediction() -> pl.DataFrame:
     without the active-only filter.
 
     Results are cached at module level — computed once, reused for all requests.
+
+    @glossary: productionizing/inference-data-prep
+    @title: Inference Data Preparation
+    @step: 2
+    @color: yellow
+    @sub: Load precleaned parquet (all statuses) and apply the same training
+        transforms without the active-only filter
+    @analogy: Training learned the recipe from a curated subset of sites
+        (Active, 12+ months of history). Inference needs to score every
+        site in the network — including Deactivated, Awaiting Installation,
+        and Cancelled ones — so we re-open the full precleaned parquet
+        and run it through the exact same prep steps the model expects.
+    @why: Calling prepare_training_dataset(active_only=False, drop_geo_ids=True)
+        guarantees train/inference parity: the same log transforms, one-hot
+        encoding, and binning that shaped the training feature space are
+        applied to every site we score. The fitted preprocessor (scalers
+        and label encoders, loaded by BatchPredictor) then takes over for
+        the numeric/categorical/boolean transforms downstream. Skipping
+        any of these steps would silently shift the input distribution
+        and degrade predictions.
+    @detail[Module-level cache]: A module-global _prediction_data_cache holds
+        the prepared DataFrame after the first call. Subsequent requests
+        return the cached frame in O(1) instead of re-reading the ~25MB
+        parquet and recomputing derived features. The cache lives for the
+        process lifetime — restarting the Flask app rebuilds it.
     """
     global _prediction_data_cache
     if _prediction_data_cache is not None:

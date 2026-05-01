@@ -14,6 +14,16 @@ from .config import Config, DEFAULT_OUTPUT_DIR
 from .model import SiteScoringModel
 from .data_loader import DataProcessor
 
+_GLOSSARY_STAGES = {
+    "productionizing": {
+        "title": "6. Productionizing",
+        "question": "How do we deploy the model and keep it running reliably?",
+        "intro": "Productionizing turns a trained experiment into a live scoring system. The <strong>BatchPredictor</strong> class loads any experiment folder, reconstructs the model (neural network or XGBoost), processes new site data using the saved preprocessor, and produces predictions for all sites in the network. Results can be filtered, ranked, and exported as CSV or Excel for sales teams.",
+        "analogy": "Training is like building a recipe. Productionizing is like opening the restaurant. The recipe (model weights) and preparation techniques (preprocessor) were perfected during training. Now we apply them at scale to every site in the network, serving predictions on demand through API endpoints.",
+        "why": "The inference pipeline reuses the exact same feature processing as training \u2014 same scalers, same encoders, same column order. This is guaranteed by loading preprocessor.pkl from the experiment folder. A module-level cache prevents reloading the model on every API request.",
+    },
+}
+
 
 class SiteScorer:
     """
@@ -191,6 +201,23 @@ class BatchPredictor:
     """
     Batch predictor that loads a trained experiment and scores all sites.
     Supports both Neural Network and XGBoost models, regression and classification.
+
+    @glossary: productionizing/model-loading
+    @title: Model Loading
+    @step: 1
+    @color: cyan
+    @sub: Load config, preprocessor (scalers + encoders), and reconstruct
+        the model in eval mode
+    @analogy: Loading a model is like reopening a recipe book. We read the
+        config to know what kind of model it is, load the preprocessor to
+        know how ingredients were prepared, then reconstruct the model
+        architecture and load the trained weights. The model is set to
+        evaluation mode (no dropout, frozen BatchNorm).
+    @why: For neural networks, the model is reconstructed from the saved
+        config (architecture dimensions) and weights (state_dict). For
+        XGBoost, the pickled model wrapper is loaded directly. A cached
+        predictor avoids reloading on every API request — the cache
+        invalidates only when the experiment directory changes.
     """
 
     def __init__(self, experiment_dir: Path):
@@ -243,6 +270,29 @@ class BatchPredictor:
 
         Returns:
             Dict mapping gtvid -> predicted probability/score.
+
+        @glossary: productionizing/batch-prediction
+        @title: Batch Prediction
+        @step: 3
+        @color: green
+        @sub: Process features, route to XGBoost or neural network, return
+            {gtvid: score} mapping
+        @analogy: Scoring works like an assembly line. Each site's raw
+            features are processed through three parallel paths (numeric
+            scaling, categorical encoding, boolean conversion),
+            concatenated, and fed through the model. Neural networks
+            process in batches of 4,096 for memory efficiency.
+        @why: Feature processing uses the fitted scaler and label_encoders
+            from training. Unknown categories (new values not seen during
+            training) map to index 0, which acts as a safe default. For
+            regression, predictions are inverse-transformed back to
+            original dollar scale.
+        @detail[XGBoost vs NN inference]: XGBoost concatenates all features
+            into one array and calls predict() directly. Neural networks
+            batch-process through the model on the available device (MPS
+            on Apple Silicon, CPU otherwise). Classification applies
+            sigmoid to raw logits; regression inverse-transforms scaled
+            predictions.
         """
         gtvids = df["gtvid"].to_list()
 
@@ -273,6 +323,18 @@ class BatchPredictor:
 
         Returns:
             DataFrame with predictions, site metadata, rank, and percentile.
+
+        @glossary: productionizing/export
+        @title: Export Pipeline
+        @step: 5
+        @color: pink
+        @sub: Join predictions with site metadata, compute rank and
+            percentile, export as CSV or XLSX
+        @why: Predictions are joined with site metadata (name, city,
+            state, network, status) from the precleaned parquet. Rank is
+            computed as dense rank by score (1 = highest). Percentile
+            uses percentile of score. Export files include experiment_id
+            and scored_at timestamp for traceability.
         """
         scores = self.predict(df)
 

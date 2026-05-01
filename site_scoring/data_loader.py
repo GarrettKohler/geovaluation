@@ -48,6 +48,26 @@ class DataProcessor:
     """
     Fast data processor using Polars for CSV parsing.
     Handles encoding, scaling, and tensor conversion.
+
+    @glossary: modeling/feature-processing
+    @title: Feature Processing
+    @step: 1
+    @color: cyan
+    @sub: Numeric scaling, categorical encoding, boolean conversion, and target
+        preparation
+    @analogy: Raw features come in different formats: numbers at various scales,
+        text categories, and yes/no flags. Feature processing standardizes
+        everything so the model sees consistent input. StandardScaler centers
+        numeric features around zero. LabelEncoder maps categories to integers.
+        Booleans become 0.0/1.0 floats.
+    @why: Feature processing state (fitted scalers, encoders, vocab sizes) is
+        saved in preprocessor.pkl alongside the model. This ensures inference uses
+        the exact same transformations as training \u2014 a critical requirement for
+        consistent predictions.
+    @detail[Percentile clipping]: Numeric features are clipped to the 1st and 99th
+        percentiles before scaling. This prevents extreme outliers from dominating
+        the StandardScaler fit, which would compress the useful range of normal
+        values.
     """
 
     def __init__(self, config: Config):
@@ -206,7 +226,52 @@ class DataProcessor:
         return torch.from_numpy(np.ascontiguousarray(boolean_array, dtype=np.float32))
 
     def _process_target(self, df: pl.DataFrame) -> torch.Tensor:
-        """Extract and process target variable based on task type."""
+        """
+        Extract and process target variable based on task type.
+
+        @glossary: modeling/target-prep
+        @title: Target Preparation
+        @step: 2
+        @color: green
+        @sub: Revenue scaled for regression, or binarized by percentile threshold
+            for classification
+        @analogy: For regression, the model predicts normalized revenue (the scaler
+            is saved so we can convert back to real dollars later). For
+            classification (lookalike), sites above the chosen percentile threshold
+            are labeled 1 (top performer), all others 0.
+        @why: The lookalike threshold is configurable from the UI: percentile mode
+            (e.g., p90 = top 10%) or standard deviation mode (e.g., mean + 1
+            sigma). Only active sites contribute to the percentile calculation,
+            preventing deactivated sites from skewing the threshold.
+
+        @glossary: testing/regression-metrics
+        @title: Regression Metrics
+        @step: 3
+        @color: orange
+        @sub: MAE, RMSE, R-squared, MAPE, SMAPE computed on the held-out test set
+        @analogy: Each metric tells a different story. MAE is the average dollar
+            error. RMSE penalizes large errors more heavily. R-squared measures how
+            much variance the model explains (1.0 = perfect). MAPE gives percentage
+            error but fails when actuals are near zero.
+        @detail[Which to trust]: R-squared is the best single summary metric for
+            regression. MAE is most interpretable (average error in dollars). MAPE
+            is useful for relative comparison but can be misleading for low-revenue
+            sites. SMAPE handles zero actuals better than MAPE.
+
+        @glossary: testing/classification-metrics
+        @title: Classification Metrics
+        @step: 4
+        @color: pink
+        @sub: AUC-ROC, F1, Log Loss, accuracy for lookalike classification
+        @analogy: AUC-ROC measures how well the model separates top performers from
+            non-performers across all possible thresholds. F1 balances precision
+            (how many flagged sites are actually top performers) with recall (how
+            many top performers were flagged). Log Loss penalizes confident wrong
+            predictions.
+        @detail[Class imbalance]: With default p90 threshold, only ~10% of sites
+            are positive. The model uses pos_weight=9.0 in BCEWithLogitsLoss to
+            compensate, effectively upweighting the minority class during training.
+        """
         print(f"Processing target: {self.config.target}")
 
         # Get target and fill nulls with median

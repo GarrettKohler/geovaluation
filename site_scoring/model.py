@@ -102,6 +102,27 @@ class SiteScoringModel(nn.Module):
     2. Numeric features -> BatchNorm -> Scaled representation
     3. Boolean features -> Direct concatenation
     4. Concatenate all -> Residual MLP blocks -> Output
+
+    @glossary: modeling/architecture
+    @title: Neural Network Architecture
+    @step: 3
+    @color: accentLt
+    @sub: Categorical embeddings + BatchNorm + Residual MLP with configurable
+        hidden dimensions
+    @analogy: The model processes three types of input differently: categorical
+        features get learned dense representations (embeddings), numeric features
+        get standardized (BatchNorm), and boolean features pass through directly.
+        All three streams concatenate into a single vector that flows through
+        residual MLP blocks \u2014 each block adds its learned transformation to the
+        input, making training more stable.
+    @why: Residual connections (skip connections) allow gradients to flow more
+        easily through deep networks. Each ResidualBlock applies Linear \u2192
+        BatchNorm \u2192 ReLU \u2192 Linear \u2192 BatchNorm, then adds the original input.
+        A projection layer handles dimension mismatches between blocks.
+    @detail[Architecture dimensions]: Default hidden dims are [512, 256, 128, 64]
+        with dropout=0.2. The final output is Linear(64, 1) producing a single
+        scalar prediction. For classification, sigmoid is applied during inference
+        (not during training, which uses BCEWithLogitsLoss).
     """
 
     def __init__(

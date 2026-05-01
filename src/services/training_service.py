@@ -58,6 +58,24 @@ from site_scoring.explainability import (
 )
 
 
+_GLOSSARY_STAGES = {
+    "modeling": {
+        "title": "4. Modeling",
+        "question": "How do we train the model to make predictions?",
+        "intro": "The modeling stage takes our cleaned, combined dataset and trains a machine learning model to predict site revenue or classify top-performing sites. The pipeline supports two model architectures: a <strong>PyTorch neural network</strong> with residual connections and a <strong>gradient-boosted tree model</strong> via XGBoost. Both share the same data loading and feature processing pipeline.",
+        "analogy": "Think of model training like teaching someone to appraise gas stations. You show them thousands of examples with known values (training data), quiz them on examples they have not seen (validation), and finally test them on a completely held-out set (test). The model learns which features \u2014 proximity to Walmart, monthly impression trends, demographic patterns \u2014 matter most for predicting revenue.",
+        "why": "Every training run produces a self-contained experiment folder with config, model weights, preprocessor state, and evaluation results. This makes any experiment reproducible \u2014 you can reload and score new sites months later using the exact same feature processing.",
+    },
+    "testing": {
+        "title": "5. Testing & Validation",
+        "question": "How do we know the model actually works?",
+        "intro": "Testing and validation ensure the model generalizes beyond its training data. We use a <strong>three-way data split</strong> (train/validation/test) where each set serves a distinct purpose. The validation set tunes hyperparameters and stops training early. The test set provides a single, unbiased evaluation that was never seen during training or tuning.",
+        "analogy": "Imagine grading a student. The training set is like homework \u2014 the student learns from it. The validation set is like practice exams \u2014 the teacher adjusts the curriculum based on results. The test set is the final exam \u2014 it is taken once, never reviewed during the course, and gives the true measure of what was learned.",
+        "why": "A critical lesson from this project: <strong>never report validation metrics as test metrics</strong>. Validation loss influences early stopping, so it is optimistically biased. The test set must be evaluated exactly once, after loading the best model, to get unbiased final metrics.",
+    },
+}
+
+
 @dataclass
 class TrainingConfig:
     """User-configurable training parameters."""
@@ -481,6 +499,22 @@ def _run_tree_training(job, config, pytorch_config, train_loader, val_loader, te
     Converts DataLoaders to numpy, trains with per-round progress callbacks,
     evaluates on held-out test set, computes SHAP TreeExplainer importance,
     and saves model artifacts.
+
+    @glossary: modeling/xgboost
+    @title: XGBoost Alternative
+    @step: 4
+    @color: green
+    @sub: Gradient-boosted decision trees via XGBoost, faster training
+        with comparable accuracy
+    @analogy: While the neural network learns complex non-linear patterns
+        through deep layers, XGBoost builds an ensemble of simple decision
+        trees. Each tree corrects the mistakes of the previous ones. It
+        trains much faster and often matches neural network performance on
+        tabular data.
+    @why: XGBoost uses the sklearn API with callbacks for progress
+        reporting. For classification, it uses binary:logistic objective.
+        For regression, it uses reg:squarederror. The model is saved as
+        model_wrapper.pkl via pickle serialization.
     """
     import pickle
 
@@ -939,6 +973,17 @@ def _export_classification_results(job, processor, test_predictions, test_target
         test_targets: numpy array of actual labels (0/1) for test set
         test_roc_auc: float, ROC-AUC score on test set
         report_callback: optional SSE progress callback
+
+    @glossary: testing/classification-exports
+    @title: Classification Exports
+    @step: 6
+    @color: orange
+    @sub: Export training labels, test predictions, and non-active site scores to CSV
+    @why: Three CSV files are produced: training_sites.csv (all training split
+        sites with labels), test_predictions.csv (test split with predicted
+        probabilities), and non_active_classification.csv (non-Active sites scored
+        by the model, top 5000 flagged). These enable downstream analysis of model
+        performance and prospect identification.
     """
     import csv
 
@@ -1432,6 +1477,110 @@ def run_training_logic(job: TrainingJob, report_callback):
     """
     Refactored training logic that accepts a job object and a reporting callback.
     This contains the core logic previously in TrainingJob._run_training.
+
+    @glossary: modeling/data-loading
+    @title: Data Loading & Splitting
+    @step: 0
+    @color: accent
+    @sub: Load parquet, filter by network and history, split 70/15/15 into train/val/test
+    @analogy: Before training begins, we prepare the data like a teacher preparing
+        an exam. The full dataset is loaded, then split into three non-overlapping
+        sets. The model only ever trains on 70% of the data.
+    @detail[History filter]: Only sites with 12+ months of history
+        (active_months > 11) are included. This ensures enough temporal data for
+        stable feature values and prevents noisy short-lived sites from polluting
+        the model.
+
+    @glossary: modeling/training-loop
+    @title: Training Loop
+    @step: 5
+    @color: orange
+    @sub: Forward pass, loss computation, backpropagation, gradient clipping, early stopping
+    @analogy: Each epoch is one complete pass through the training data. The model
+        makes predictions, measures how wrong it was (loss), and adjusts its weights
+        to do better next time. Early stopping watches the validation loss and stops
+        when the model starts memorizing instead of learning.
+    @why: Training uses AdamW optimizer with weight decay regularization. Learning
+        rate is reduced by half when validation loss plateaus (ReduceLROnPlateau).
+        Gradient clipping at max_norm=1.0 prevents exploding gradients. Progress
+        streams to the UI via Server-Sent Events (SSE).
+    @detail[Loss functions]: Regression uses HuberLoss(delta=1.0) which is robust
+        to outliers. Classification uses BCEWithLogitsLoss with pos_weight=9.0 to
+        handle class imbalance (typically only 10% of sites are top performers).
+
+    @glossary: modeling/artifacts
+    @title: Experiment Artifacts
+    @step: 6
+    @color: pink
+    @sub: Model checkpoint, preprocessor state, config, and metadata saved to experiment folder
+    @why: Each experiment writes to site_scoring/outputs/experiments/job_xxx/ with
+        a maximum of 10 experiments (FIFO cleanup). The folder contains everything
+        needed to reconstruct the model for inference: config.json, best_model.pt
+        (or model_wrapper.pkl for XGBoost), preprocessor.pkl, and
+        model_metadata.json with test metrics.
+
+    @glossary: testing/split-philosophy
+    @title: Train/Val/Test Split Philosophy
+    @step: 0
+    @color: yellow
+    @sub: Three non-overlapping splits, each with one job — learn, tune, judge
+    @analogy: Three splits, three jobs. The training set is the textbook the
+        model studies. The validation set is the practice quiz the teacher
+        grades after every chapter to decide what to teach next. The test set
+        is the sealed final exam — opened once, after all studying is done,
+        to give the only honest grade.
+    @why: We split 70/15/15 into train, validation, and test before any
+        learning happens. Validation loss drives early stopping and learning
+        rate scheduling, so it is optimistically biased — the model has,
+        indirectly, seen it. The test set is touched exactly once at the very
+        end, after the best model is reloaded from checkpoint. This is why
+        the project rule is absolute: <strong>never report validation metrics
+        as test metrics</strong>. Doing so reports the practice-quiz score as
+        the final-exam grade, and silently overstates how well the model
+        generalizes to sites it has never seen.
+    @detail[Why three splits, not two?]: A train/test split alone forces an
+        impossible choice — either tune on the test set (and lose your
+        unbiased estimate) or never tune at all. The validation set absorbs
+        the bias from tuning so the test set can stay clean.
+
+    @glossary: testing/validation
+    @title: Validation During Training
+    @step: 1
+    @color: cyan
+    @sub: Per-epoch validation metrics, early stopping patience, learning rate scheduling
+    @why: Validation runs after every training epoch with no gradient computation
+        (torch.no_grad). If validation loss does not improve for
+        early_stopping_patience epochs, training stops and the best model state is
+        restored. The learning rate scheduler also watches validation loss and
+        reduces LR when it plateaus.
+
+    @glossary: testing/test-evaluation
+    @title: Test Set Evaluation
+    @step: 2
+    @color: green
+    @sub: Load best model, score held-out test set, compute final unbiased metrics
+    @analogy: This is the final exam. After loading the best model (chosen by
+        validation performance), we score the held-out test set that was never used
+        during training or hyperparameter tuning. Predictions are
+        inverse-transformed back to original dollar scale before computing metrics.
+    @why: For regression, predictions are inverse-transformed using the saved
+        StandardScaler to convert from normalized space back to real dollar values.
+        This ensures metrics like MAE and RMSE are in interpretable units, not
+        scaled space.
+    @detail[Test vs validation]: The test set was never seen during training.
+        Validation metrics are optimistically biased because validation loss
+        influenced early stopping and learning rate scheduling. Test metrics are
+        the only honest measure of generalization.
+
+    @glossary: testing/shap
+    @title: SHAP Feature Importance
+    @step: 5
+    @color: accent
+    @sub: Compute SHAP values on test set to explain which features drive predictions
+    @why: SHAP (SHapley Additive exPlanations) uses 100 background samples and
+        explains 200 test samples. The top 20 features by mean absolute SHAP value
+        are saved to shap_importance.json. This provides interpretable, per-feature
+        contribution scores.
     """
     config = job.config
     start_time = job.start_time

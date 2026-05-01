@@ -15,7 +15,23 @@ _cached_predictor_experiment = None
 
 
 def _find_latest_experiment() -> Path:
-    """Find the most recent experiment directory with a complete model."""
+    """Find the most recent experiment directory with a complete model.
+
+    @glossary: productionizing/experiment-discovery
+    @title: Experiment Discovery
+    @step: 0
+    @color: accent
+    @sub: Find the most recent valid experiment by modification time and
+        artifact validation
+    @analogy: Before scoring sites, we need to pick which trained model
+        to use. The system sorts experiment folders by modification time
+        (newest first) and validates each one has the required artifacts:
+        config.json, preprocessor.pkl, and either best_model.pt or
+        model_wrapper.pkl.
+    @why: An experiment is only valid if it has all three artifact types.
+        Partially-saved experiments (e.g., training was interrupted) are
+        skipped automatically.
+    """
     experiments_dir = DEFAULT_OUTPUT_DIR / "experiments"
     if not experiments_dir.exists():
         return None
@@ -262,6 +278,21 @@ def api_predict_filtered():
         }
 
     Returns same format as /api/predict/batch with summary stats.
+
+    @glossary: productionizing/filtered-scoring
+    @title: Filtered Scoring
+    @step: 4
+    @color: orange
+    @sub: Apply map filter state (network, state, status) to score a
+        subset of sites
+    @analogy: Instead of scoring all 57,000 sites, filtered scoring lets
+        users focus on what they care about. "Show me just the Wayne
+        network sites in Texas" scores only that subset, returning
+        results with summary statistics in under 2 seconds.
+    @why: Filters support multi-select on network, state, and status,
+        plus min/max revenue bounds and explicit gtvid lists. The filter
+        is applied to the prediction DataFrame before scoring, not
+        after, for efficiency.
     """
     import numpy as np
     import polars as pl
