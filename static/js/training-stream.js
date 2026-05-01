@@ -511,4 +511,13 @@ function showTrainingComplete(data) {
         }
     }
 
+    // Show and wire "View SHAP Importance" button — scoped to this experiment.
+    // Clustering runs don't compute SHAP, so the button stays hidden for them.
+    const shapBtn = document.getElementById('btn-view-shap');
+    if (shapBtn && currentJobId && !isClustering) {
+        shapBtn.style.display = '';
+        shapBtn.onclick = () => {
+            window.location.href = `/shap-values/${currentJobId}`;
+        };
+    }
 }

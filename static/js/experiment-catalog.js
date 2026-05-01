@@ -129,9 +129,13 @@ function renderExperimentGalleryCard(exp) {
     const fc = exp.feature_count || {};
     const totalFeatures = (fc.numeric || 0) + (fc.categorical || 0) + (fc.boolean || 0);
 
-    // Artifact badges
+    // Artifact badges. The SHAP badge is a clickable link that jumps straight
+    // to that experiment's SHAP page — stopPropagation prevents the parent
+    // card click (which navigates to /map/<job_id>) from also firing.
     let artifactBadges = '';
-    if (exp.has_shap) artifactBadges += '<span class="exp-badge exp-badge-artifact">SHAP</span>';
+    if (exp.has_shap) {
+        artifactBadges += `<a href="/shap-values/${exp.job_id}" class="exp-badge exp-badge-artifact exp-badge-link" onclick="event.stopPropagation()" title="View SHAP feature importance for this experiment">SHAP</a>`;
+    }
     if (exp.has_predictions) artifactBadges += '<span class="exp-badge exp-badge-artifact">Predictions</span>';
     if (!exp.is_complete) artifactBadges += '<span class="exp-badge exp-badge-artifact" style="color: var(--kepler-warning);">(incomplete)</span>';
 

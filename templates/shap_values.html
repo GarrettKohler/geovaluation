@@ -472,6 +472,10 @@
         <div class="page-title-block">
             <h1>SHAP Feature Importance</h1>
             <div class="subtitle">Model interpretability via Shapley additive explanations</div>
+            <div class="subtitle" id="experiment-context" style="margin-top: 6px; font-size: 0.9em;">
+                <span id="experiment-label">Loading experiment…</span>
+                <a id="experiment-latest-link" href="/shap-values" style="margin-left: 12px; display: none;">View latest →</a>
+            </div>
         </div>
 
         <!-- Summary Cards -->
@@ -579,6 +583,16 @@
 
 {% block page_scripts %}
 <script>
+    // Per-experiment routing: when arrived at /shap-values/<job_id>, scope all
+    // SHAP API requests to that experiment. Otherwise fall back to the
+    // server's "latest experiment" resolution.
+    window.shapJobId = {{ job_id|tojson }};
+    function shapApiUrl(path, params) {
+        const qs = new URLSearchParams(params || {});
+        if (window.shapJobId) qs.set('job_id', window.shapJobId);
+        const s = qs.toString();
+        return s ? `${path}?${s}` : path;
+    }
     // State
     let shapData = null;
     let sortColumn = 'importance';
@@ -597,10 +611,21 @@
     // Load data on page load
     async function init() {
         try {
-            // Fetch summary data and plots in parallel
+            // Render experiment context banner
+            const labelEl = document.getElementById('experiment-label');
+            const latestLink = document.getElementById('experiment-latest-link');
+            if (window.shapJobId) {
+                if (labelEl) labelEl.textContent = `Experiment: ${window.shapJobId}`;
+                if (latestLink) latestLink.style.display = '';
+            } else {
+                if (labelEl) labelEl.textContent = 'Showing latest experiment';
+                if (latestLink) latestLink.style.display = 'none';
+            }
+
+            // Fetch summary data and plots in parallel — scoped to job_id when set
             const [summaryRes, plotsRes] = await Promise.all([
-                fetch('/api/shap/summary?top_n=50'),
-                fetch('/api/shap/plots')
+                fetch(shapApiUrl('/api/shap/summary', { top_n: 50 })),
+                fetch(shapApiUrl('/api/shap/plots'))
             ]);
 
             if (!summaryRes.ok) {

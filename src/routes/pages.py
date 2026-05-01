@@ -47,6 +47,12 @@ def glossary():
 
 
 @pages_bp.route('/shap-values')
-def shap_values():
-    """Render the SHAP feature importance visualization page."""
-    return render_template('shap_values.html')
+@pages_bp.route('/shap-values/<job_id>')
+def shap_values(job_id=None):
+    """Render the SHAP feature importance visualization page.
+
+    With no job_id, the page loads SHAP for the most recent experiment that
+    has a shap_cache.npz. With a job_id, it loads SHAP for that specific
+    experiment (or shows an error if SHAP wasn't computed for it).
+    """
+    return render_template('shap_values.html', job_id=job_id)
