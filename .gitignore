@@ -13,6 +13,7 @@ build/
 
 # Data files (large)
 data/input/*.csv
+data/*.zip
 *.parquet
 !data/processed/*.parquet
 
@@ -44,3 +45,6 @@ geospatial/
 src/geospatial/
 site_scoring/outputs/
 site_scoring/__pycache__/
+
+# Local-only workspaces (out of scope for this repo)
+mcp_servers/
